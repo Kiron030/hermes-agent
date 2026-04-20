@@ -134,3 +134,7 @@ Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-
 ## Final cleanup linkage (v2.8)
 
 - `docs/powerunits_runtime_cleanup_v1.md`
+
+## First safe Telegram review linkage (v3.0)
+
+- `docs/powerunits_first_safe_telegram_review_v1.md`

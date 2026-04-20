@@ -21,6 +21,9 @@ Der Auftrag ist bewusst **minimaler Railway-Bootstrap** fuer einen sicheren inte
 - Fuer Cloud/Container-Run ist im Repo klar der Foreground-Gateway-Modus vorgesehen:
   - `hermes gateway run`
   - In `hermes_cli/main.py` ist `gateway run` explizit als empfohlen fuer Docker-Umgebungen markiert.
+- Docker-Default ist jetzt repo-seitig explizit auf Gateway gesetzt:
+  - `Dockerfile`: `CMD ["gateway", "run"]`
+  - `docker/entrypoint.sh`: fallback auf `gateway run`, wenn kein Command uebergeben wurde.
 
 ### Docker vs. non-Docker on Railway
 
@@ -166,3 +169,17 @@ Der konkrete First-Switchover-Ablauf (Source-Switch + Post-Deploy-Checks) ist do
 Die Verifikation des Post-Policy Runtime-Zustands ist dokumentiert in:
 
 - `docs/powerunits_runtime_verification_v1.md`
+
+## Telegram connectivity debug linkage (v3.1)
+
+Bei laufendem Service ohne Telegram-Antworten (z. B. `/start`, `/help`, Text),
+siehe:
+
+- `docs/powerunits_telegram_connectivity_debug_v1.md`
+
+## Telegram gateway activation debug linkage (v3.2)
+
+Wenn zwar Startup/Banner sichtbar ist, aber keine Telegram-Connection-Line erscheint,
+siehe:
+
+- `docs/powerunits_telegram_gateway_activation_v1.md`

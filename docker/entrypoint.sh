@@ -74,4 +74,9 @@ if [ -d "$INSTALL_DIR/skills" ] && [ "${HERMES_POWERUNITS_RUNTIME_POLICY:-}" != 
     python3 "$INSTALL_DIR/tools/skills_sync.py"
 fi
 
+if [ "$#" -eq 0 ]; then
+    echo "No command provided; defaulting to: hermes gateway run"
+    set -- gateway run
+fi
+
 exec hermes "$@"

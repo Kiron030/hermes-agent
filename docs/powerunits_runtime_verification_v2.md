@@ -108,3 +108,7 @@ Die umgesetzte finale Surface-Bereinigung ist dokumentiert in:
 
 - `docs/powerunits_runtime_cleanup_v1.md`
 
+## First safe Telegram review linkage (v3.0)
+
+- `docs/powerunits_first_safe_telegram_review_v1.md`
+
