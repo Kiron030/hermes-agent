@@ -158,3 +158,11 @@ Dann Third-Party-Pfad als nicht-kanonisch stilllegen.
 Der konkrete First-Switchover-Ablauf (Source-Switch + Post-Deploy-Checks) ist dokumentiert in:
 
 - `docs/powerunits_railway_switchover_v1.md`
+
+---
+
+## Runtime verification linkage (v2.5)
+
+Die Verifikation des Post-Policy Runtime-Zustands ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v1.md`

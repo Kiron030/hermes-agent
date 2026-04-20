@@ -20,9 +20,8 @@ POLICY_ID = "first_safe_v1"
 ALLOWED_TELEGRAM_TOOLSETS = [
     "memory",
     "session_search",
-    "skills",
     "todo",
-    "no_mcp",
+    "clarify",
 ]
 
 DISABLED_PLATFORMS = [

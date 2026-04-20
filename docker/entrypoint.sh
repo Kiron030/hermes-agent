@@ -68,8 +68,9 @@ if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
     cp "$INSTALL_DIR/docker/SOUL.md" "$HERMES_HOME/SOUL.md"
 fi
 
-# Sync bundled skills (manifest-based so user edits are preserved)
-if [ -d "$INSTALL_DIR/skills" ]; then
+# Sync bundled skills (manifest-based so user edits are preserved).
+# In first-safe Powerunits mode, do not sync bundled skills into runtime.
+if [ -d "$INSTALL_DIR/skills" ] && [ "${HERMES_POWERUNITS_RUNTIME_POLICY:-}" != "first_safe_v1" ]; then
     python3 "$INSTALL_DIR/tools/skills_sync.py"
 fi
 

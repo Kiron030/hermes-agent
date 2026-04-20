@@ -21,6 +21,8 @@ from utils import is_truthy_value
 
 logger = logging.getLogger(__name__)
 
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+
 
 def _coerce_bool(value: Any, default: bool = True) -> bool:
     """Coerce bool-ish config values, preserving a caller-provided default."""
@@ -43,6 +45,11 @@ def _normalize_unauthorized_dm_behavior(value: Any, default: str = "pair") -> st
         if normalized in {"pair", "ignore"}:
             return normalized
     return default
+
+
+def _powerunits_lockdown_enabled() -> bool:
+    """Return True when Powerunits first-safe runtime lockdown is active."""
+    return os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY
 
 
 class Platform(Enum):
@@ -746,11 +753,26 @@ def load_gateway_config() -> GatewayConfig:
 
     # Override with environment variables
     _apply_env_overrides(config)
+    _apply_powerunits_runtime_lockdown(config)
     
     # --- Validate loaded values ---
     _validate_gateway_config(config)
 
     return config
+
+
+def _apply_powerunits_runtime_lockdown(config: GatewayConfig) -> None:
+    """Force first-safe platform exposure for Powerunits deployment."""
+    if not _powerunits_lockdown_enabled():
+        return
+
+    # Fail-closed: explicitly disable every known platform except Telegram.
+    for platform in Platform:
+        if platform == Platform.LOCAL:
+            continue
+        if platform not in config.platforms:
+            config.platforms[platform] = PlatformConfig()
+        config.platforms[platform].enabled = platform == Platform.TELEGRAM
 
 
 def _validate_gateway_config(config: "GatewayConfig") -> None:

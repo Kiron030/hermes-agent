@@ -114,3 +114,11 @@ Nach diesem Repo-Change in Railway:
 ## Part E - One exact next recommendation
 
 `Redeploy Hermes with the tiered first-safe runtime policy next`
+
+---
+
+## Post-policy verification linkage (v2.5)
+
+Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-Blocker) ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v1.md`

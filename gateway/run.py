@@ -99,6 +99,8 @@ load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).resolve(
 
 _DOCKER_VOLUME_SPEC_RE = re.compile(r"^(?P<host>.+):(?P<container>/[^:]+?)(?::(?P<options>[^:]+))?$")
 _DOCKER_MEDIA_OUTPUT_CONTAINER_PATHS = {"/output", "/outputs"}
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {"memory", "session_search", "todo", "clarify"}
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.
 # config.yaml is authoritative for terminal settings — overrides .env.
@@ -489,10 +491,46 @@ def _load_gateway_config() -> dict:
         if config_path.exists():
             import yaml
             with open(config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f) or {}
+                loaded = yaml.safe_load(f) or {}
+            if isinstance(loaded, dict):
+                return _apply_powerunits_runtime_lockdown_to_user_config(loaded)
+            return {}
     except Exception:
         logger.debug("Could not load gateway config from %s", _hermes_home / 'config.yaml')
     return {}
+
+
+def _powerunits_lockdown_enabled() -> bool:
+    return os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY
+
+
+def _apply_powerunits_runtime_lockdown_to_user_config(cfg: dict) -> dict:
+    """Force fail-closed runtime surface in gateway user config view."""
+    if not _powerunits_lockdown_enabled():
+        return cfg
+
+    platform_toolsets = cfg.get("platform_toolsets")
+    if not isinstance(platform_toolsets, dict):
+        platform_toolsets = {}
+    platform_toolsets["telegram"] = sorted(_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS)
+    for platform_name in (
+        "discord", "whatsapp", "slack", "signal", "homeassistant",
+        "email", "sms", "mattermost", "matrix", "dingtalk", "feishu",
+        "wecom", "wecom_callback", "weixin", "qqbot", "webhook",
+        "api_server", "bluebubbles",
+    ):
+        platform_toolsets[platform_name] = []
+    cfg["platform_toolsets"] = platform_toolsets
+    return cfg
+
+
+def _enforce_powerunits_toolsets(enabled_toolsets: list[str], platform_key: str) -> list[str]:
+    """Apply hard runtime allowlist for first-safe Powerunits deployment."""
+    if not _powerunits_lockdown_enabled():
+        return enabled_toolsets
+    if platform_key != "telegram":
+        return []
+    return sorted(ts for ts in enabled_toolsets if ts in _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS)
 
 
 def _resolve_gateway_model(config: dict | None = None) -> str:
@@ -3635,7 +3673,7 @@ class GatewayRunner:
         # resolve_skill_command_key() handles the Telegram underscore/hyphen
         # round-trip so /claude_code from Telegram autocomplete still resolves
         # to the claude-code skill.
-        if command:
+        if command and not _powerunits_lockdown_enabled():
             try:
                 from agent.skill_commands import (
                     get_skill_commands,
@@ -5230,7 +5268,7 @@ class GatewayRunner:
         ]
         try:
             from agent.skill_commands import get_skill_commands
-            skill_cmds = get_skill_commands()
+            skill_cmds = {} if _powerunits_lockdown_enabled() else get_skill_commands()
             if skill_cmds:
                 lines.append(f"\n⚡ **Skill Commands** ({len(skill_cmds)} active):")
                 # Show first 10, then point to /commands for the rest
@@ -5260,7 +5298,7 @@ class GatewayRunner:
         entries = list(gateway_help_lines())
         try:
             from agent.skill_commands import get_skill_commands
-            skill_cmds = get_skill_commands()
+            skill_cmds = {} if _powerunits_lockdown_enabled() else get_skill_commands()
             if skill_cmds:
                 entries.append("")
                 entries.append("⚡ **Skill Commands**:")
@@ -6386,6 +6424,7 @@ class GatewayRunner:
 
             from hermes_cli.tools_config import _get_platform_tools
             enabled_toolsets = sorted(_get_platform_tools(user_config, platform_key))
+            enabled_toolsets = _enforce_powerunits_toolsets(enabled_toolsets, platform_key)
 
             pr = self._provider_routing
             max_iterations = int(os.getenv("HERMES_MAX_ITERATIONS", "90"))
@@ -9113,6 +9152,7 @@ class GatewayRunner:
 
         from hermes_cli.tools_config import _get_platform_tools
         enabled_toolsets = sorted(_get_platform_tools(user_config, platform_key))
+        enabled_toolsets = _enforce_powerunits_toolsets(enabled_toolsets, platform_key)
 
         display_config = user_config.get("display", {})
         if not isinstance(display_config, dict):
@@ -10785,12 +10825,15 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
             )
             return False
 
-    # Sync bundled skills on gateway start (fast -- skips unchanged)
-    try:
-        from tools.skills_sync import sync_skills
-        sync_skills(quiet=True)
-    except Exception:
-        pass
+    # Sync bundled skills on gateway start (fast -- skips unchanged).
+    # In Powerunits first-safe mode we intentionally keep bundled skills
+    # out of the runtime surface to avoid broad slash-command exposure.
+    if not _powerunits_lockdown_enabled():
+        try:
+            from tools.skills_sync import sync_skills
+            sync_skills(quiet=True)
+        except Exception:
+            pass
 
     # Centralized logging — agent.log (INFO+), errors.log (WARNING+),
     # and gateway.log (INFO+, gateway-component records only).
