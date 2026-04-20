@@ -126,3 +126,11 @@ Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-
 ## Final enforcement linkage (v2.6b)
 
 - `docs/powerunits_runtime_enforcement_v2.md`
+
+## Post-enforcement verification linkage (v2.7)
+
+- `docs/powerunits_runtime_verification_v2.md`
+
+## Final cleanup linkage (v2.8)
+
+- `docs/powerunits_runtime_cleanup_v1.md`

@@ -5,6 +5,7 @@ Pure display functions with no HermesCLI state dependency.
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -21,6 +22,11 @@ from prompt_toolkit import print_formatted_text as _pt_print
 from prompt_toolkit.formatted_text import ANSI as _PT_ANSI
 
 logger = logging.getLogger(__name__)
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+
+
+def _powerunits_lockdown_enabled() -> bool:
+    return os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY
 
 
 # =========================================================================
@@ -338,6 +344,7 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
     enabled_toolsets = enabled_toolsets or []
 
     _, unavailable_toolsets = check_tool_availability(quiet=True)
+    _powerunits_lockdown = _powerunits_lockdown_enabled()
     disabled_tools = set()
     # Tools whose toolset has a check_fn are lazy-initialized (e.g. honcho,
     # homeassistant) — they show as unavailable at banner time because the
@@ -391,14 +398,17 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
         toolset = _display_toolset_name(get_toolset_for_tool(tool_name) or "other")
         toolsets_dict.setdefault(toolset, []).append(tool_name)
 
-    for item in unavailable_toolsets:
-        toolset_id = item.get("id", item.get("name", "unknown"))
-        display_name = _display_toolset_name(toolset_id)
-        if display_name not in toolsets_dict:
-            toolsets_dict[display_name] = []
-        for tool_name in item.get("tools", []):
-            if tool_name not in toolsets_dict[display_name]:
-                toolsets_dict[display_name].append(tool_name)
+    # In first-safe lockdown we intentionally do not surface unavailable/default
+    # toolsets in the banner. Show only the final callable tool surface.
+    if not _powerunits_lockdown:
+        for item in unavailable_toolsets:
+            toolset_id = item.get("id", item.get("name", "unknown"))
+            display_name = _display_toolset_name(toolset_id)
+            if display_name not in toolsets_dict:
+                toolsets_dict[display_name] = []
+            for tool_name in item.get("tools", []):
+                if tool_name not in toolsets_dict[display_name]:
+                    toolsets_dict[display_name].append(tool_name)
 
     sorted_toolsets = sorted(toolsets_dict.keys())
     display_toolsets = sorted_toolsets[:8]
@@ -449,7 +459,7 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
     except Exception:
         mcp_status = []
 
-    if mcp_status:
+    if mcp_status and not _powerunits_lockdown:
         right_lines.append("")
         right_lines.append(f"[bold {accent}]MCP Servers[/]")
         for srv in mcp_status:
@@ -465,23 +475,29 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
                 )
 
     right_lines.append("")
-    right_lines.append(f"[bold {accent}]Available Skills[/]")
-    skills_by_category = get_available_skills()
-    total_skills = sum(len(s) for s in skills_by_category.values())
-
-    if skills_by_category:
-        for category in sorted(skills_by_category.keys()):
-            skill_names = sorted(skills_by_category[category])
-            if len(skill_names) > 8:
-                display_names = skill_names[:8]
-                skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
-            else:
-                skills_str = ", ".join(skill_names)
-            if len(skills_str) > 50:
-                skills_str = skills_str[:47] + "..."
-            right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
+    if _powerunits_lockdown:
+        skills_by_category = {}
+        total_skills = 0
+        right_lines.append(f"[bold {accent}]Available Skills[/]")
+        right_lines.append(f"[dim {dim}]hidden in first-safe mode[/]")
     else:
-        right_lines.append(f"[dim {dim}]No skills installed[/]")
+        right_lines.append(f"[bold {accent}]Available Skills[/]")
+        skills_by_category = get_available_skills()
+        total_skills = sum(len(s) for s in skills_by_category.values())
+
+        if skills_by_category:
+            for category in sorted(skills_by_category.keys()):
+                skill_names = sorted(skills_by_category[category])
+                if len(skill_names) > 8:
+                    display_names = skill_names[:8]
+                    skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
+                else:
+                    skills_str = ", ".join(skill_names)
+                if len(skills_str) > 50:
+                    skills_str = skills_str[:47] + "..."
+                right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
+        else:
+            right_lines.append(f"[dim {dim}]No skills installed[/]")
 
     right_lines.append("")
     mcp_connected = sum(1 for s in mcp_status if s["connected"]) if mcp_status else 0

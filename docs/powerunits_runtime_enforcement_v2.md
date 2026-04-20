@@ -88,3 +88,15 @@ Keine weiteren Railway- oder Secret-Aenderungen erforderlich.
 
 `Redeploy Hermes after final runtime surface enforcement next`
 
+---
+
+## Post-enforcement verification linkage (v2.7)
+
+Die Verifikation nach Redeploy inkl. Mismatch-Analyse ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v2.md`
+
+## Final cleanup linkage (v2.8)
+
+- `docs/powerunits_runtime_cleanup_v1.md`
+
