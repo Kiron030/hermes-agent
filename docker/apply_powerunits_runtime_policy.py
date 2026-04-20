@@ -45,6 +45,12 @@ DISABLED_PLATFORMS = [
     "bluebubbles",
 ]
 
+# Deterministic short-term primary LLM route for Powerunits internal spike:
+# use direct OpenAI-compatible endpoint instead of implicit OpenRouter fallback.
+POWERUNITS_PRIMARY_MODEL_DEFAULT = "gpt-4.1-mini"
+POWERUNITS_PRIMARY_PROVIDER = "custom"
+POWERUNITS_PRIMARY_BASE_URL = "https://api.openai.com/v1"
+
 
 def _load_yaml(path: Path) -> dict:
     if not path.exists():
@@ -67,6 +73,16 @@ def _save_yaml(path: Path, data: dict) -> None:
 
 def apply_policy(config_path: Path) -> None:
     cfg = _load_yaml(config_path)
+
+    # Enforce deterministic primary model/provider routing to match
+    # OPENAI_API_KEY-only Railway environments.
+    model_cfg = cfg.get("model")
+    if not isinstance(model_cfg, dict):
+        model_cfg = {}
+    model_cfg["default"] = POWERUNITS_PRIMARY_MODEL_DEFAULT
+    model_cfg["provider"] = POWERUNITS_PRIMARY_PROVIDER
+    model_cfg["base_url"] = POWERUNITS_PRIMARY_BASE_URL
+    cfg["model"] = model_cfg
 
     # Enforce narrow, explicit platform toolset policy (fail-closed for gateway usage).
     platform_toolsets = cfg.get("platform_toolsets")

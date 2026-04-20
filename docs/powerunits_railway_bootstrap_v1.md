@@ -183,3 +183,9 @@ Wenn zwar Startup/Banner sichtbar ist, aber keine Telegram-Connection-Line ersch
 siehe:
 
 - `docs/powerunits_telegram_gateway_activation_v1.md`
+
+## Primary provider routing linkage (v3.3)
+
+Bei erfolgreicher Telegram-Connectivity aber 401-LLM-Fehlern (Provider/Model mismatch), siehe:
+
+- `docs/powerunits_primary_provider_routing_v1.md`

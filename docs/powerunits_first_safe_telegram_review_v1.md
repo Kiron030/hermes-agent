@@ -97,3 +97,9 @@ Wenn keine Telegram-Antworten auftreten und Connection-Logs fehlen, siehe:
 
 - `docs/powerunits_telegram_gateway_activation_v1.md`
 
+## Primary provider routing linkage (v3.3)
+
+Wenn Telegram antwortet, aber Main-Model-Calls mit Auth/Provider-Fehlern scheitern, siehe:
+
+- `docs/powerunits_primary_provider_routing_v1.md`
+
