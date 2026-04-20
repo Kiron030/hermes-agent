@@ -18,6 +18,12 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+
+
+def _powerunits_lockdown_enabled() -> bool:
+    return os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY
+
 
 # prompt_toolkit is an optional CLI dependency — only needed for
 # SlashCommandCompleter and SlashCommandAutoSuggest.  Gateway and test
@@ -492,6 +498,9 @@ def _collect_gateway_skill_entries(
         number of skill entries dropped due to the cap.  ``cmd_key`` is the
         original ``/skill-name`` key from :func:`get_skill_commands`.
     """
+    if _powerunits_lockdown_enabled():
+        return [], 0
+
     all_entries: list[tuple[str, str, str]] = []
 
     # --- Tier 1: Plugin slash commands (never trimmed) ---------------------

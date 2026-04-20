@@ -122,3 +122,7 @@ Nach diesem Repo-Change in Railway:
 Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-Blocker) ist dokumentiert in:
 
 - `docs/powerunits_runtime_verification_v1.md`
+
+## Final enforcement linkage (v2.6b)
+
+- `docs/powerunits_runtime_enforcement_v2.md`

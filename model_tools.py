@@ -23,6 +23,7 @@ Public API (signatures preserved from the original 2,400-line version):
 import json
 import asyncio
 import logging
+import os
 import threading
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -30,6 +31,8 @@ from tools.registry import discover_builtin_tools, registry
 from toolsets import resolve_toolset, validate_toolset
 
 logger = logging.getLogger(__name__)
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+_POWERUNITS_ALLOWED_TOOLSETS = ("memory", "session_search", "todo", "clarify")
 
 
 # =============================================================================
@@ -253,6 +256,14 @@ def get_tool_definitions(
         from toolsets import get_all_toolsets
         for ts_name in get_all_toolsets():
             tools_to_include.update(resolve_toolset(ts_name))
+
+    # Powerunits first-safe runtime lockdown: hard-cap the final callable
+    # tool surface regardless of upstream defaults or caller-provided toolsets.
+    if os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY:
+        allowed_tools: set[str] = set()
+        for ts_name in _POWERUNITS_ALLOWED_TOOLSETS:
+            allowed_tools.update(resolve_toolset(ts_name))
+        tools_to_include.intersection_update(allowed_tools)
 
     # Plugin-registered tools are now resolved through the normal toolset
     # path — validate_toolset() / resolve_toolset() / get_all_toolsets()

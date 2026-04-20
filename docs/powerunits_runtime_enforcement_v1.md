@@ -104,3 +104,11 @@ Keine neuen Secrets, keine neuen Volumes, keine DB-Aenderung, keine neuen extern
 
 `Redeploy Hermes with enforced first-safe runtime lockdown next`
 
+---
+
+## v2 follow-up linkage
+
+Die finale, registry-nahe Runtime-Enforcement-Runde ist dokumentiert in:
+
+- `docs/powerunits_runtime_enforcement_v2.md`
+
