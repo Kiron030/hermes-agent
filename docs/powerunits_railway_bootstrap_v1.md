@@ -85,6 +85,10 @@ Optional spaeter (nur wenn Betrieb es verlangt):
 
 - sehr kleine `railway.toml` zur expliziten Dokumentation von Build/Start/Healthcheck.
 
+Railway-Kompatibilitaetshinweis:
+
+- Dockerfile-`VOLUME` wird auf Railway nicht akzeptiert; Persistenz wird ausschliesslich ueber Railway-Volume-Mount auf `/opt/data` hergestellt.
+
 ---
 
 ## Part D - Safety defaults (first internal rollout)
@@ -141,3 +145,11 @@ Dann Third-Party-Pfad als nicht-kanonisch stilllegen.
 ## Exact next recommendation
 
 `Switch Railway source from the third-party template to the Powerunits-controlled fork next`
+
+---
+
+## Switchover linkage (v2.3)
+
+Der konkrete First-Switchover-Ablauf (Source-Switch + Post-Deploy-Checks) ist dokumentiert in:
+
+- `docs/powerunits_railway_switchover_v1.md`
