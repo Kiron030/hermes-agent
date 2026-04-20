@@ -52,5 +52,5 @@ RUN uv venv && \
 # ---------- Runtime ----------
 ENV HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist
 ENV HERMES_HOME=/opt/data
-VOLUME [ "/opt/data" ]
+ENV HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 ENTRYPOINT [ "/opt/hermes/docker/entrypoint.sh" ]
