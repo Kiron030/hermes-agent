@@ -36,6 +36,7 @@ Exakte Reihenfolge fuer den ersten Source-Switch in Railway:
    - Service startet ohne Crashloop.
    - Gateway laeuft im Foreground-Modus.
    - Telegram-Interaktion mit erlaubtem User funktioniert.
+   - Runtime-Policy aktiv: `powerunits.runtime_policy.id = first_safe_v1` in `config.yaml`.
 
 ---
 

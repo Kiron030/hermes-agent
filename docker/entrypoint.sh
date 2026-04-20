@@ -58,6 +58,11 @@ if [ ! -f "$HERMES_HOME/config.yaml" ]; then
     cp "$INSTALL_DIR/cli-config.yaml.example" "$HERMES_HOME/config.yaml"
 fi
 
+# Optional Powerunits first-deployment runtime policy (fail-closed defaults).
+if [ "${HERMES_POWERUNITS_RUNTIME_POLICY:-}" = "first_safe_v1" ]; then
+    python3 "$INSTALL_DIR/docker/apply_powerunits_runtime_policy.py"
+fi
+
 # SOUL.md
 if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
     cp "$INSTALL_DIR/docker/SOUL.md" "$HERMES_HOME/SOUL.md"

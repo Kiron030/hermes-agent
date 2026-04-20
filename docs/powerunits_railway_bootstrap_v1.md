@@ -104,6 +104,11 @@ Setze fuer den ersten Rollout folgende sicheren Defaults:
 7. Keine externen Control-Plane-Integrationen.
 8. Keine customer-facing Kommunikation oder Produkt-Einbettung.
 
+Ergaenzung fuer ersten Live-Rollout:
+
+- tiered runtime policy aktivieren/halten (`HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`),
+  damit die Telegram-Tooloberflaeche fail-closed eingeschraenkt bleibt.
+
 ---
 
 ## Minimum env contract (v1 bootstrap)
