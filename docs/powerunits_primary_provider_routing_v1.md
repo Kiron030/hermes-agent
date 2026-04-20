@@ -112,3 +112,13 @@ Auxiliary-Coverage kann in einem separaten Schritt konsistent nachgezogen werden
 
 `Set the canonical provider env and redeploy next`
 
+---
+
+## OpenAI request compatibility linkage (v3.4)
+
+Nach erfolgreichem OpenAI-first Routing kann ein weiterer Fehler auftreten:
+
+- HTTP 400, Parameter `include`, Meldung zu **encrypted content** / nicht unterstuetzt fuer das Modell.
+
+Fix und Diagnose: `docs/powerunits_openai_request_compatibility_v1.md`
+

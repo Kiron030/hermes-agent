@@ -1,7 +1,7 @@
 """Tests for hermes_cli.runtime_provider._detect_api_mode_for_url.
 
-The helper maps base URLs to api_modes for three cases:
-  * api.openai.com  → codex_responses
+The helper maps base URLs to api_modes for these cases:
+  * api.openai.com  → None (GPT-5+ upgrades to codex_responses are model-driven in AIAgent)
   * api.x.ai        → codex_responses
   * */anthropic     → anthropic_messages (third-party gateways like MiniMax,
                                           Zhipu GLM, LiteLLM proxies)
@@ -18,8 +18,8 @@ from hermes_cli.runtime_provider import _detect_api_mode_for_url
 
 
 class TestCodexResponsesDetection:
-    def test_openai_api_returns_codex_responses(self):
-        assert _detect_api_mode_for_url("https://api.openai.com/v1") == "codex_responses"
+    def test_openai_api_does_not_force_codex_responses(self):
+        assert _detect_api_mode_for_url("https://api.openai.com/v1") is None
 
     def test_xai_api_returns_codex_responses(self):
         assert _detect_api_mode_for_url("https://api.x.ai/v1") == "codex_responses"

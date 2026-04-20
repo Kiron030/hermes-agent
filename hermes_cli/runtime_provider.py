@@ -38,8 +38,13 @@ def _normalize_custom_provider_name(value: str) -> str:
 def _detect_api_mode_for_url(base_url: str) -> Optional[str]:
     """Auto-detect api_mode from the resolved base URL.
 
-    - Direct api.openai.com endpoints need the Responses API for GPT-5.x
-      tool calls with reasoning (chat/completions returns 400).
+    Note: ``https://api.openai.com`` is intentionally *not* mapped to
+    ``codex_responses`` here.  GPT-5.x models need the Responses API path,
+    but that upgrade is model-driven in ``run_agent.AIAgent`` (see
+    ``_provider_model_requires_responses_api``).  Forcing ``codex_responses``
+    from the URL alone breaks GPT-4.x models on OpenAI direct, which reject
+    ``include: [\"reasoning.encrypted_content\"]`` on /v1/responses.
+
     - Third-party Anthropic-compatible gateways (MiniMax, Zhipu GLM,
       LiteLLM proxies, etc.) conventionally expose the native Anthropic
       protocol under a ``/anthropic`` suffix — treat those as
@@ -48,8 +53,6 @@ def _detect_api_mode_for_url(base_url: str) -> Optional[str]:
     """
     normalized = (base_url or "").strip().lower().rstrip("/")
     if "api.x.ai" in normalized:
-        return "codex_responses"
-    if "api.openai.com" in normalized and "openrouter" not in normalized:
         return "codex_responses"
     if normalized.endswith("/anthropic"):
         return "anthropic_messages"

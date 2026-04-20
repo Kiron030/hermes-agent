@@ -793,25 +793,26 @@ class AIAgent:
 
         # GPT-5.x models usually require the Responses API path, but some
         # providers have exceptions (for example Copilot's gpt-5-mini still
-        # uses chat completions). Also auto-upgrade for direct OpenAI URLs
-        # (api.openai.com) since all newer tool-calling models prefer
-        # Responses there. ACP runtimes are excluded: CopilotACPClient
-        # handles its own routing and does not implement the Responses API
-        # surface.
-        # When api_mode was explicitly provided, respect it — the user
-        # knows what their endpoint supports (#10473).
+        # uses chat completions).  Do NOT auto-upgrade purely from a direct
+        # OpenAI base URL — GPT-4.x models on api.openai.com must stay on
+        # chat/completions because they reject Responses-only fields such as
+        # ``include: ["reasoning.encrypted_content"]``.
+        #
+        # When the runtime resolved ``api_mode="chat_completions"`` (the
+        # default for custom OpenAI URLs), still allow a model-driven upgrade
+        # to codex_responses for GPT-5+.
+        #
+        # When api_mode was explicitly set to a non-chat mode, respect it —
+        # the caller knows what their endpoint supports (#10473).
         if (
-            api_mode is None
+            (api_mode is None or api_mode == "chat_completions")
             and self.api_mode == "chat_completions"
             and self.provider != "copilot-acp"
             and not str(self.base_url or "").lower().startswith("acp://copilot")
             and not str(self.base_url or "").lower().startswith("acp+tcp://")
-            and (
-                self._is_direct_openai_url()
-                or self._provider_model_requires_responses_api(
-                    self.model,
-                    provider=self.provider,
-                )
+            and self._provider_model_requires_responses_api(
+                self.model,
+                provider=self.provider,
             )
         ):
             self.api_mode = "codex_responses"
@@ -7229,6 +7230,17 @@ class AIAgent:
                 kwargs["prompt_cache_key"] = self.session_id
 
             is_xai_responses = self.provider == "xai" or "api.x.ai" in (self.base_url or "").lower()
+            # OpenAI /v1/responses: only GPT-5+ accepts reasoning.encrypted_content.
+            # GPT-4.x (e.g. gpt-4.1-mini) returns 400 if ``include`` requests it.
+            is_openai_direct_responses = (
+                self._is_direct_openai_url()
+                and not is_github_responses
+                and not is_xai_responses
+            )
+            openai_encrypted_reasoning_ok = (
+                not is_openai_direct_responses
+                or self._model_requires_responses_api(self.model)
+            )
 
             if reasoning_enabled and is_xai_responses:
                 # xAI reasons automatically — no effort param, just include encrypted content
@@ -7241,9 +7253,12 @@ class AIAgent:
                     github_reasoning = self._github_models_reasoning_extra_body()
                     if github_reasoning is not None:
                         kwargs["reasoning"] = github_reasoning
-                else:
+                elif openai_encrypted_reasoning_ok:
                     kwargs["reasoning"] = {"effort": reasoning_effort, "summary": "auto"}
                     kwargs["include"] = ["reasoning.encrypted_content"]
+                else:
+                    # Direct OpenAI + non-GPT-5 model: omit reasoning/include entirely.
+                    kwargs["include"] = []
             elif not is_github_responses and not is_xai_responses:
                 kwargs["include"] = []
 

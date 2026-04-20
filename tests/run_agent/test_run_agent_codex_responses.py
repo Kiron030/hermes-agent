@@ -313,6 +313,61 @@ def test_build_api_kwargs_codex(monkeypatch):
     assert "extra_body" not in kwargs
 
 
+def test_build_api_kwargs_codex_openai_direct_skips_encrypted_reasoning_for_gpt41(monkeypatch):
+    """GPT-4.x on api.openai.com rejects ``include: reasoning.encrypted_content`` on /responses."""
+    _patch_agent_bootstrap(monkeypatch)
+    agent = run_agent.AIAgent(
+        model="gpt-4.1-mini",
+        provider="custom",
+        api_mode="codex_responses",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        quiet_mode=True,
+        max_iterations=1,
+        skip_context_files=True,
+        skip_memory=True,
+    )
+    kwargs = agent._build_api_kwargs(
+        [
+            {"role": "system", "content": "You are Hermes."},
+            {"role": "user", "content": "Ping"},
+        ]
+    )
+    assert kwargs["model"] == "gpt-4.1-mini"
+    assert "reasoning" not in kwargs
+    assert kwargs.get("include") == []
+
+
+def test_aiagent_openai_direct_gpt41_defaults_to_chat_completions(monkeypatch):
+    _patch_agent_bootstrap(monkeypatch)
+    agent = run_agent.AIAgent(
+        model="gpt-4.1-mini",
+        provider="custom",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        quiet_mode=True,
+        max_iterations=1,
+        skip_context_files=True,
+        skip_memory=True,
+    )
+    assert agent.api_mode == "chat_completions"
+
+
+def test_aiagent_openai_direct_gpt5_upgrades_to_codex_responses(monkeypatch):
+    _patch_agent_bootstrap(monkeypatch)
+    agent = run_agent.AIAgent(
+        model="gpt-5-nano",
+        provider="custom",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        quiet_mode=True,
+        max_iterations=1,
+        skip_context_files=True,
+        skip_memory=True,
+    )
+    assert agent.api_mode == "codex_responses"
+
+
 def test_build_api_kwargs_codex_clamps_minimal_effort(monkeypatch):
     """'minimal' reasoning effort is clamped to 'low' on the Responses API.
 

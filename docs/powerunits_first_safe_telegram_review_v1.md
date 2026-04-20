@@ -103,3 +103,9 @@ Wenn Telegram antwortet, aber Main-Model-Calls mit Auth/Provider-Fehlern scheite
 
 - `docs/powerunits_primary_provider_routing_v1.md`
 
+## OpenAI request compatibility linkage (v3.4)
+
+Wenn Telegram und Routing ok sind, aber Main-Model-Calls mit OpenAI-400 (`include` / encrypted content) scheitern, siehe:
+
+- `docs/powerunits_openai_request_compatibility_v1.md`
+

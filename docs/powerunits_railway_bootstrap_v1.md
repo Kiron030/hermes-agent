@@ -189,3 +189,9 @@ siehe:
 Bei erfolgreicher Telegram-Connectivity aber 401-LLM-Fehlern (Provider/Model mismatch), siehe:
 
 - `docs/powerunits_primary_provider_routing_v1.md`
+
+## OpenAI request compatibility linkage (v3.4)
+
+Bei HTTP 400 auf OpenAI (`include` / encrypted content) trotz gueltigem Key und korrektem Routing, siehe:
+
+- `docs/powerunits_openai_request_compatibility_v1.md`
