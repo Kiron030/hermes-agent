@@ -54,7 +54,7 @@ Implementierung: `tools/powerunits_docs_tool.py`.
 ## Part D — Hermes integration shape (first-safe)
 
 - Eigenes **Toolset** `powerunits_docs` mit genau einem Tool `read_powerunits_doc`.
-- In **first-safe** explizit erlaubt (neben `memory`, `session_search`, `todo`; **ohne** `clarify` im Telegram-Gateway) in:
+- In **first-safe** explizit erlaubt (neben `memory`, `session_search`, `todo`, `powerunits_github_docs`, `powerunits_workspace`; **ohne** `clarify` im Telegram-Gateway) in:
   - `model_tools.py` (`_POWERUNITS_ALLOWED_TOOLSETS`)
   - `gateway/run.py` (`_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS`)
   - `docker/apply_powerunits_runtime_policy.py` (`ALLOWED_TELEGRAM_TOOLSETS`)

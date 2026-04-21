@@ -215,6 +215,18 @@ First-safe Telegram-Toolset um `powerunits_docs` / `read_powerunits_doc` erweite
 
 - `docs/powerunits_docs_reader_v1.md`
 
+## GitHub docs reader linkage
+
+Narrow read-only GitHub docs tools (`powerunits_github_docs`) fuer genau einen allowgelisteten privaten Doku-Subtree:
+
+- `docs/powerunits_github_docs_reader_v1.md`
+
+## Workspace reader/writer linkage
+
+Bounded persistent Hermes workspace unter `/opt/data/hermes_workspace` mit allowgelisteten Subdirs (`analysis|notes|drafts|exports`):
+
+- `docs/powerunits_workspace_v1.md`
+
 ## Internal deploy artifact contract (docs reader)
 
 `read_powerunits_doc` funktioniert nur, wenn das Build-Artefakt `docker/powerunits_docs/` inkl. `MANIFEST.json` **im deployten Image enthalten** ist.

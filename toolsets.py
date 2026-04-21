@@ -188,6 +188,28 @@ TOOLSETS = {
         "tools": ["read_powerunits_doc"],
         "includes": [],
     },
+
+    "powerunits_github_docs": {
+        "description": (
+            "Read-only GitHub docs access, hard-allowlisted to "
+            "Kiron030/Powerunits.io docs/roadmap on branch starting_the_seven_phases."
+        ),
+        "tools": ["list_powerunits_roadmap_dir", "read_powerunits_roadmap_file"],
+        "includes": [],
+    },
+
+    "powerunits_workspace": {
+        "description": (
+            "Bounded persistent workspace at /opt/data/hermes_workspace "
+            "(analysis/notes/drafts/exports), no delete/rename, text files only."
+        ),
+        "tools": [
+            "list_hermes_workspace",
+            "read_hermes_workspace_file",
+            "save_hermes_workspace_note",
+        ],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

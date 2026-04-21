@@ -10,6 +10,9 @@ INSTALL_DIR="/opt/hermes"
 # optionally remap the hermes user/group to match host-side ownership, fix volume
 # permissions, then re-exec as hermes.
 if [ "$(id -u)" = "0" ]; then
+    # Ensure Railway-mounted volume path exists before any ownership checks.
+    mkdir -p "$HERMES_HOME"
+
     if [ -n "$HERMES_UID" ] && [ "$HERMES_UID" != "$(id -u hermes)" ]; then
         echo "Changing hermes UID to $HERMES_UID"
         usermod -u "$HERMES_UID" hermes
@@ -32,6 +35,11 @@ if [ "$(id -u)" = "0" ]; then
             echo "Warning: chown failed (rootless container?) — continuing anyway"
     fi
 
+    # Pre-create runtime dirs while still privileged, then hand over to hermes.
+    mkdir -p "$HERMES_HOME"/{cron,sessions,logs,hooks,memories,skills,skins,plans,workspace,home,hermes_workspace}
+    mkdir -p "$HERMES_HOME/hermes_workspace"/{analysis,notes,drafts,exports}
+    chown -R hermes:hermes "$HERMES_HOME" 2>/dev/null || true
+
     echo "Dropping root privileges"
     exec gosu hermes "$0" "$@"
 fi
@@ -47,6 +55,7 @@ source "${INSTALL_DIR}/.venv/bin/activate"
 # ssh, gh, npm …).  Without it those tools write to /root which is
 # ephemeral and shared across profiles.  See issue #4426.
 mkdir -p "$HERMES_HOME"/{cron,sessions,logs,hooks,memories,skills,skins,plans,workspace,home}
+mkdir -p "$HERMES_HOME/hermes_workspace"/{analysis,notes,drafts,exports}
 
 # .env
 if [ ! -f "$HERMES_HOME/.env" ]; then

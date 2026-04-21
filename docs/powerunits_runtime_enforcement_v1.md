@@ -74,7 +74,7 @@ In `docker/apply_powerunits_runtime_policy.py`:
 
 - Telegram-Allowlist auf first-safe Kernflaeche reduziert:
   - entfernt: `skills`, `no_mcp`
-  - gesetzt: `memory`, `session_search`, `todo`, `powerunits_docs`
+  - gesetzt: `memory`, `session_search`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace`
 
 ---
 

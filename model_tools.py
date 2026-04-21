@@ -39,6 +39,8 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "session_search",
     "todo",
     "powerunits_docs",
+    "powerunits_github_docs",
+    "powerunits_workspace",
 )
 
 

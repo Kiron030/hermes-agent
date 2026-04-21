@@ -59,3 +59,45 @@ Bei fehlendem/ungueltigem Bundle wird eine Warnung geloggt, sinngemaess:
 - oder Manifest/Entry inkonsistent
 
 Damit ist fuer Operatoren sofort sichtbar: Deploy war erfolgreich, aber Docs-Reader ist nicht verfuegbar, weil das interne Bundle-Artefakt fehlt.
+
+## Operator-managed GitHub read allowlist
+
+Datei: `config/powerunits_repo_read_allowlist.json`
+
+Schema pro Surface:
+
+- `alias`
+- `repo`
+- `branch`
+- `root_prefix`
+- `allowed_extensions`
+- `enabled`
+
+### Surface hinzufuegen/entfernen
+
+1. Eintrag in `surfaces` ergaenzen oder `enabled=false` setzen.
+2. Deployen (kein Runtime-Write noetig).
+3. Telegram testen mit `list_powerunits_roadmap_dir(alias=...)` und `read_powerunits_roadmap_file(alias=..., name=...)`.
+
+Sicherheitsprinzip:
+
+- Modell waehlt nur Alias.
+- Repo/Branch/Root werden nie aus User-Input genommen.
+
+## Railway workspace safe usage
+
+Root: `/opt/data/hermes_workspace` mit nur:
+
+- `analysis`
+- `notes`
+- `drafts`
+- `exports`
+
+Kein delete/rename/generische Pfadschreibrechte.
+
+## Intentionally out of scope
+
+- GitHub write (`POWERUNITS_GITHUB_TOKEN_WRITE`) bleibt ungenutzt.
+- Keine PRs/Branch-Writes/Repo-Mutationen.
+- Keine DB-Integration.
+- Kein breites privates Repo-Browsing.

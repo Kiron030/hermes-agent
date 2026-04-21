@@ -35,7 +35,7 @@ Vorliegende Evidenz:
 ### Erwartete Surface nach Policy (Soll-Zustand)
 
 - Sichtbar bleiben (Telegram, aktualisiert):
-  - `memory`, `session_search`, `todo`, `powerunits_docs`
+  - `memory`, `session_search`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace`
   - (Frueher: `skills`, `no_mcp`, `clarify` — `clarify` entfernt, Gateway ohne interaktives Clarify.)
 - Nicht mehr exposed:
   - Browser-/Execution-/Delegation-/MCP-nahe Toolsets

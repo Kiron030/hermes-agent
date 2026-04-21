@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "alias": "powerunits_roadmap",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "root_prefix": "docs/roadmap",
+      "allowed_extensions": [
+        ".md",
+        ".txt"
+      ],
+      "enabled": true
+    }
+  ]
+}

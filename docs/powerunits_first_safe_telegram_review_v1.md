@@ -22,6 +22,8 @@ Erwartetes Live-Verhalten im first-safe Zustand:
      - `session_search`
      - `todo`
      - `powerunits_docs` (nur `read_powerunits_doc`: manifest-keyed Bundle-Doku)
+     - `powerunits_github_docs` (nur allowgelisteter GitHub-Doku-Subtree, read-only)
+     - `powerunits_workspace` (nur begrenzter Workspace unter `/opt/data/hermes_workspace`)
    - **`clarify` ist nicht Teil der Telegram-Allowlist**, weil der Gateway-Chat **kein** interaktives Clarify-Callback verdrahtet hat — ein exponiertes `clarify`-Tool fuehrte zu Fehler-Schleifen statt direkter Tool-Nutzung.
    - Keine `skills`- / `no_mcp`-Toolsets auf der Telegram-Allowlist; keine breite Skill-Exposure (Skills hidden/0 im first-safe Modus).
 

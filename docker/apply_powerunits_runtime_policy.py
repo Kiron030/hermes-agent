@@ -22,6 +22,8 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "session_search",
     "todo",
     "powerunits_docs",
+    "powerunits_github_docs",
+    "powerunits_workspace",
 ]
 
 DISABLED_PLATFORMS = [
