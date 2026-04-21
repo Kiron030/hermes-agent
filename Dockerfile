@@ -39,8 +39,11 @@ RUN npm install --prefer-offline --no-audit && \
 # ---------- Source code ----------
 # .dockerignore excludes node_modules, so the installs above survive.
 COPY --chown=hermes:hermes . .
-# Harden startup for Windows/local deploy paths where git filemode may not survive.
-RUN chmod 0755 /opt/hermes/docker/entrypoint.sh
+# Harden startup for Windows/local deploy paths:
+# - normalize CRLF -> LF (prevents "/bin/bash^M" / "No such file or directory")
+# - set executable bit independent of host git filemode
+RUN sed -i 's/\r$//' /opt/hermes/docker/entrypoint.sh && \
+    chmod 0755 /opt/hermes/docker/entrypoint.sh
 
 # Build web dashboard (Vite outputs to hermes_cli/web_dist/)
 RUN cd web && npm run build
