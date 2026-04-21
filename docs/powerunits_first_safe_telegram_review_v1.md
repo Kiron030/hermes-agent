@@ -4,6 +4,8 @@
 
 Der Runtime-Lockdown erscheint jetzt konsistent genug fuer den ersten safe Telegram-Interaction-Review.
 
+Hermes laeuft im first-safe Telegram-Modus stabil; das **Doku-Bundle** ist im Image; der Kontextpfad ist jetzt **manifest-keyed** lesbar (`read_powerunits_doc`). Design: `docs/powerunits_docs_allowlist_integration_v1.md`; Bundle: `docs/powerunits_docs_read_surface_v1.md`; Reader: `docs/powerunits_docs_reader_v1.md`.
+
 ---
 
 ## Part A - Expected Telegram-first behavior
@@ -15,12 +17,13 @@ Erwartetes Live-Verhalten im first-safe Zustand:
    - Nicht erlaubte User werden blockiert bzw. nicht bedient.
 
 2. **Surface-Reduktion**
-   - Sichtbare und effektive Surface bleibt auf den first-safe Kern begrenzt:
+   - Sichtbare und effektive Toolset-Surface fuer Telegram bleibt auf den first-safe Kern begrenzt:
      - `memory`
      - `session_search`
      - `todo`
      - `clarify`
-   - Keine breite Skill-Exposure (Skills hidden/0 im first-safe Modus).
+     - `powerunits_docs` (nur `read_powerunits_doc`: manifest-keyed Bundle-Doku)
+   - Keine `skills`- / `no_mcp`-Toolsets auf der Telegram-Allowlist; keine breite Skill-Exposure (Skills hidden/0 im first-safe Modus).
 
 3. **Keine Plattform-Bleed-Over**
    - Keine Hinweise auf aktive Discord/Slack/Email/HomeAssistant/etc.-Interaktion.
@@ -81,7 +84,9 @@ Als first-safe Fail gelten insbesondere:
 
 ## Part E - One exact next recommendation
 
-`Proceed to Powerunits docs allowlist integration next`
+`Test Hermes with manifest-keyed Powerunits docs prompts next`
+
+Reader-Contract und Telegram-Testideen: `docs/powerunits_docs_reader_v1.md`.
 
 ---
 
@@ -108,4 +113,16 @@ Wenn Telegram antwortet, aber Main-Model-Calls mit Auth/Provider-Fehlern scheite
 Wenn Telegram und Routing ok sind, aber Main-Model-Calls mit OpenAI-400 (`include` / encrypted content) scheitern, siehe:
 
 - `docs/powerunits_openai_request_compatibility_v1.md`
+
+## Docs read surface linkage (v3.6)
+
+Gebündelte Powerunits-Docs im Image, siehe:
+
+- `docs/powerunits_docs_read_surface_v1.md`
+
+## Docs reader linkage (v3.7)
+
+Manifest-keyed Tool `read_powerunits_doc` (first-safe allowlist), siehe:
+
+- `docs/powerunits_docs_reader_v1.md`
 

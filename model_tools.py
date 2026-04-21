@@ -32,7 +32,13 @@ from toolsets import resolve_toolset, validate_toolset
 
 logger = logging.getLogger(__name__)
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
-_POWERUNITS_ALLOWED_TOOLSETS = ("memory", "session_search", "todo", "clarify")
+_POWERUNITS_ALLOWED_TOOLSETS = (
+    "memory",
+    "session_search",
+    "todo",
+    "clarify",
+    "powerunits_docs",
+)
 
 
 # =============================================================================

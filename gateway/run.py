@@ -100,7 +100,13 @@ load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).resolve(
 _DOCKER_VOLUME_SPEC_RE = re.compile(r"^(?P<host>.+):(?P<container>/[^:]+?)(?::(?P<options>[^:]+))?$")
 _DOCKER_MEDIA_OUTPUT_CONTAINER_PATHS = {"/output", "/outputs"}
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
-_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {"memory", "session_search", "todo", "clarify"}
+_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
+    "memory",
+    "session_search",
+    "todo",
+    "clarify",
+    "powerunits_docs",
+}
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.
 # config.yaml is authoritative for terminal settings — overrides .env.

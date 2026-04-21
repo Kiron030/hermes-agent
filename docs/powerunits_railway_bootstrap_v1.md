@@ -195,3 +195,21 @@ Bei erfolgreicher Telegram-Connectivity aber 401-LLM-Fehlern (Provider/Model mis
 Bei HTTP 400 auf OpenAI (`include` / encrypted content) trotz gueltigem Key und korrektem Routing, siehe:
 
 - `docs/powerunits_openai_request_compatibility_v1.md`
+
+## Docs allowlist integration linkage (v3.5)
+
+Erste sichere Powerunits-Wissensflaeche (nur explizit gebundelte Docs, kein breites Repo-Scannen), siehe:
+
+- `docs/powerunits_docs_allowlist_integration_v1.md`
+
+## Docs read surface linkage (v3.6)
+
+Build-Zeit-Bundle (`scripts/bundle_powerunits_docs.py`), gestufte Dateien unter `docker/powerunits_docs/`, `.dockerignore`-Ausnahme fuer diesen Pfad, **keine** zusaetzlichen Railway-Env-Variablen fuer docs-only v1:
+
+- `docs/powerunits_docs_read_surface_v1.md`
+
+## Docs reader linkage (v3.7)
+
+First-safe Telegram-Toolset um `powerunits_docs` / `read_powerunits_doc` erweitert; optional nur fuer Tests: `HERMES_POWERUNITS_DOCS_BUNDLE`.
+
+- `docs/powerunits_docs_reader_v1.md`

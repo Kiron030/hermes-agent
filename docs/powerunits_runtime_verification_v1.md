@@ -34,8 +34,9 @@ Vorliegende Evidenz:
 
 ### Erwartete Surface nach Policy (Soll-Zustand)
 
-- Sichtbar bleiben (Telegram):
-  - `memory`, `session_search`, `skills`, `todo`, `no_mcp`
+- Sichtbar bleiben (Telegram, aktualisiert):
+  - `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
+  - (Frueher dokumentiert: `skills`, `no_mcp` — durch first-safe Policy/Registry-Kappung ersetzt.)
 - Nicht mehr exposed:
   - Browser-/Execution-/Delegation-/MCP-nahe Toolsets
   - weitere Messaging-Plattformen ausser Telegram

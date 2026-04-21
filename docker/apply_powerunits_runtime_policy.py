@@ -22,6 +22,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "session_search",
     "todo",
     "clarify",
+    "powerunits_docs",
 ]
 
 DISABLED_PLATFORMS = [

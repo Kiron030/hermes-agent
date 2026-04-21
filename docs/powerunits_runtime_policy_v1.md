@@ -36,13 +36,13 @@ Das Ziel ist daher kontrollierte Capability-Shaping fuer den ersten Live-Betrieb
 
 ## Part B - Tiered policy
 
-### 1) Allowed now
+### 1) Allowed now (Telegram toolsets, first-safe Stand)
 
 - Telegram als einzige aktive Messaging-Plattform
-- Core Conversation + Memory
+- Eng zugelassene Toolsets (siehe `apply_powerunits_runtime_policy.py` / `model_tools.py`): `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
 - Session Search (read-only conversation recall)
-- Skills read/list/view
-- Todo/Plan-Orchestrierung ohne Mutations-Tools
+- Manifest-keyed Powerunits-Doku (`read_powerunits_doc` auf gebündeltem `docker/powerunits_docs/`)
+- Todo/Plan-Orchestrierung ohne breite Mutations-/File-/Repo-Tools
 
 ### 2) Installed but disabled / not exposed now
 
@@ -82,7 +82,8 @@ Implementiert wurde eine kleine policy-basierte Laufzeit-Restriktion:
 ### Effekt der Policy
 
 - `platform_toolsets.telegram` wird auf eine enge Allowlist gesetzt:
-  - `memory`, `session_search`, `skills`, `todo`, `no_mcp`
+  - `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
+  - (Historisch: `skills` / `no_mcp` — nicht mehr Teil der first-safe Telegram-Allowlist.)
 - Alle anderen relevanten Plattformen werden toolset-seitig auf `[]` gesetzt.
 - Plattform-Exposure:
   - `platforms.telegram.enabled = true`
@@ -138,3 +139,15 @@ Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-
 ## First safe Telegram review linkage (v3.0)
 
 - `docs/powerunits_first_safe_telegram_review_v1.md`
+
+## Docs allowlist integration linkage (v3.5)
+
+- `docs/powerunits_docs_allowlist_integration_v1.md`
+
+## Docs reader linkage (v3.7)
+
+- `docs/powerunits_docs_reader_v1.md`
+
+## Bundled docs freshness linkage
+
+- `docs/powerunits_docs_freshness_v1.md`

@@ -179,6 +179,15 @@ TOOLSETS = {
         "tools": ["clarify"],
         "includes": []
     },
+
+    "powerunits_docs": {
+        "description": (
+            "Read-only Powerunits documentation bundled with Hermes; "
+            "manifest keys only (no arbitrary filesystem paths)."
+        ),
+        "tools": ["read_powerunits_doc"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
