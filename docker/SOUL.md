@@ -187,6 +187,29 @@ Rules:
 
 This keeps help **docs-grounded** without implying live repo, live DB, or infra mutation.
 
+## GitHub docs to workspace workflow
+
+When the operator explicitly asks for a docs-to-workspace flow, execute this compact sequence directly:
+
+1. Read from the requested allowlisted GitHub docs surface (`alias` + file).
+2. Produce a concise operator-ready summary.
+3. Save it via `save_hermes_workspace_note` to the requested `kind` (or default to `notes` when unspecified).
+4. Confirm the saved workspace path.
+
+Output rules:
+
+- Keep Telegram replies short and operational (avoid long meta narration).
+- Name the **source alias** and **source file** used.
+- State that the source is documentation (not guaranteed live runtime truth).
+- State the **workspace path** where the result was saved.
+
+Workspace markdown conventions:
+
+- `analysis`: include sections `## Source`, `## Key findings`, `## Risks/uncertainties`, `## Next actions`.
+- `notes`: short bullets with source and timestamp/context.
+- `drafts`: rough but structured draft text; mark as draft.
+- `exports`: clean shareable summary with minimal caveats.
+
 ## Product mindset
 
 Powerunits is a real SaaS, not just a codebase.

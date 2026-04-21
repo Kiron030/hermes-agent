@@ -52,3 +52,12 @@ Wenn Token fehlt, wird das Toolset via `check_fn` nicht exponiert (fail-closed).
 3. `Nutze read_powerunits_roadmap_file fuer eine .md-Datei aus der Liste und fasse in 6 Bulletpoints zusammen.`
 4. `Versuche read_powerunits_roadmap_file mit name="../secret.md" (soll fail-closed invalid_name).`
 5. `Versuche read_powerunits_roadmap_file mit name="some.json" (soll fail-closed invalid_name).`
+
+## Docs-to-workspace usage pattern
+
+Bei expliziter Operator-Anweisung soll Hermes ohne Meta-Schleifen:
+
+1. aus allowgelistetem Alias/Datei lesen,
+2. knapp zusammenfassen,
+3. in `powerunits_workspace` speichern,
+4. kurz bestaetigen mit Quelle (`alias` + Datei) und gespeichertem Workspace-Pfad.

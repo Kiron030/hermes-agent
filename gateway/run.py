@@ -9511,7 +9511,9 @@ class GatewayRunner:
                     "Powerunits first-safe (Telegram): use tools directly when the user gives a concrete "
                     "instruction. For bundled Powerunits docs, call read_powerunits_doc in your next "
                     "tool-calling turn (e.g. action=list_keys or action=read with key) without "
-                    "narration-only turns or placeholder confirmations."
+                    "narration-only turns or placeholder confirmations. For docs-to-workspace requests, "
+                    "run read -> summarize -> save in one flow and reply briefly with source alias/file "
+                    "and saved workspace path."
                 )
                 try:
                     from tools.powerunits_docs_tool import check_powerunits_docs_requirements

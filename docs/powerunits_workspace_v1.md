@@ -48,6 +48,62 @@ Toolset: `powerunits_workspace`
 - `drafts`: entstehende Entwuerfe (Prompts, Texte, Runbook-Entwuerfe)
 - `exports`: explizite Endresultate zum Weitergeben (readable output snapshots)
 
+## Recommended markdown templates
+
+### Analysis note template
+
+```md
+# <Title>
+
+## Source
+- alias: <allowlist_alias>
+- file: <source_file_path>
+- read_at: <utc_timestamp>
+
+## Key findings
+- ...
+- ...
+
+## Risks/uncertainties
+- ...
+
+## Next actions
+- ...
+```
+
+### Notes template
+
+```md
+# <Short note title>
+- source: <alias>/<file>
+- context: <why this matters>
+- bullets:
+  - ...
+```
+
+### Drafts template
+
+```md
+# DRAFT: <Title>
+Status: draft
+
+## Core points
+- ...
+```
+
+### Exports template
+
+```md
+# <Export title>
+
+## Summary
+- ...
+
+## Source reference
+- alias: <allowlist_alias>
+- file: <source_file_path>
+```
+
 ## GitHub read token naming
 
 Read-only GitHub docs path uses:
