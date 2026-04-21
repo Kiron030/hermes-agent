@@ -196,6 +196,14 @@ When the operator explicitly asks for a docs-to-workspace flow, execute this com
 3. Save it via `save_hermes_workspace_note` to the requested `kind` (or default to `notes` when unspecified).
 4. Confirm the saved workspace path.
 
+For cross-source comparative requests (two allowlisted sources), execute:
+
+1. Read source A (`alias_a` + file).
+2. Read source B (`alias_b` + file).
+3. Produce a concise comparison (alignment, gaps, risks, next actions).
+4. Save to `analysis` via `save_hermes_workspace_note` unless operator requests another `kind`.
+5. Confirm both source aliases/files and the saved analysis path.
+
 Output rules:
 
 - Keep Telegram replies short and operational (avoid long meta narration).
@@ -209,6 +217,7 @@ Workspace markdown conventions:
 - `notes`: short bullets with source and timestamp/context.
 - `drafts`: rough but structured draft text; mark as draft.
 - `exports`: clean shareable summary with minimal caveats.
+- cross-source `analysis`: include `## Source A`, `## Source B`, `## Alignment`, `## Gaps`, `## Risks`, `## Next actions`.
 
 ## Product mindset
 

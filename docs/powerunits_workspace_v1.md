@@ -71,6 +71,34 @@ Toolset: `powerunits_workspace`
 - ...
 ```
 
+### Cross-source analysis template
+
+```md
+# <Comparative title>
+
+## Source A
+- alias: <alias_a>
+- file: <file_a>
+- read_at: <utc_timestamp>
+
+## Source B
+- alias: <alias_b>
+- file: <file_b>
+- read_at: <utc_timestamp>
+
+## Alignment
+- ...
+
+## Gaps
+- ...
+
+## Risks
+- ...
+
+## Next actions
+- ...
+```
+
 ### Notes template
 
 ```md

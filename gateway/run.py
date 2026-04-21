@@ -9513,7 +9513,8 @@ class GatewayRunner:
                     "tool-calling turn (e.g. action=list_keys or action=read with key) without "
                     "narration-only turns or placeholder confirmations. For docs-to-workspace requests, "
                     "run read -> summarize -> save in one flow and reply briefly with source alias/file "
-                    "and saved workspace path."
+                    "and saved workspace path. For comparative requests, read two sources, synthesize "
+                    "alignment/gaps/risks/next actions, save under analysis, and confirm both sources + path."
                 )
                 try:
                     from tools.powerunits_docs_tool import check_powerunits_docs_requirements

@@ -227,6 +227,10 @@ Bounded persistent Hermes workspace unter `/opt/data/hermes_workspace` mit allow
 
 - `docs/powerunits_workspace_v1.md`
 
+## Operator setup + staged roadmap
+
+- `docs/powerunits_operator_setup_and_roadmap_v1.md`
+
 ## Internal deploy artifact contract (docs reader)
 
 `read_powerunits_doc` funktioniert nur, wenn das Build-Artefakt `docker/powerunits_docs/` inkl. `MANIFEST.json` **im deployten Image enthalten** ist.

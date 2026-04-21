@@ -6,7 +6,8 @@ Kleinstmoegliche read-only GitHub-Dokuoberflaeche fuer Hermes:
 
 - Repo: `Kiron030/Powerunits.io`
 - Branch: `starting_the_seven_phases`
-- Allowlisted Root: `docs/roadmap/`
+- Allowlisted roots are alias-driven from `config/powerunits_repo_read_allowlist.json`
+  (e.g. `powerunits_roadmap -> docs/roadmap`, `powerunits_architecture -> docs/architecture`).
 
 Keine Writes, keine Codepfade, keine freie Repo-/Branch-/Path-Wahl durch das Modell.
 
@@ -47,11 +48,11 @@ Wenn Token fehlt, wird das Toolset via `check_fn` nicht exponiert (fail-closed).
 
 ## Telegram validation prompts
 
-1. `Nutze list_powerunits_roadmap_dir ohne Argumente und gib die Eintraege aus.`
-2. `Nutze list_powerunits_roadmap_dir mit subpath="phase_1" (oder passendem Ordner aus Schritt 1).`
-3. `Nutze read_powerunits_roadmap_file fuer eine .md-Datei aus der Liste und fasse in 6 Bulletpoints zusammen.`
-4. `Versuche read_powerunits_roadmap_file mit name="../secret.md" (soll fail-closed invalid_name).`
-5. `Versuche read_powerunits_roadmap_file mit name="some.json" (soll fail-closed invalid_name).`
+1. `Nutze list_powerunits_roadmap_dir mit alias="powerunits_roadmap" und gib die Eintraege aus.`
+2. `Nutze list_powerunits_roadmap_dir mit alias="powerunits_architecture" und gib die Eintraege aus.`
+3. `Lies je eine .md-Datei aus alias="powerunits_roadmap" und alias="powerunits_architecture"; speichere eine Vergleichsanalyse unter analysis als "roadmap_vs_architecture.md".`
+4. `Versuche read_powerunits_roadmap_file mit alias="powerunits_architecture" und name="../secret.md" (soll fail-closed invalid_name).`
+5. `Versuche read_powerunits_roadmap_file mit alias="powerunits_architecture" und name="some.json" (soll fail-closed invalid_name).`
 
 ## Docs-to-workspace usage pattern
 
@@ -61,3 +62,10 @@ Bei expliziter Operator-Anweisung soll Hermes ohne Meta-Schleifen:
 2. knapp zusammenfassen,
 3. in `powerunits_workspace` speichern,
 4. kurz bestaetigen mit Quelle (`alias` + Datei) und gespeichertem Workspace-Pfad.
+
+Bei expliziter Vergleichsanfrage:
+
+1. Datei aus Alias A lesen,
+2. Datei aus Alias B lesen,
+3. kurze Vergleichssynthese (Alignment/Gaps/Risks/Next actions),
+4. in `analysis/` speichern und Pfad kurz bestaetigen.

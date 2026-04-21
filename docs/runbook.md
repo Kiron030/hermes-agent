@@ -101,3 +101,9 @@ Kein delete/rename/generische Pfadschreibrechte.
 - Keine PRs/Branch-Writes/Repo-Mutationen.
 - Keine DB-Integration.
 - Kein breites privates Repo-Browsing.
+
+## Consolidated operator guide
+
+Fuer den Gesamtueberblick (Ist-Zustand, Workflow, Grenzen, staged Roadmap):
+
+- `docs/powerunits_operator_setup_and_roadmap_v1.md`
