@@ -32,11 +32,12 @@ from toolsets import resolve_toolset, validate_toolset
 
 logger = logging.getLogger(__name__)
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+# Clarify is omitted: gateway Telegram has no interactive clarify callback, which
+# caused models to loop on failed clarify calls instead of using safe tools.
 _POWERUNITS_ALLOWED_TOOLSETS = (
     "memory",
     "session_search",
     "todo",
-    "clarify",
     "powerunits_docs",
 )
 

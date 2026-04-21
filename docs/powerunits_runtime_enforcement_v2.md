@@ -40,7 +40,7 @@ Wichtig: Fruehere YAML-/Platform-Filter sind nur vorgelagerte Inputs. Entscheide
 In `model_tools.py`:
 
 - Bei `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1` wird in `get_tool_definitions(...)` die Toolmenge final per Intersection auf die first-safe Allowlist begrenzt.
-- Allowlist-basiert (ueber Toolsets): `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`.
+- Allowlist-basiert (ueber Toolsets): `memory`, `session_search`, `todo`, `powerunits_docs` (Telegram: kein `clarify`, da kein Callback).
 
 Effekt: Auch wenn ein spaeter Layer breite Toolsets anfordert, bleibt die final callable Surface hard-capped.
 

@@ -135,6 +135,21 @@ def test_first_safe_tool_cap_includes_reader(
     assert "read_file" not in names
 
 
+def test_first_safe_excludes_clarify_even_if_requested(
+    tiny_bundle: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    from model_tools import get_tool_definitions
+
+    defs = get_tool_definitions(
+        ["memory", "clarify", "powerunits_docs"],
+        quiet_mode=True,
+    )
+    names = {d["function"]["name"] for d in defs}
+    assert "read_powerunits_doc" in names
+    assert "clarify" not in names
+
+
 def test_read_stale_warning_old_bundle(
     tiny_bundle: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

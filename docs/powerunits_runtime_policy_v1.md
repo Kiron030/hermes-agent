@@ -39,7 +39,7 @@ Das Ziel ist daher kontrollierte Capability-Shaping fuer den ersten Live-Betrieb
 ### 1) Allowed now (Telegram toolsets, first-safe Stand)
 
 - Telegram als einzige aktive Messaging-Plattform
-- Eng zugelassene Toolsets (siehe `apply_powerunits_runtime_policy.py` / `model_tools.py`): `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
+- Eng zugelassene Toolsets (siehe `apply_powerunits_runtime_policy.py` / `model_tools.py`): `memory`, `session_search`, `todo`, `powerunits_docs` (ohne `clarify` im Telegram-first-safe Pfad)
 - Session Search (read-only conversation recall)
 - Manifest-keyed Powerunits-Doku (`read_powerunits_doc` auf gebündeltem `docker/powerunits_docs/`)
 - Todo/Plan-Orchestrierung ohne breite Mutations-/File-/Repo-Tools
@@ -82,8 +82,8 @@ Implementiert wurde eine kleine policy-basierte Laufzeit-Restriktion:
 ### Effekt der Policy
 
 - `platform_toolsets.telegram` wird auf eine enge Allowlist gesetzt:
-  - `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
-  - (Historisch: `skills` / `no_mcp` — nicht mehr Teil der first-safe Telegram-Allowlist.)
+  - `memory`, `session_search`, `todo`, `powerunits_docs`
+  - (Historisch: `skills` / `no_mcp` / `clarify` — `clarify` entfernt wegen fehlendem Gateway-Callback und Modell-Loops.)
 - Alle anderen relevanten Plattformen werden toolset-seitig auf `[]` gesetzt.
 - Plattform-Exposure:
   - `platforms.telegram.enabled = true`

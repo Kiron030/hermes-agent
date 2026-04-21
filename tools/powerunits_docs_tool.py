@@ -318,6 +318,8 @@ READ_POWERUNITS_DOC_SCHEMA = {
         "Read-only access to **allowlisted Powerunits documentation** shipped inside "
         "this Hermes image. Use **manifest keys only** (flat filenames like "
         "`implementation_state.md`) — never filesystem paths. "
+        "When the user explicitly requests this tool (including `action` and optional `key`), "
+        "invoke it immediately in your first tool-calling turn—do not spend turns narrating intent. "
         'Use action=list_keys to list allowed keys plus bundle freshness metadata. '
         "Does not access the live monorepo, database, or arbitrary files."
     ),

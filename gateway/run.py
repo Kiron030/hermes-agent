@@ -100,11 +100,12 @@ load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).resolve(
 _DOCKER_VOLUME_SPEC_RE = re.compile(r"^(?P<host>.+):(?P<container>/[^:]+?)(?::(?P<options>[^:]+))?$")
 _DOCKER_MEDIA_OUTPUT_CONTAINER_PATHS = {"/output", "/outputs"}
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+# Clarify omitted: Telegram gateway does not wire clarify_callback on AIAgent; exposing
+# clarify led to tool-error loops. Use read_powerunits_doc / memory / session_search / todo.
 _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
     "memory",
     "session_search",
     "todo",
-    "clarify",
     "powerunits_docs",
 }
 
@@ -9502,6 +9503,15 @@ class GatewayRunner:
                 combined_ephemeral = (combined_ephemeral + "\n\n" + event_channel_prompt).strip()
             if self._ephemeral_system_prompt:
                 combined_ephemeral = (combined_ephemeral + "\n\n" + self._ephemeral_system_prompt).strip()
+
+            if _powerunits_lockdown_enabled() and platform_key == "telegram":
+                _pu_tool_hint = (
+                    "Powerunits first-safe (Telegram): use tools directly when the user gives a concrete "
+                    "instruction. For bundled Powerunits docs, call read_powerunits_doc in your next "
+                    "tool-calling turn (e.g. action=list_keys or action=read with key) without "
+                    "narration-only turns or placeholder confirmations."
+                )
+                combined_ephemeral = (combined_ephemeral + "\n\n" + _pu_tool_hint).strip()
 
             # Re-read .env and config for fresh credentials (gateway is long-lived,
             # keys may change without restart).

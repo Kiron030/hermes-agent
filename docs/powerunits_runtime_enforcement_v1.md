@@ -55,7 +55,6 @@ In `gateway/run.py`:
   - `memory`
   - `session_search`
   - `todo`
-  - `clarify`
   - `powerunits_docs`
 - Kein Browser, kein Code-Execution, kein File-Mutation-Toolset, keine Delegation, kein Cron, kein MCP.
 
@@ -75,7 +74,7 @@ In `docker/apply_powerunits_runtime_policy.py`:
 
 - Telegram-Allowlist auf first-safe Kernflaeche reduziert:
   - entfernt: `skills`, `no_mcp`
-  - gesetzt: `memory`, `session_search`, `todo`, `clarify`, `powerunits_docs`
+  - gesetzt: `memory`, `session_search`, `todo`, `powerunits_docs`
 
 ---
 

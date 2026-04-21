@@ -21,7 +21,6 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "memory",
     "session_search",
     "todo",
-    "clarify",
     "powerunits_docs",
 ]
 
