@@ -213,3 +213,12 @@ Build-Zeit-Bundle (`scripts/bundle_powerunits_docs.py`), gestufte Dateien unter 
 First-safe Telegram-Toolset um `powerunits_docs` / `read_powerunits_doc` erweitert; optional nur fuer Tests: `HERMES_POWERUNITS_DOCS_BUNDLE`.
 
 - `docs/powerunits_docs_reader_v1.md`
+
+## Internal deploy artifact contract (docs reader)
+
+`read_powerunits_doc` funktioniert nur, wenn das Build-Artefakt `docker/powerunits_docs/` inkl. `MANIFEST.json` **im deployten Image enthalten** ist.
+
+- Public-safe Code ohne dieses Artefakt bleibt deploybar, aber der Docs-Reader ist dann zur Laufzeit deaktiviert (Tool via `check_fn` versteckt, Warn-Log sichtbar).
+- Das ist erwartetes fail-closed Verhalten; keine Live-Repo-/DB-Fallbacks.
+
+Empfehlung fuer internen Betrieb: interner Build-Job erzeugt zuerst das Bundle (`scripts/bundle_powerunits_docs.py`), validiert `docker/powerunits_docs/MANIFEST.json`, baut dann erst das Railway-Image.

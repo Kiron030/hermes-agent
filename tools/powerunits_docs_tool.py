@@ -33,6 +33,7 @@ _BUNDLED_DOCS_NOTICE = (
     "Content is from bundled allowlisted documentation (build-time snapshot), "
     "not live monorepo or database state."
 )
+_BUNDLE_UNAVAILABLE_WARNED = False
 
 
 def _env_int(name: str, default: int) -> int:
@@ -158,9 +159,17 @@ def _load_manifest(bundle: Path) -> dict[str, Any]:
 
 def check_powerunits_docs_requirements() -> bool:
     """Expose the bundled docs surface only when manifest and files are present."""
+    global _BUNDLE_UNAVAILABLE_WARNED
     try:
         bundle = _bundle_root()
         if not bundle.is_dir():
+            if not _BUNDLE_UNAVAILABLE_WARNED:
+                logger.warning(
+                    "Powerunits docs tool disabled: bundle directory missing at %s. "
+                    "read_powerunits_doc requires docker/powerunits_docs + MANIFEST.json in the deployed image.",
+                    bundle,
+                )
+                _BUNDLE_UNAVAILABLE_WARNED = True
             return False
         data = _load_manifest(bundle)
         root = bundle.resolve()
@@ -169,12 +178,31 @@ def check_powerunits_docs_requirements() -> bool:
             try:
                 path.relative_to(root)
             except ValueError:
+                if not _BUNDLE_UNAVAILABLE_WARNED:
+                    logger.warning(
+                        "Powerunits docs tool disabled: manifest entry escaped bundle root (%s).",
+                        key,
+                    )
+                    _BUNDLE_UNAVAILABLE_WARNED = True
                 return False
             if not path.is_file():
+                if not _BUNDLE_UNAVAILABLE_WARNED:
+                    logger.warning(
+                        "Powerunits docs tool disabled: manifest key %s missing on disk under %s.",
+                        key,
+                        bundle,
+                    )
+                    _BUNDLE_UNAVAILABLE_WARNED = True
                 return False
+        _BUNDLE_UNAVAILABLE_WARNED = False
         return True
     except Exception as exc:
-        logger.debug("powerunits docs bundle unavailable: %s", exc)
+        if not _BUNDLE_UNAVAILABLE_WARNED:
+            logger.warning(
+                "Powerunits docs tool disabled: invalid or missing MANIFEST.json/bundle (%s).",
+                exc,
+            )
+            _BUNDLE_UNAVAILABLE_WARNED = True
         return False
 
 

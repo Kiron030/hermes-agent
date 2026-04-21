@@ -107,6 +107,7 @@ python scripts/bundle_powerunits_docs.py
 
 - **Keine** zusaetzlichen Railway-Umgebungsvariablen fuer docs-only v1 erforderlich.
 - Das Bundle ist **im Image**; Aktualisierung = **Rebuild + Deploy**, kein Runtime-Download aus dem Monorepo.
+- Wenn `docker/powerunits_docs/` vom Deploy-Pfad ausgeschlossen wird, ist der Reader absichtlich **nicht verfuegbar** (`check_fn` hide, Warn-Log im Startup/Runtime-Pfad).
 
 ---
 

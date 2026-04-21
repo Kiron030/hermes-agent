@@ -80,6 +80,12 @@ Wie in `docs/powerunits_docs_read_surface_v1.md`: `scripts/bundle_powerunits_doc
 - Im Container oder lokal: JSON lesen — `entries[].key`.
 - In Telegram (wenn Modell Tools nutzen darf): z. B. Anweisung, `read_powerunits_doc` mit `action=list_keys` aufzurufen.
 
+### Fehlende Bundle-Artefakte (klarer Fail)
+
+- Wenn `docker/powerunits_docs/` oder `MANIFEST.json` im deployten Image fehlt/ungueltig ist, wird `read_powerunits_doc` via `check_fn` **nicht exponiert** (fail-closed).
+- Runtime-Log zeigt dann eine explizite Warnung: Docs-Tool deaktiviert, Bundle-Artefakt fehlt/ist inkonsistent.
+- In diesem Zustand darf Hermes keine Docs-Lesefaehigkeit behaupten; Operator muss intern mit gebuendeltem Artefakt neu bauen/deployen.
+
 ### Nachweis „nur allowgelistet“
 
 - Modell kann **kein** `read_file` aufs Repo aus first-safe heraus aufrufen (weiterhin blockiert).

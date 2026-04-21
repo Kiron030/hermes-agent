@@ -9511,6 +9511,16 @@ class GatewayRunner:
                     "tool-calling turn (e.g. action=list_keys or action=read with key) without "
                     "narration-only turns or placeholder confirmations."
                 )
+                try:
+                    from tools.powerunits_docs_tool import check_powerunits_docs_requirements
+                    if not check_powerunits_docs_requirements():
+                        _pu_tool_hint += (
+                            " IMPORTANT: docs bundle artifact is currently unavailable in this deployment, "
+                            "so do not claim you can read Powerunits docs; state clearly that redeploy with "
+                            "docker/powerunits_docs and MANIFEST.json is required."
+                        )
+                except Exception:
+                    pass
                 combined_ephemeral = (combined_ephemeral + "\n\n" + _pu_tool_hint).strip()
 
             # Re-read .env and config for fresh credentials (gateway is long-lived,
