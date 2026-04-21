@@ -36,6 +36,21 @@ Fehlt eines davon, deaktiviert `check_fn` den Reader.
    - alle Manifest-Keys existieren im Bundle-Verzeichnis
 4. Erst danach Docker-Image bauen und nach Railway deployen.
 
+### Railway local deploy from Windows (`railway up`)
+
+Der Repo-`gitignore` schliesst `docker/powerunits_docs/` aus, damit gebuendelte interne Docs nicht versehentlich committet werden.
+Fuer lokalen Railway-Deploy wird das ueber `.railwayignore` explizit wieder einbezogen.
+
+Operator-Ablauf:
+
+1. Bundle erzeugen (`scripts/bundle_powerunits_docs.py ...`).
+2. Lokal pruefen: `docker/powerunits_docs/MANIFEST.json` + `.md` Dateien vorhanden.
+3. `railway up` aus dem Repo-Root starten.
+
+Wenn der Reader nach Deploy trotzdem fehlt, sind die ersten Checks:
+- Deploy-Artefakt/Upload hat `docker/powerunits_docs/` nicht enthalten.
+- Runtime-Warnung: "Powerunits docs tool disabled ..." (Bundle/Manifest fehlt oder inkonsistent).
+
 ## Runtime diagnostics
 
 Bei fehlendem/ungueltigem Bundle wird eine Warnung geloggt, sinngemaess:

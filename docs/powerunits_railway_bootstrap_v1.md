@@ -24,6 +24,7 @@ Der Auftrag ist bewusst **minimaler Railway-Bootstrap** fuer einen sicheren inte
 - Docker-Default ist jetzt repo-seitig explizit auf Gateway gesetzt:
   - `Dockerfile`: `CMD ["gateway", "run"]`
   - `docker/entrypoint.sh`: fallback auf `gateway run`, wenn kein Command uebergeben wurde.
+  - Entrypoint wird im Image explizit mit `chmod 0755` gesetzt (unabhaengig vom Host-Git-Filemode, wichtig fuer Windows/`railway up`).
 
 ### Docker vs. non-Docker on Railway
 
@@ -222,3 +223,8 @@ First-safe Telegram-Toolset um `powerunits_docs` / `read_powerunits_doc` erweite
 - Das ist erwartetes fail-closed Verhalten; keine Live-Repo-/DB-Fallbacks.
 
 Empfehlung fuer internen Betrieb: interner Build-Job erzeugt zuerst das Bundle (`scripts/bundle_powerunits_docs.py`), validiert `docker/powerunits_docs/MANIFEST.json`, baut dann erst das Railway-Image.
+
+### Local `railway up` packaging note (Windows)
+
+`docker/powerunits_docs/` bleibt in `.gitignore`, damit interne Docs nicht in den Public-Repo-Flow geraten.
+Fuer lokalen Railway-Deploy wird das Bundle ueber `.railwayignore` explizit wieder eingeschlossen.
