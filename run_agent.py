@@ -6790,63 +6790,6 @@ class AIAgent:
             or base_url_host_matches(self.base_url, "moonshot.cn")
         )
 
-<<<<<<< HEAD
-            kwargs = {
-                "model": self.model,
-                "instructions": instructions,
-                "input": self._chat_messages_to_responses_input(payload_messages),
-                "tools": self._responses_tools(),
-                "tool_choice": "auto",
-                "parallel_tool_calls": True,
-                "store": False,
-            }
-
-            if not is_github_responses:
-                kwargs["prompt_cache_key"] = self.session_id
-
-            is_xai_responses = self.provider == "xai" or "api.x.ai" in (self.base_url or "").lower()
-            # OpenAI /v1/responses: only GPT-5+ accepts reasoning.encrypted_content.
-            # GPT-4.x (e.g. gpt-4.1-mini) returns 400 if ``include`` requests it.
-            is_openai_direct_responses = (
-                self._is_direct_openai_url()
-                and not is_github_responses
-                and not is_xai_responses
-            )
-            openai_encrypted_reasoning_ok = (
-                not is_openai_direct_responses
-                or self._model_requires_responses_api(self.model)
-            )
-
-            if reasoning_enabled and is_xai_responses:
-                # xAI reasons automatically — no effort param, just include encrypted content
-                kwargs["include"] = ["reasoning.encrypted_content"]
-            elif reasoning_enabled:
-                if is_github_responses:
-                    # Copilot's Responses route advertises reasoning-effort support,
-                    # but not OpenAI-specific prompt cache or encrypted reasoning
-                    # fields. Keep the payload to the documented subset.
-                    github_reasoning = self._github_models_reasoning_extra_body()
-                    if github_reasoning is not None:
-                        kwargs["reasoning"] = github_reasoning
-                elif openai_encrypted_reasoning_ok:
-                    kwargs["reasoning"] = {"effort": reasoning_effort, "summary": "auto"}
-                    kwargs["include"] = ["reasoning.encrypted_content"]
-                else:
-                    # Direct OpenAI + non-GPT-5 model: omit reasoning/include entirely.
-                    kwargs["include"] = []
-            elif not is_github_responses and not is_xai_responses:
-                kwargs["include"] = []
-
-            if self.request_overrides:
-                kwargs.update(self.request_overrides)
-
-            if self.max_tokens is not None and not is_codex_backend:
-                kwargs["max_output_tokens"] = self.max_tokens
-
-            if is_xai_responses and getattr(self, "session_id", None):
-                kwargs["extra_headers"] = {"x-grok-conv-id": self.session_id}
-
-            return kwargs
 
         sanitized_messages = api_messages
         needs_sanitization = False
@@ -6927,10 +6870,8 @@ class AIAgent:
             "messages": sanitized_messages,
             "timeout": self._resolved_api_call_timeout(),
         }
-=======
         # Temperature: _fixed_temperature_for_model may return OMIT_TEMPERATURE
         # sentinel (temperature omitted entirely), a numeric override, or None.
->>>>>>> upstream/main
         try:
             from agent.auxiliary_client import _fixed_temperature_for_model, OMIT_TEMPERATURE
             _ft = _fixed_temperature_for_model(self.model, self.base_url)

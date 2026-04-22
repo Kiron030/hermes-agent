@@ -108,3 +108,7 @@ Fuer den Gesamtueberblick (Ist-Zustand, Workflow, Grenzen, staged Roadmap):
 
 - `docs/powerunits_operator_setup_and_roadmap_v1.md`
 - `docs/powerunits_fork_sync_strategy_v1.md`
+
+Hinweis zur Wartungspolitik: Upstream-Syncs bevorzugt release-/tag-basiert und weiterhin nur ueber Integrationsbranch + Validierung in den stabilen Powerunits-Zweig uebernehmen.
+
+Praktisch: `scripts/sync_upstream_powerunits.ps1` unterstuetzt `-UpstreamRef <tag/ref>` und `-ConservativeMode`, inkl. Warnhinweisen fuer sensible Diff-Pfade (Workflows, Setup-/Install-Pfade).
