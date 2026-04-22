@@ -1,0 +1,29 @@
+{
+  "upstream_remote": "upstream",
+  "origin_remote": "origin",
+  "upstream_branch": "main",
+  "stable_branch": "powerunits-internal-setup",
+  "active_branch": "powerunits-internal-setup",
+  "integration_branch_prefix": "integration/upstream-sync-",
+  "protected_paths": [
+    "docker/apply_powerunits_runtime_policy.py",
+    "gateway/run.py",
+    "model_tools.py",
+    "toolsets.py",
+    "tools/powerunits_*",
+    "docker/entrypoint.sh",
+    "Dockerfile",
+    ".dockerignore",
+    ".railwayignore",
+    "docker/SOUL.md",
+    "docs/powerunits_*.md"
+  ],
+  "validation_reminders": [
+    "Run Docker build/startup smoke checks.",
+    "Verify first-safe toolset restrictions still apply.",
+    "Test GitHub docs reader allowlist behavior.",
+    "Test workspace save/read roundtrip under /opt/data/hermes_workspace.",
+    "Run Telegram docs-to-workspace smoke flow.",
+    "Open PR into powerunits-internal-setup only after validation."
+  ]
+}

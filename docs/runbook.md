@@ -107,3 +107,4 @@ Kein delete/rename/generische Pfadschreibrechte.
 Fuer den Gesamtueberblick (Ist-Zustand, Workflow, Grenzen, staged Roadmap):
 
 - `docs/powerunits_operator_setup_and_roadmap_v1.md`
+- `docs/powerunits_fork_sync_strategy_v1.md`
