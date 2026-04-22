@@ -12,6 +12,18 @@ Ziel: Upstream-Verbesserungen aufnehmen, ohne die Powerunits-first-safe Sicherhe
 
 ## 2) Safe upstream update workflow
 
+### Maintenance policy (default)
+
+- Standardquelle fuer Syncs ist **upstream Release/Tag**, nicht jeder neue Commit auf `upstream/main`.
+- `upstream/main` wird nur selektiv verwendet (siehe unten), wenn ein konkreter Fix/Blocker frueh benoetigt wird.
+- Ziel ist ein **kleiner, reviewbarer Delta-Umfang** pro Sync.
+
+Wann `upstream/main` trotzdem ok ist:
+
+- kritischer Fix ist noch nicht getaggt, aber fuer Stabilitaet/Sicherheit notwendig
+- klar abgegrenzter Scope, der in einer Integrationsbranch pruefbar bleibt
+- ausreichende Zeit fuer Konfliktloesung + Post-sync-Validierung ist eingeplant
+
 Empfohlener Ablauf:
 
 1. Fork lokal aktualisieren:
@@ -28,6 +40,10 @@ Empfohlener Ablauf:
 6. Branch pushen und PR nach `powerunits-internal-setup`.
 
 Hinweis: Keine direkten Pushes auf produktionsnahe Hauptbranches.
+
+#### Supply-chain caution (praktisch, nicht alarmistisch)
+
+Oeffentliche Upstream-Repos werden **nicht** pauschal als malizioes angenommen. Trotzdem erhoehen grosse, unauditierte Syncs das Regression- und Review-Risiko deutlich. Deshalb fuer Powerunits: lieber kleinere, nachvollziehbare, selektive Updates statt "immer alles sofort".
 
 ### Sync Quickstart (ca. 10 Befehle)
 
@@ -109,6 +125,15 @@ Regel:
 
 - Upstream-Syncs immer in dediziertem Integrationszweig.
 - Erst nach Review + Smoke-Validierung in den stabilen Betriebszweig mergen.
+- Integrationszweige bleiben auch bei Release-Tag-Syncs verpflichtend (kein Direkt-Merge in `powerunits-internal-setup`).
+- Betreiberregel: **stabile, selektive, reviewbare Updates** vor "latest chasing".
+
+Warum Integrationsbranch + Validierung zwingend bleiben:
+
+- trennt Upstream-Import klar vom stabilen Deploy-Zweig
+- macht Konflikte in Powerunits-Guardrails sichtbar und gezielt pruefbar
+- reduziert Ausfallrisiko fuer Railway-/Telegram-first-safe Betrieb
+- verhindert, dass ungetestete Provider-/Runtime-Aenderungen direkt in den Live-Pfad gehen
 
 ---
 
@@ -138,19 +163,22 @@ Beispiel:
 
 - `pwsh ./scripts/sync_upstream_powerunits.ps1`
 - `pwsh ./scripts/sync_upstream_powerunits.ps1 -DryRun`
+- Release/Tag-first (empfohlen): `pwsh ./scripts/sync_upstream_powerunits.ps1 -UpstreamRef v0.10.0 -ConservativeMode`
 - Optional mit explizitem Datum: `pwsh ./scripts/sync_upstream_powerunits.ps1 -DateStamp 20260421`
 
 Was das Script macht:
 
 1. prueft sauberen Working Tree
 2. prueft erforderliche Remotes
-3. fetched `upstream` und `origin`
+3. fetched `upstream` (inkl. Tags) und `origin`
 4. wechselt auf stabilen Branch und aktualisiert ihn
 5. erstellt Integrationsbranch `integration/upstream-sync-YYYYMMDD`
-6. merged `upstream/main`
+6. merged bevorzugt den angegebenen Release/Tag-Ref (`-UpstreamRef`), sonst Config-Default
 7. stoppt bei Konflikten (kein Auto-Resolve)
 8. pusht Integrationsbranch zu `origin`
 9. gibt Review-/Validierungs-Reminder aus
+10. meldet sensible Diff-Pfade (z. B. `.github/workflows/*`, `hermes_cli/setup.py`, Install-Skripte)
+11. mit `-ConservativeMode`: markiert Workflow-/Supply-Chain-sensitive Dateien explizit als "defer for later review"
 
 Was das Script **nicht** macht (absichtlich):
 

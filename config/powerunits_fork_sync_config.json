@@ -2,9 +2,22 @@
   "upstream_remote": "upstream",
   "origin_remote": "origin",
   "upstream_branch": "main",
+  "default_upstream_ref": "main",
   "stable_branch": "powerunits-internal-setup",
   "active_branch": "powerunits-internal-setup",
   "integration_branch_prefix": "integration/upstream-sync-",
+  "sensitive_path_patterns": [
+    ".github/workflows/*",
+    "hermes_cli/setup.py",
+    "scripts/install.sh",
+    "scripts/install.ps1",
+    "setup-hermes.sh",
+    "Dockerfile"
+  ],
+  "conservative_defer_patterns": [
+    ".github/workflows/*",
+    "hermes_cli/setup.py"
+  ],
   "protected_paths": [
     "docker/apply_powerunits_runtime_policy.py",
     "gateway/run.py",
@@ -24,6 +37,7 @@
     "Test GitHub docs reader allowlist behavior.",
     "Test workspace save/read roundtrip under /opt/data/hermes_workspace.",
     "Run Telegram docs-to-workspace smoke flow.",
+    "Review sensitive-path diffs (.github/workflows, setup/install paths) before merge.",
     "Open PR into powerunits-internal-setup only after validation."
   ]
 }
