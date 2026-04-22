@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "description": "Canonical Hermes config for Powerunits GitHub docs (read-only). No secrets. Override paths via env HERMES_POWERUNITS_DOC_KEY_ALLOWLIST if needed.",
+  "doc_key_allowlist_relative": "scripts/powerunits_docs_allowlist.json",
+  "surfaces": [
+    {
+      "alias": "powerunits_docs",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "root_prefix": "docs",
+      "allowed_extensions": [".md", ".txt"],
+      "enabled": true
+    },
+    {
+      "alias": "powerunits_roadmap",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "root_prefix": "docs/roadmap",
+      "allowed_extensions": [".md", ".txt"],
+      "enabled": true
+    },
+    {
+      "alias": "powerunits_architecture",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "root_prefix": "docs/architecture",
+      "allowed_extensions": [".md", ".txt"],
+      "enabled": true
+    }
+  ]
+}

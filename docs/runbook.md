@@ -26,6 +26,8 @@ Fuer funktionierenden Docs-Reader muss das deployte Image enthalten:
 
 Fehlt eines davon, deaktiviert `check_fn` den Reader.
 
+Hinweis (aktueller Betriebsfokus): Der gebuendelte Reader ist ein **legacy/optional fallback**. Primaerer Powerunits-Doku-Zugriff erfolgt ueber allowgelistete GitHub-Read-Surfaces.
+
 ## Recommended internal deployment pattern (current)
 
 1. Monorepo-Checkout aktualisieren.
@@ -55,14 +57,15 @@ Wenn der Reader nach Deploy trotzdem fehlt, sind die ersten Checks:
 
 Bei fehlendem/ungueltigem Bundle wird eine Warnung geloggt, sinngemaess:
 
-- Docs-Tool deaktiviert, Bundle-Verzeichnis fehlt
-- oder Manifest/Entry inkonsistent
+- Legacy bundled-docs surface nicht verfuegbar (Info-Hinweis), inkl. Ursache
+  - Bundle-Verzeichnis fehlt
+  - oder Manifest/Entry inkonsistent
 
 Damit ist fuer Operatoren sofort sichtbar: Deploy war erfolgreich, aber Docs-Reader ist nicht verfuegbar, weil das interne Bundle-Artefakt fehlt.
 
 ## Operator-managed GitHub read allowlist
 
-Datei: `config/powerunits_repo_read_allowlist.json`
+Datei: `config/powerunits_github_knowledge.json`
 
 Schema pro Surface:
 
@@ -112,3 +115,5 @@ Fuer den Gesamtueberblick (Ist-Zustand, Workflow, Grenzen, staged Roadmap):
 Hinweis zur Wartungspolitik: Upstream-Syncs bevorzugt release-/tag-basiert und weiterhin nur ueber Integrationsbranch + Validierung in den stabilen Powerunits-Zweig uebernehmen.
 
 Praktisch: `scripts/sync_upstream_powerunits.ps1` unterstuetzt `-UpstreamRef <tag/ref>` und `-ConservativeMode`, inkl. Warnhinweisen fuer sensible Diff-Pfade (Workflows, Setup-/Install-Pfade).
+
+Branch-Regel aus dem ersten echten Sync: Sync-Helper-/Policy-Haertungen zunaechst im Integrationsbranch entwickeln und validieren; nach erfolgreichem Sync als verifizierten Standard in `powerunits-internal-setup` uebernehmen.

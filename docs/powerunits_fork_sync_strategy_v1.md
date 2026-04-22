@@ -101,7 +101,7 @@ Mindestens diese Validierung nach jedem Upstream-Sync:
    - `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1` greift
    - Telegram-Toolset bleibt auf erlaubte Powerunits-Toolsets begrenzt
 3. **GitHub read surfaces**
-   - Allowlist funktioniert (`config/powerunits_repo_read_allowlist.json`)
+   - Allowlist funktioniert (`config/powerunits_github_knowledge.json`)
    - Alias-basierte Reads funktionieren fail-closed
 4. **Workspace**
    - `/opt/data/hermes_workspace` nutzbar
@@ -186,3 +186,32 @@ Was das Script **nicht** macht (absichtlich):
 - kein Auto-Merge nach `main`
 - kein Auto-Deploy
 - kein automatisches Konflikt-Resolving
+
+---
+
+## 8) Lessons learned (first real sync)
+
+Technisch:
+
+- Merge kann formal "resolved" sein, obwohl Marker-Reste im File bleiben; daher nach Konfliktloesung immer Marker-Scan (`<<<<<<<`, `=======`, `>>>>>>>`) + Syntax-Check auf kritische Runtime-Dateien.
+- Workflow-Diffs unter `.github/workflows/` und Supply-Chain-sensitive Pfade (z. B. `hermes_cli/setup.py`) brauchen explizite Sichtpruefung, auch wenn kein akuter Fehler sichtbar ist.
+- Tag-first plus kleiner Scope reduziert Konfliktflaeche und vereinfacht Root-Cause-Analyse bei Runtime-Breaks.
+
+Operativ:
+
+- Integrationsbranch als Quarantaene fuer Upstream-Import hat sich bewaehrt; stabile Branch blieb bis zur Verifikation unberuehrt.
+- Telegram/Railway-Smoke muss als Gate vor Merge in `powerunits-internal-setup` gelten.
+- Sensible Diffs sollten bei Bedarf in separaten Folge-PRs isoliert werden statt im grossen Sync-PR mitzulaufen.
+
+Empfohlene Branch-Strategie (clean):
+
+- **Immer**: `integration/upstream-sync-YYYYMMDD` fuer Upstream-Import.
+- **Dann**:
+  - `integration/upstream-sync-YYYYMMDD` -> PR nach `powerunits-internal-setup` (nur nach Validierung).
+  - optionale Folgebranches fuer Deferred-Themen, z. B. `integration/upstream-workflow-review-*`.
+
+Wann Sync-Helper/Doku-Aenderungen wohin gehoeren:
+
+- **Auf Integrationsbranch**, wenn die Aenderung aus dem aktuellen Sync gelernt wurde oder direkt zur sicheren Abarbeitung dieses Syncs gehoert (z. B. sensitive-path Warnungen, Tag-Ref Verhalten, Marker-Checks).
+- **Auf Stable branch**, wenn die Verbesserung bereits durch den laufenden Sync verifiziert wurde, keinen zusaetzlichen riskanten Scope oeffnet und als neuer Betriebsstandard fuer den naechsten Sync gelten soll.
+- Praktische Regel: erst im Integrationskontext beweisen, dann mit dem Sync oder unmittelbar danach gezielt nach `powerunits-internal-setup` uebernehmen.

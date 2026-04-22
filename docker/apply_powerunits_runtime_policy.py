@@ -24,6 +24,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_docs",
     "powerunits_github_docs",
     "powerunits_workspace",
+    "powerunits_timescale_read",
 ]
 
 DISABLED_PLATFORMS = [

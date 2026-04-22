@@ -210,6 +210,15 @@ TOOLSETS = {
         ],
         "includes": [],
     },
+
+    "powerunits_timescale_read": {
+        "description": (
+            "Staged operator-only bounded read against Timescale "
+            "(DATABASE_URL_TIMESCALE, feature-flagged); single view, fixed patterns."
+        ),
+        "tools": ["read_powerunits_timescale_dataset"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

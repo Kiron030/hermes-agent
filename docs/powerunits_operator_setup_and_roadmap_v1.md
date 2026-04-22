@@ -34,7 +34,7 @@
 
 ### 1) Read surfaces verwalten
 
-Datei: `config/powerunits_repo_read_allowlist.json`
+Datei: `config/powerunits_github_knowledge.json`
 
 Pro Surface:
 
