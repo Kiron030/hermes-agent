@@ -92,7 +92,7 @@ def _resolve_entry(key: str) -> dict[str, Any]:
         raise ValueError("key is required")
     entries = _load_allowlist_entries()
     if k not in entries:
-        raise ValueError(f"unknown key: {k!r}; use action=list_keys")
+        raise ValueError(f"unknown key: {k!r}; use action=list_repo_b_keys")
     return entries[k]
 
 
@@ -128,8 +128,17 @@ def read_powerunits_repo_b_allowlisted(
         return tool_error("Missing GitHub read token (POWERUNITS_GITHUB_TOKEN_READ).", error_code="missing_token")
 
     act = (action or "").strip().lower()
-    if act not in ("list_keys", "read"):
-        return tool_error('action must be "list_keys" or "read".', error_code="invalid_action")
+    # Legacy aliases (pre-disambiguation); prefer list_repo_b_keys / read_repo_b_key in prompts.
+    if act == "list_keys":
+        act = "list_repo_b_keys"
+    elif act == "read":
+        act = "read_repo_b_key"
+    if act not in ("list_repo_b_keys", "read_repo_b_key"):
+        return tool_error(
+            'action must be "list_repo_b_keys" or "read_repo_b_key" '
+            '(not read_powerunits_doc list_keys/read — those are manifest keys only).',
+            error_code="invalid_action",
+        )
 
     try:
         entries = _load_allowlist_entries()
@@ -137,18 +146,24 @@ def read_powerunits_repo_b_allowlisted(
         logger.warning("repo_b_read allowlist error: %s", type(exc).__name__)
         return tool_error(f"Allowlist invalid or unreadable: {exc}", error_code="allowlist_error")
 
-    if act == "list_keys":
+    if act == "list_repo_b_keys":
         keys = sorted(entries.keys())
         logger.info(
-            "repo_b_read target=github action=list_keys keys_count=%s outcome=success",
+            "repo_b_read target=github action=list_repo_b_keys keys_count=%s outcome=success",
             len(keys),
         )
         return json.dumps(
             {
                 "surface": "powerunits_repo_b_read",
-                "action": "list_keys",
+                "key_namespace": "repo_b_allowlist_snake_case",
+                "action": "list_repo_b_keys",
                 "keys": keys,
                 "allowlist_path": str(repo_b_allowlist_path()),
+                "disambiguation": (
+                    "These keys are from config/powerunits_repo_b_read_allowlist.json only. "
+                    "If you expected *.md filenames (e.g. implementation_state.md), "
+                    "that is read_powerunits_doc (doc manifest), not this tool."
+                ),
             },
             ensure_ascii=False,
         )
@@ -185,7 +200,8 @@ def read_powerunits_repo_b_allowlisted(
     return json.dumps(
         {
             "surface": "powerunits_repo_b_read",
-            "action": "read",
+            "key_namespace": "repo_b_allowlist_snake_case",
+            "action": "read_repo_b_key",
             "key": entry.get("key"),
             "repo": repo,
             "branch": branch,
@@ -202,22 +218,28 @@ def read_powerunits_repo_b_allowlisted(
 READ_POWERUNITS_REPO_B_SCHEMA = {
     "name": "read_powerunits_repo_b_allowlisted",
     "description": (
-        "Read-only allowlisted Repo B files via GitHub API (keys from "
-        "config/powerunits_repo_b_read_allowlist.json). No free paths. "
-        "Supplemental to primary GitHub docs reader; requires "
-        f"{_FEATURE_ENV}."
+        "**Repo B implementation allowlist only** (snake_case keys such as "
+        "`implementation_state`, `job_market_feature` from "
+        "`config/powerunits_repo_b_read_allowlist.json`). Reads **code and docs paths** "
+        "outside the doc-key manifest via GitHub API — **not** the same keys as "
+        "`read_powerunits_doc` (those are *.md manifest names like `implementation_state.md`). "
+        "Actions: `list_repo_b_keys`, `read_repo_b_key` (not list_keys/read). "
+        f"Requires {_FEATURE_ENV}. No free path parameters."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
-                "description": 'Use "list_keys" or "read".',
-                "enum": ["list_keys", "read"],
+                "description": (
+                    "list_repo_b_keys: list allowlist keys for THIS tool only. "
+                    "read_repo_b_key: read one file by snake_case key (e.g. job_market_feature)."
+                ),
+                "enum": ["list_repo_b_keys", "read_repo_b_key"],
             },
             "key": {
                 "type": "string",
-                "description": 'Allowlist key (required when action is "read").',
+                "description": 'Required when action is read_repo_b_key. Snake_case allowlist key (NOT *.md manifest names).',
             },
             "max_output_chars": {
                 "type": "integer",

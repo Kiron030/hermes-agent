@@ -39,7 +39,7 @@ def test_read_allowed_key(monkeypatch: pytest.MonkeyPatch) -> None:
         return "implementation body"
 
     raw = mod.read_powerunits_repo_b_allowlisted(
-        "read",
+        "read_repo_b_key",
         key="implementation_state",
         _fetch_raw=fake_fetch,
     )
@@ -47,6 +47,22 @@ def test_read_allowed_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert data["key"] == "implementation_state"
     assert data["content"] == "implementation body"
     assert data["truncated"] is False
+    assert data["surface"] == "powerunits_repo_b_read"
+    assert data["action"] == "read_repo_b_key"
+
+
+def test_legacy_read_action_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Old prompts using action=read still resolve."""
+    from tools import powerunits_repo_b_read_tool as mod
+
+    _enabled_env(monkeypatch)
+    raw = mod.read_powerunits_repo_b_allowlisted(
+        "read",
+        key="implementation_state",
+        _fetch_raw=lambda *a, **k: "body",
+    )
+    data = json.loads(raw)
+    assert data["action"] == "read_repo_b_key"
 
 
 def test_unknown_key_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,7 +70,7 @@ def test_unknown_key_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 
     _enabled_env(monkeypatch)
     raw = mod.read_powerunits_repo_b_allowlisted(
-        "read",
+        "read_repo_b_key",
         key="totally_unknown_key",
         _fetch_raw=lambda *a, **k: "",
     )
@@ -63,13 +79,28 @@ def test_unknown_key_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "unknown" in err["error"].lower()
 
 
-def test_list_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_repo_b_keys_includes_job_market_feature(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tools import powerunits_repo_b_read_tool as mod
+
+    _enabled_env(monkeypatch)
+    raw = mod.read_powerunits_repo_b_allowlisted("list_repo_b_keys")
+    data = json.loads(raw)
+    assert data["surface"] == "powerunits_repo_b_read"
+    assert data["key_namespace"] == "repo_b_allowlist_snake_case"
+    assert data["action"] == "list_repo_b_keys"
+    assert "implementation_state" in data["keys"]
+    assert "job_market_feature" in data["keys"]
+    assert "disambiguation" in data
+    assert ".md" in data["disambiguation"]
+
+
+def test_legacy_list_keys_action_alias(monkeypatch: pytest.MonkeyPatch) -> None:
     from tools import powerunits_repo_b_read_tool as mod
 
     _enabled_env(monkeypatch)
     raw = mod.read_powerunits_repo_b_allowlisted("list_keys")
     data = json.loads(raw)
-    assert "implementation_state" in data["keys"]
+    assert data["action"] == "list_repo_b_keys"
     assert "job_market_feature" in data["keys"]
 
 
@@ -79,6 +110,21 @@ def test_schema_has_no_free_path_parameter() -> None:
     props = READ_POWERUNITS_REPO_B_SCHEMA["parameters"]["properties"]
     assert "path" not in props
     assert "repo" not in props
+    enum = props["action"]["enum"]
+    assert "list_keys" not in enum
+    assert "read" not in enum
+
+
+def test_repo_b_schema_distinct_from_doc_tool_description() -> None:
+    from tools.powerunits_docs_tool import READ_POWERUNITS_DOC_SCHEMA
+    from tools.powerunits_repo_b_read_tool import READ_POWERUNITS_REPO_B_SCHEMA
+
+    doc_desc = READ_POWERUNITS_DOC_SCHEMA["description"].lower()
+    repo_desc = READ_POWERUNITS_REPO_B_SCHEMA["description"].lower()
+    assert "read_powerunits_repo_b_allowlisted" in doc_desc
+    assert "manifest" in doc_desc
+    assert "job_market_feature" in repo_desc
+    assert "list_repo_b_keys" in repo_desc or "read_repo_b_key" in repo_desc
 
 
 def test_first_safe_includes_repo_b_tool_when_gated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -103,7 +149,7 @@ def test_feature_disabled_returns_error(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv("HERMES_POWERUNITS_REPO_B_READ_ENABLED", raising=False)
     monkeypatch.setenv("POWERUNITS_GITHUB_TOKEN_READ", "tok")
     raw = mod.read_powerunits_repo_b_allowlisted(
-        "read",
+        "read_repo_b_key",
         key="implementation_state",
         _fetch_raw=lambda *a, **k: "x",
     )

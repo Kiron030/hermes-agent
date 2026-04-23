@@ -8,7 +8,7 @@
 |------|--------|
 | Tool name | `read_powerunits_repo_b_allowlisted` |
 | Toolset | `powerunits_repo_b_read` |
-| Actions | `list_keys` (no `key`), `read` (requires allowlist `key`) |
+| Actions | `list_repo_b_keys` (no `key`), `read_repo_b_key` (requires allowlist `key`) — distinct from `read_powerunits_doc`’s `list_keys` / `read` (manifest `*.md` keys). Legacy `list_keys` / `read` are still accepted by the handler but omitted from the schema. |
 | Allowlist file | `config/powerunits_repo_b_read_allowlist.json` (override: `HERMES_POWERUNITS_REPO_B_READ_ALLOWLIST`) |
 | Feature gate | `HERMES_POWERUNITS_REPO_B_READ_ENABLED` must be truthy (`1`, `true`, `yes`, `on`) |
 | GitHub auth | Same as docs: `POWERUNITS_GITHUB_TOKEN_READ` or legacy `POWERUNITS_GITHUB_DOCS_TOKEN` |

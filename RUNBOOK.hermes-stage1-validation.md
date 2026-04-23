@@ -74,20 +74,21 @@ Tool: `read_powerunits_repo_b_allowlisted` — **GitHub API only**, **key-only**
 
 ### Checklist
 
-- [ ] **Feature gate:** With `HERMES_POWERUNITS_REPO_B_READ_ENABLED` unset/false, a `read` call returns a clear **disabled** / missing-feature error (not a GitHub stack trace to the user).
+- [ ] **Feature gate:** With `HERMES_POWERUNITS_REPO_B_READ_ENABLED` unset/false, a `read_repo_b_key` call returns a clear **disabled** / missing-feature error (not a GitHub stack trace to the user).
 - [ ] **Gate on:** With flag **true** and `POWERUNITS_GITHUB_TOKEN_READ` (or legacy docs token) set, tool appears in the bounded tool surface (same `first_safe_v1` set as other Powerunits tools).
-- [ ] **`list_keys`:** `action=list_keys` returns JSON listing **only** keys from the allowlist file (e.g. contains `implementation_state`, `job_market_feature`).
-- [ ] **Allowed read:** `action=read`, `key=implementation_state` returns JSON with non-empty `content` and `path` matching allowlist (`docs/implementation_state.md`).
-- [ ] **Unknown key (negative):** `action=read`, `key=__nonexistent_key__` → error JSON (`unknown` / invalid key); no partial file body.
+- [ ] **`list_repo_b_keys`:** `action=list_repo_b_keys` returns JSON with `surface: powerunits_repo_b_read` and keys from `config/powerunits_repo_b_read_allowlist.json` only (must include `job_market_feature`).
+- [ ] **Allowed read:** `action=read_repo_b_key`, `key=implementation_state` returns JSON with non-empty `content` and `path` matching allowlist (`docs/implementation_state.md`).
+- [ ] **Unknown key (negative):** `action=read_repo_b_key`, `key=__nonexistent_key__` → error JSON (`unknown` / invalid key); no partial file body.
 - [ ] **No free path:** Confirm tool schema / `/help` description has **no** `path` / `repo` / free-form file argument — only `action`, optional `key`, optional `max_output_chars` (see `docs/powerunits_repo_b_read_operator_v1.md`).
 
 ### Smoke prompts (copy for internal / Telegram test)
 
-Ask Hermes to run the tool with **exact** arguments (or use an API/debug path your team uses):
+Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc manifest keys use `*.md` names; Repo B allowlist uses **snake_case** keys (`job_market_feature`, …).
 
-1. **List keys** — `read_powerunits_repo_b_allowlisted` with `{"action": "list_keys"}`.
-2. **Happy read** — `{"action": "read", "key": "implementation_state"}` (expect markdown body in `content`).
-3. **Reject** — `{"action": "read", "key": "__nonexistent_key__"}` (expect JSON error, no secrets).
+1. **List Repo B allowlist keys** — `{"action": "list_repo_b_keys"}` → JSON with `surface: powerunits_repo_b_read`, `key_namespace: repo_b_allowlist_snake_case`, keys include `job_market_feature`.
+2. **Happy read** — `{"action": "read_repo_b_key", "key": "implementation_state"}` (expect markdown body in `content`).
+3. **Reject** — `{"action": "read_repo_b_key", "key": "__nonexistent_key__"}` (expect JSON error, no secrets).
+4. **Wrong-tool check** — `read_powerunits_doc` with `{"action": "list_keys"}` → keys look like `implementation_state.md` and `surface: powerunits_doc_key_manifest` — **different** from step 1.
 
 ### Rollback (Repo B read only)
 

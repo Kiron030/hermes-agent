@@ -446,6 +446,8 @@ def read_powerunits_doc(
                 )
 
         payload: dict[str, Any] = {
+            "surface": "powerunits_doc_key_manifest",
+            "key_style": "manifest_filename_with_md_suffix",
             "keys": keys,
             "count": len(keys),
             "primary_knowledge_path": "github_allowlisted_docs",
@@ -602,12 +604,15 @@ def read_powerunits_doc(
 READ_POWERUNITS_DOC_SCHEMA = {
     "name": "read_powerunits_doc",
     "description": (
-        "Read-only access to **allowlisted Powerunits documentation**. "
+        "Read-only **doc-key manifest** Powerunits documentation (keys like "
+        "`implementation_state.md`, `runbook.md`). "
         "**Primary path:** GitHub (`Kiron030/Powerunits.io`, branch `starting_the_seven_phases`) "
         "for keys listed in the doc-key allowlist (see `config/powerunits_github_knowledge.json`). "
+        "**Do not use this tool** for Repo B implementation allowlist reads "
+        "(snake_case keys such as `job_market_feature`, Python paths under `backend/`): "
+        "use **`read_powerunits_repo_b_allowlisted`** with `list_repo_b_keys` / `read_repo_b_key`. "
         "**Fallback:** bundled snapshot under `docker/powerunits_docs/` when GitHub is "
-        "unavailable or after explicit degraded use — use manifest keys only (e.g. "
-        "`implementation_state.md`), never filesystem paths."
+        "unavailable or after explicit degraded use — manifest keys only, never filesystem paths."
     ),
     "parameters": {
         "type": "object",
@@ -615,7 +620,11 @@ READ_POWERUNITS_DOC_SCHEMA = {
             "action": {
                 "type": "string",
                 "enum": ["read", "list_keys"],
-                "description": 'read: fetch one doc by manifest key; list_keys: return all allowed keys.',
+                "description": (
+                    "read: fetch one doc by **manifest** key (*.md name). "
+                    "list_keys: list **doc manifest** keys only (see response surface=powerunits_doc_key_manifest). "
+                    "Not for Repo B allowlist snake_case keys — use read_powerunits_repo_b_allowlisted."
+                ),
             },
             "key": {
                 "type": "string",
