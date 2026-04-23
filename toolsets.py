@@ -219,6 +219,16 @@ TOOLSETS = {
         "tools": ["read_powerunits_timescale_dataset"],
         "includes": [],
     },
+
+    "powerunits_repo_b_read": {
+        "description": (
+            "Allowlisted Repo B file read via GitHub API only "
+            "(HERMES_POWERUNITS_REPO_B_READ_ENABLED + GitHub read token); "
+            "keys from config/powerunits_repo_b_read_allowlist.json."
+        ),
+        "tools": ["read_powerunits_repo_b_allowlisted"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

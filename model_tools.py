@@ -42,6 +42,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_github_docs",
     "powerunits_workspace",
     "powerunits_timescale_read",
+    "powerunits_repo_b_read",
 )
 
 

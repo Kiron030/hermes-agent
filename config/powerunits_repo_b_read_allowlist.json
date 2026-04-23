@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "description": "Frozen v1 key→path map for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). No secrets.",
+  "entries": [
+    {
+      "key": "implementation_state",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/implementation_state.md",
+      "content_type": "markdown",
+      "rationale": "Canonical what-exists vs planned listing for the product repo."
+    },
+    {
+      "key": "repo_boundaries",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/repo_boundaries_and_growth.md",
+      "content_type": "markdown",
+      "rationale": "Monorepo boundaries and where batch/API logic must not leak."
+    },
+    {
+      "key": "runbook",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/runbook.md",
+      "content_type": "markdown",
+      "rationale": "Operator commands and DB check entrypoints aligned to the platform."
+    },
+    {
+      "key": "architecture_overview",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/architecture_overview.md",
+      "content_type": "markdown",
+      "rationale": "High-level stack and layer relationships; doc-level complement to Timescale row facts."
+    },
+    {
+      "key": "job_market_feature",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/market_feature_job.py",
+      "content_type": "python",
+      "rationale": "Single high-signal hourly market_feature pipeline entrypoint (not whole jobs tree)."
+    }
+  ]
+}
