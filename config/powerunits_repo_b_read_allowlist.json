@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "description": "Frozen v1 key→path map for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). No secrets.",
+  "version": 2,
+  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR expansion. No secrets.",
   "entries": [
     {
       "key": "implementation_state",
@@ -41,6 +41,70 @@
       "path": "backend/services/data_ingestion/jobs/market_feature_job.py",
       "content_type": "python",
       "rationale": "Single high-signal hourly market_feature pipeline entrypoint (not whole jobs tree)."
+    },
+    {
+      "key": "job_entsoe_market",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/entsoe_market_job.py",
+      "content_type": "python",
+      "rationale": "v2: Core ENTSO-E market ingestion job wiring alongside market_feature."
+    },
+    {
+      "key": "adr_013_entsoe_raw_object_store",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/013_entsoe_raw_object_store.md",
+      "content_type": "markdown",
+      "rationale": "v2: Normative raw archive / bucket semantics for ENTSO-E pipeline questions."
+    },
+    {
+      "key": "job_era5_weather",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/era5_weather_job.py",
+      "content_type": "python",
+      "rationale": "v2: ERA5 weather ingestion entrypoint; pairs with weather ADR and Timescale facts."
+    },
+    {
+      "key": "adr_010_weather_ingestion_mvp",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/010_weather_ingestion_mvp_decisions.md",
+      "content_type": "markdown",
+      "rationale": "v2: Weather MVP semantics (indices, windows) for analyst questions vs code."
+    },
+    {
+      "key": "job_market_driver_feature",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/market_driver_feature_job.py",
+      "content_type": "python",
+      "rationale": "v2: Modeling-driver feature job; bridges hourly features to driver layer."
+    },
+    {
+      "key": "agent_repo_overview",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/agent_repo_overview.md",
+      "content_type": "markdown",
+      "rationale": "v2: Where code vs docs vs jobs live — reduces cross-repo confusion for operators."
+    },
+    {
+      "key": "target_architecture_v04",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/target_architecture_v0.4.md",
+      "content_type": "markdown",
+      "rationale": "v2: Target architecture reference; read alongside implementation_state for drift awareness."
+    },
+    {
+      "key": "adr_014_entsoe_generation_outages",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/014_entsoe_generation_outages_v1.md",
+      "content_type": "markdown",
+      "rationale": "v2: Generation outages pipeline semantics (A80/B) for outage-related analyst questions."
     }
   ]
 }

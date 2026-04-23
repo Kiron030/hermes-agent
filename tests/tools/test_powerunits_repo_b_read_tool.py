@@ -90,6 +90,10 @@ def test_list_repo_b_keys_includes_job_market_feature(monkeypatch: pytest.Monkey
     assert data["action"] == "list_repo_b_keys"
     assert "implementation_state" in data["keys"]
     assert "job_market_feature" in data["keys"]
+    assert "job_entsoe_market" in data["keys"]
+    assert "adr_010_weather_ingestion_mvp" in data["keys"]
+    assert "adr_014_entsoe_generation_outages" in data["keys"]
+    assert len(data["keys"]) >= 13
     assert "disambiguation" in data
     assert ".md" in data["disambiguation"]
 
