@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR expansion. No secrets.",
+  "version": 3,
+  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product slice. No secrets.",
   "entries": [
     {
       "key": "implementation_state",
@@ -105,6 +105,46 @@
       "path": "docs/adr/014_entsoe_generation_outages_v1.md",
       "content_type": "markdown",
       "rationale": "v2: Generation outages pipeline semantics (A80/B) for outage-related analyst questions."
+    },
+    {
+      "key": "frontend_product_ux_principles",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_product_ux_principles.md",
+      "content_type": "markdown",
+      "rationale": "v3: Product/UX principles for Trusted Analyst answers on experience and tone."
+    },
+    {
+      "key": "frontend_ui_architecture",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_ui_architecture.md",
+      "content_type": "markdown",
+      "rationale": "v3: UI shell/layering blueprint without diving into component trees."
+    },
+    {
+      "key": "frontend_punkt4_risiken",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_punkt4_risiken.md",
+      "content_type": "markdown",
+      "rationale": "v3: Documented UX/product risks for explicit caveat framing."
+    },
+    {
+      "key": "feature_policy",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/feature_policy.md",
+      "content_type": "markdown",
+      "rationale": "v3: Feature gating and product constraints Hermes must respect when advising."
+    },
+    {
+      "key": "adr_0008_monorepo_frontend_backend",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/0008-monorepo-frontend-backend.md",
+      "content_type": "markdown",
+      "rationale": "v3: ADR for frontend vs backend monorepo boundary questions."
     }
   ]
 }

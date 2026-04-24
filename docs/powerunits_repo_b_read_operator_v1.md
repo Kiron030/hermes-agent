@@ -21,11 +21,31 @@ Operator checklist and JSON-style smoke steps: **`RUNBOOK.hermes-stage1-validati
 
 ## Purpose
 
-Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys.
+Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2** and **Allowlist v3** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys.
+
+## Source precedence (Repo B read keys — quality)
+
+Use this when **several allowlist keys** could answer the same topic. Prefer **one primary key** per question type; pull a **second** key only to disambiguate.
+
+| Kind of question | Prefer first | Then (if needed) |
+|------------------|--------------|-------------------|
+| **What is implemented / live today?** | `implementation_state` | `architecture_overview`; job files (`job_market_feature`, `job_entsoe_market`, `job_era5_weather`, `job_market_driver_feature`) for **how** a pipeline is wired in code. |
+| **Normative design / storage / semantics** | Matching **ADR** (`adr_013_*`, `adr_010_*`, `adr_014_*`) | `repo_boundaries` if scope/monorepo rules matter. |
+| **Future / target direction (may lag prod)** | `target_architecture_v04` | `implementation_state` to contrast plan vs shipped reality. |
+| **How to run checks, migrate, operate** | `runbook` | `implementation_state` for whether a capability exists. |
+| **Where things live in the repo** | `agent_repo_overview` | `repo_boundaries`, then `implementation_state`. |
+| **Product / UX / UI boundaries (no component crawl)** | `frontend_product_ux_principles` | `frontend_ui_architecture`, then `feature_policy`; use **`adr_0008_monorepo_frontend_backend`** when the question is explicitly **frontend vs backend** responsibility in the monorepo. |
+
+**Cross-surface (outside this tool):** narrative roadmap doc keys → **`read_powerunits_doc`** first; row facts → **Timescale** tool; Repo B read for **allowlisted** implementation/ADR/job files only.
+
+### Ambiguity and recency
+
+- If **ADR vs job code vs `implementation_state`** appear to disagree, say so **explicitly**: quote or paraphrase each source and its **key**; treat **ADRs as normative for designed semantics**, **`implementation_state` as normative for “exists in platform today”**, **job files as “how the job is coded”** (may lag ADR until refactors land).  
+- If **`target_architecture_v04` vs `implementation_state`** conflict, state that target-arch may be **ahead or behind** deployment — default to **`implementation_state`** for “what we run now” unless the question is explicitly about target vision.
 
 ## Allowlist v2 (controlled expansion)
 
-**Config:** `config/powerunits_repo_b_read_allowlist.json` **version 2** — retains all **v1** keys and adds **exactly eight** entries for architecture / pipeline / ADR depth:
+**Historical slice (still in the same file at `version` ≥ 3):** the **v2** batch retains all **v1** keys and adds **eight** entries for architecture / pipeline / ADR depth:
 
 | Key | Why added |
 |-----|-----------|
@@ -40,9 +60,21 @@ Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B
 
 **Unchanged rules:** only **`list_repo_b_keys`** / **`read_repo_b_key`**; keys are **snake_case** from this JSON only; **GitHub remote only**; **Stage 1** stays read-only (no writer, no new tool classes).
 
+## Allowlist v3 (frontend / product slice)
+
+**Config version 3** adds **five** keys for **product, UX, and frontend-architecture** questions — still one file per key, no `src/` component trees:
+
+| Key | Role |
+|-----|------|
+| `frontend_product_ux_principles` | UX/product principles — default first stop for “how should the product behave?”. |
+| `frontend_ui_architecture` | UI shell / layering blueprint. |
+| `frontend_punkt4_risiken` | Documented UX/product risks — use for explicit caveats. |
+| `feature_policy` | Feature gating and surface constraints. |
+| `adr_0008_monorepo_frontend_backend` | Normative **frontend vs backend** boundary in the monorepo. |
+
 ## Why this is separate from GitHub docs (primary)
 
-The primary GitHub docs reader uses the **doc-key manifest** under curated `docs/` surfaces. This tool reads the **Repo B implementation allowlist** (including **non-manifest** paths such as selected `backend/...` jobs). Use **docs reader first** for narrative roadmap content; use **Repo B read** for allowlisted implementation files when needed.
+The primary GitHub docs reader uses the **doc-key manifest** under curated `docs/` surfaces. This tool reads the **Repo B implementation allowlist** (including **non-manifest** paths such as selected `backend/...` jobs). Use **docs reader first** for narrative roadmap content; use **Repo B read** for allowlisted implementation files when needed — and use the **source precedence** table above when choosing among overlapping Repo B keys.
 
 ## Why this is separate from Timescale
 
