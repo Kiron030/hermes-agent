@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product + v4 Option A arch/data/ops slice. No secrets.",
+  "version": 5,
+  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product + v4 Option A + v5 Option D fact-gathering (read-only). No secrets.",
   "entries": [
     {
       "key": "implementation_state",
@@ -193,6 +193,30 @@
       "path": "backend/services/data_ingestion/ops/backfill_entsoe_outages.py",
       "content_type": "python",
       "rationale": "v4 Option A: Chunked outage backfill ops script; complements outage jobs and ADR014."
+    },
+    {
+      "key": "apply_market_pipeline_schema_to_timescale",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "scripts/migrations/apply_market_pipeline_schema_to_timescale.py",
+      "content_type": "python",
+      "rationale": "v5 Option D: Canonical DDL file order applied to DATABASE_URL_TIMESCALE (includes 011 market_features_hourly)."
+    },
+    {
+      "key": "wave1_country_readiness_it_pl_se",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/operations/wave1_country_readiness_it_pl_se.md",
+      "content_type": "markdown",
+      "rationale": "v5 Option D: PL (and IT/SE) Wave-1 ENTSO-E / archive readiness — passthrough prices, DE–PL flows context."
+    },
+    {
+      "key": "ddl_011_create_market_features_hourly",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/db/011_create_market_features_hourly.sql",
+      "content_type": "sql",
+      "rationale": "v5 Option D: DDL for market_features_hourly — PK/hypertable/index facts for Timescale parity checks vs job upsert."
     }
   ]
 }

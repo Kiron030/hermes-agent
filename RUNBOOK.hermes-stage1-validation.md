@@ -13,7 +13,8 @@
 | `docs/powerunits_timescale_read_operator_v1.md` | Timescale tool env gates and scope. |
 | `docs/powerunits_repo_b_read_operator_v1.md` | Repo B allowlisted read (`read_powerunits_repo_b_allowlisted`); env-gated. |
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual browser/preview smoke (read-only; no Hermes URL fetch). |
-| `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2/v3/v4 expectations in checks below). |
+| `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
+| `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
 
 ---
 
@@ -85,6 +86,7 @@ Tool: `read_powerunits_repo_b_allowlisted` — **GitHub API only**, **key-only**
 - [ ] **Gate on:** With flag **true** and `POWERUNITS_GITHUB_TOKEN_READ` (or legacy docs token) set, tool appears in the bounded tool surface (same `first_safe_v1` set as other Powerunits tools).
 - [ ] **`list_repo_b_keys`:** `action=list_repo_b_keys` returns JSON with `surface: powerunits_repo_b_read` and keys from `config/powerunits_repo_b_read_allowlist.json` only (must include `job_market_feature`, v2 samples such as `job_entsoe_market`, and v3 `frontend_product_ux_principles` when allowlist **version** ≥ 3 — see file `version` field).
 - [ ] **Allowlist v4 (Option A):** When JSON **`version` ≥ 4**, `list_repo_b_keys` includes **at least one** Option A key (e.g. `adr_013_hybrid_postgis_timescale_strategy`, `job_entsoe_generation_outage`, or `agent_onboarding`).
+- [ ] **Allowlist v5 (Option D support):** When JSON **`version` ≥ 5**, `list_repo_b_keys` includes **at least one** v5 key (e.g. `apply_market_pipeline_schema_to_timescale`, `wave1_country_readiness_it_pl_se`, or `ddl_011_create_market_features_hourly`).
 - [ ] **Allowed read:** `action=read_repo_b_key`, `key=implementation_state` returns JSON with non-empty `content` and `path` matching allowlist (`docs/implementation_state.md`).
 - [ ] **Unknown key (negative):** `action=read_repo_b_key`, `key=__nonexistent_key__` → error JSON (`unknown` / invalid key); no partial file body.
 - [ ] **No free path:** Confirm tool schema / `/help` description has **no** `path` / `repo` / free-form file argument — only `action`, optional `key`, optional `max_output_chars` (see `docs/powerunits_repo_b_read_operator_v1.md`).

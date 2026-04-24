@@ -21,7 +21,7 @@ Operator checklist and JSON-style smoke steps: **`RUNBOOK.hermes-stage1-validati
 
 ## Purpose
 
-Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2**, **v3**, and **v4 (Option A)** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys.
+Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2**, **v3**, **v4 (Option A)**, and **v5 (Option D support)** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys. Growth / Option D decisions: **`docs/powerunits_hermes_growth_and_option_d_intake_v1.md`**.
 
 ## Source precedence (Repo B read keys — quality)
 
@@ -37,6 +37,8 @@ Use this when **several allowlist keys** could answer the same topic. Prefer **o
 | **Product / UX / UI boundaries (no component crawl)** | `frontend_product_ux_principles` | `frontend_ui_architecture`, then `feature_policy`; use **`adr_0008_monorepo_frontend_backend`** when the question is explicitly **frontend vs backend** responsibility in the monorepo. |
 | **ENTSO-E generation outages (pipeline order)** | **`adr_014_entsoe_generation_outages`** | **`job_entsoe_generation_outage`** → **`job_outage_country_hourly`** (ADR = semantics; jobs = wiring; optional **`ops_backfill_entsoe_outages`** for chunked backfill ops). |
 | **PostGIS vs Timescale / where geo vs time series live** | **`adr_013_hybrid_postgis_timescale_strategy`** | `architecture_overview`, `implementation_state` if deployment reality matters. |
+| **Option D — Timescale DDL order / `market_features_hourly` schema text** | **`apply_market_pipeline_schema_to_timescale`** + **`ddl_011_create_market_features_hourly`** | `job_market_feature` (runtime upsert/delete behavior), `runbook` (CLI windows). |
+| **Option D — PL country readiness (ENTSO-E / archive context)** | **`wave1_country_readiness_it_pl_se`** | `implementation_state` (chain table), `job_entsoe_market` if fetch wiring needed. |
 
 **Cross-surface (outside this tool):** narrative roadmap doc keys → **`read_powerunits_doc`** first; row facts → **Timescale** tool; Repo B read for **allowlisted** implementation/ADR/job files only.
 
@@ -86,6 +88,16 @@ Use this when **several allowlist keys** could answer the same topic. Prefer **o
 | `adr_011_era5_raw_storage_object_store` | ERA5 **raw** artifacts in **object storage** — complements `job_era5_weather` and `adr_010_weather_ingestion_mvp`. |
 | `agent_onboarding` | **Agent/operator** onboarding — workflow, boundaries, how to work the repo safely. |
 | `ops_backfill_entsoe_outages` | **Ops** chunked backfill for outages — read alongside outage ADR/jobs, not as a second generic `ops/` tree. |
+
+## Allowlist v5 (Option D support — fact-gathering only)
+
+**Config version 5** adds **three** keys for **Option D** intake: confirming how **`market_features_hourly`** lands on Timescale (DDL apply order + `011` definition), and **PL** Wave-1 operational context. These keys **do not** enable writes, jobs, or Hermes-side mutation — they only ground **read-only** answers before any staging-only write experiment is designed or operator-run outside Hermes.
+
+| Key | Role |
+|-----|------|
+| `apply_market_pipeline_schema_to_timescale` | Ordered list of `backend/db/*.sql` applied to `DATABASE_URL_TIMESCALE` (includes `011` … `017` last). |
+| `wave1_country_readiness_it_pl_se` | PL day-ahead passthrough, DE↔PL flow scope notes, soak lessons. |
+| `ddl_011_create_market_features_hourly` | Authoritative SQL for the `market_features_hourly` relation (constraints / hypertable as defined in repo). |
 
 ## Why this is separate from GitHub docs (primary)
 
