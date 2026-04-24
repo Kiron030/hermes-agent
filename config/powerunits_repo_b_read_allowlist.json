@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product slice. No secrets.",
+  "version": 4,
+  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product + v4 Option A arch/data/ops slice. No secrets.",
   "entries": [
     {
       "key": "implementation_state",
@@ -145,6 +145,54 @@
       "path": "docs/adr/0008-monorepo-frontend-backend.md",
       "content_type": "markdown",
       "rationale": "v3: ADR for frontend vs backend monorepo boundary questions."
+    },
+    {
+      "key": "adr_013_hybrid_postgis_timescale_strategy",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/013_hybrid_postgis_timescale_strategy.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: PostGIS vs Timescale hybrid strategy for geo vs time-series placement."
+    },
+    {
+      "key": "job_outage_country_hourly",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/outage_country_hourly_job.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: Country-hourly outage aggregation (step B) alongside ADR014."
+    },
+    {
+      "key": "job_entsoe_generation_outage",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/entsoe_generation_outage_job.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: ENTSO-E generation outage ingest job entrypoint (pairs ADR014)."
+    },
+    {
+      "key": "adr_011_era5_raw_storage_object_store",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/011_era5_raw_storage_object_store.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: Normative ERA5 raw artifact object-store semantics with weather jobs."
+    },
+    {
+      "key": "agent_onboarding",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/agent_onboarding.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: Agent/operator onboarding and repo workflow discipline for Powerunits."
+    },
+    {
+      "key": "ops_backfill_entsoe_outages",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/ops/backfill_entsoe_outages.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: Chunked outage backfill ops script; complements outage jobs and ADR014."
     }
   ]
 }

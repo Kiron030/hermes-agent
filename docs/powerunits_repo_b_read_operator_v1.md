@@ -21,7 +21,7 @@ Operator checklist and JSON-style smoke steps: **`RUNBOOK.hermes-stage1-validati
 
 ## Purpose
 
-Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2** and **Allowlist v3** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys.
+Supplemental **read-only** access to a **fixed allowlist** of high-signal Repo B paths (see **Allowlist v2**, **v3**, and **v4 (Option A)** below) for **Trusted Analyst** grounding. Still **one GitHub file per key**, **no** free paths, **fail-closed** on unknown keys.
 
 ## Source precedence (Repo B read keys — quality)
 
@@ -35,6 +35,8 @@ Use this when **several allowlist keys** could answer the same topic. Prefer **o
 | **How to run checks, migrate, operate** | `runbook` | `implementation_state` for whether a capability exists. |
 | **Where things live in the repo** | `agent_repo_overview` | `repo_boundaries`, then `implementation_state`. |
 | **Product / UX / UI boundaries (no component crawl)** | `frontend_product_ux_principles` | `frontend_ui_architecture`, then `feature_policy`; use **`adr_0008_monorepo_frontend_backend`** when the question is explicitly **frontend vs backend** responsibility in the monorepo. |
+| **ENTSO-E generation outages (pipeline order)** | **`adr_014_entsoe_generation_outages`** | **`job_entsoe_generation_outage`** → **`job_outage_country_hourly`** (ADR = semantics; jobs = wiring; optional **`ops_backfill_entsoe_outages`** for chunked backfill ops). |
+| **PostGIS vs Timescale / where geo vs time series live** | **`adr_013_hybrid_postgis_timescale_strategy`** | `architecture_overview`, `implementation_state` if deployment reality matters. |
 
 **Cross-surface (outside this tool):** narrative roadmap doc keys → **`read_powerunits_doc`** first; row facts → **Timescale** tool; Repo B read for **allowlisted** implementation/ADR/job files only.
 
@@ -71,6 +73,19 @@ Use this when **several allowlist keys** could answer the same topic. Prefer **o
 | `frontend_punkt4_risiken` | Documented UX/product risks — use for explicit caveats. |
 | `feature_policy` | Feature gating and surface constraints. |
 | `adr_0008_monorepo_frontend_backend` | Normative **frontend vs backend** boundary in the monorepo. |
+
+## Allowlist v4 (Option A — arch / data / ops slice)
+
+**Config version 4** adds **six** keys — still one file per key, GitHub read-only, **Stage 1** (no writer):
+
+| Key | Role |
+|-----|------|
+| `adr_013_hybrid_postgis_timescale_strategy` | Hybrid **PostGIS vs Timescale** strategy — prefer this for placement and scaling questions. |
+| `job_outage_country_hourly` | **Step B** country-hourly outage aggregation into feature-layer join semantics (with ADR014). |
+| `job_entsoe_generation_outage` | **Step A** outage raw ingest / sync job entrypoint (with ADR014). |
+| `adr_011_era5_raw_storage_object_store` | ERA5 **raw** artifacts in **object storage** — complements `job_era5_weather` and `adr_010_weather_ingestion_mvp`. |
+| `agent_onboarding` | **Agent/operator** onboarding — workflow, boundaries, how to work the repo safely. |
+| `ops_backfill_entsoe_outages` | **Ops** chunked backfill for outages — read alongside outage ADR/jobs, not as a second generic `ops/` tree. |
 
 ## Why this is separate from GitHub docs (primary)
 
