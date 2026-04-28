@@ -70,6 +70,6 @@ ENV HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist
 ENV HERMES_HOME=/opt/data
 ENV HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 ENV PATH="/opt/data/.local/bin:${PATH}"
-VOLUME [ "/opt/data" ]
+# No VOLUME: Railway rejects VOLUME in Dockerfile; mount /opt/data via Railway Volumes.
 ENTRYPOINT [ "/usr/bin/tini", "-g", "--", "/opt/hermes/docker/entrypoint.sh" ]
 CMD [ "gateway", "run" ]
