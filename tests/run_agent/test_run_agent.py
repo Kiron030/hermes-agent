@@ -3475,15 +3475,13 @@ class TestAzureOpenAIRouting:
         agent.base_url = "https://my-resource.openai.azure.com/openai/v1"
         agent.api_mode = "chat_completions"
         agent.model = "gpt-5.4-mini"
-        # Mirror the routing logic from __init__
+        # Mirror the routing logic from __init__ (model-driven upgrade only;
+        # never from api.openai.com URL alone; Azure never upgrades).
         if (
             agent.api_mode == "chat_completions"
             and not agent._is_azure_openai_url()
-            and (
-                agent._is_direct_openai_url()
-                or agent._provider_model_requires_responses_api(
-                    agent.model, provider=agent.provider,
-                )
+            and agent._provider_model_requires_responses_api(
+                agent.model, provider=agent.provider,
             )
         ):
             agent.api_mode = "codex_responses"
@@ -3497,11 +3495,8 @@ class TestAzureOpenAIRouting:
         if (
             agent.api_mode == "chat_completions"
             and not agent._is_azure_openai_url()
-            and (
-                agent._is_direct_openai_url()
-                or agent._provider_model_requires_responses_api(
-                    agent.model, provider=agent.provider,
-                )
+            and agent._provider_model_requires_responses_api(
+                agent.model, provider=agent.provider,
             )
         ):
             agent.api_mode = "codex_responses"

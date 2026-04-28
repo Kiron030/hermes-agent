@@ -89,7 +89,18 @@ def apply_policy(config_path: Path) -> None:
     model_cfg["default"] = POWERUNITS_PRIMARY_MODEL_DEFAULT
     model_cfg["provider"] = POWERUNITS_PRIMARY_PROVIDER
     model_cfg["base_url"] = POWERUNITS_PRIMARY_BASE_URL
+    # Pin OpenAI wire mode: GPT-4.x on api.openai.com must not use the
+    # Responses path with reasoning.encrypted_content (400 from provider).
+    model_cfg["api_mode"] = "chat_completions"
     cfg["model"] = model_cfg
+
+    # Belt-and-suspenders: disable Hermes "reasoning effort" for this phase so
+    # auxiliary Responses-shaped calls do not request encrypted reasoning.
+    agent_cfg = cfg.get("agent")
+    if not isinstance(agent_cfg, dict):
+        agent_cfg = {}
+    agent_cfg["reasoning_effort"] = "none"
+    cfg["agent"] = agent_cfg
 
     # Enforce narrow, explicit platform toolset policy (fail-closed for gateway usage).
     platform_toolsets = cfg.get("platform_toolsets")
