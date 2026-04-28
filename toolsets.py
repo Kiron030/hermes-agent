@@ -240,6 +240,17 @@ TOOLSETS = {
         "tools": ["preflight_powerunits_option_d_bounded_slice"],
         "includes": [],
     },
+
+    "powerunits_option_d_execute": {
+        "description": (
+            "Option D **bounded execute**: one subprocess to "
+            "`tools.powerunits_option_d_bounded_market_features` only (PL / v1 / ≤24h UTC). "
+            "Gated by HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED. First Hermes write test path — "
+            "not a general SQL writer."
+        ),
+        "tools": ["execute_powerunits_option_d_bounded_slice"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

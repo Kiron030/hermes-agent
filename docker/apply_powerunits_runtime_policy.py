@@ -27,6 +27,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_timescale_read",
     "powerunits_repo_b_read",
     "powerunits_option_d_preflight",
+    "powerunits_option_d_execute",
 ]
 
 DISABLED_PLATFORMS = [

@@ -1,11 +1,13 @@
 # Option D bounded wrapper — operator notes (v1)
 
-**What this is:** An **operator-run** Python entrypoint in **Repo A (`hermes-agent`)** that validates a **fixed first-release slice** (PL / `v1` / window ≤ 24h UTC), checks env, then runs **`uv run python -m services.data_ingestion.jobs.market_feature_job`** inside the **Powerunits product repo** checkout. It adds **no** Hermes tool, **no** Telegram surface, **no** new DB objects — same write semantics as the product job alone.
+**What this is:** A Python entrypoint in **Repo A (`hermes-agent`)** that validates a **fixed first-release slice** (PL / `v1` / window ≤ 24h UTC), checks env, then runs **`uv run python -m services.data_ingestion.jobs.market_feature_job`** inside the **Powerunits product repo** checkout. Same write semantics as the product job alone — **no** new SQL in this repo.
 
-**What this is not:** Not a **Hermes writer** capability; not Stage 2; not safe to expose to untrusted chat interfaces.
+**What this is not:** Not a **generic** Hermes SQL writer; not Stage 2; not safe to expose to untrusted chat interfaces.
 
 **Spec:** `docs/powerunits_option_d_bounded_wrapper_spec_v1.md`  
 **Implementation:** `tools/powerunits_option_d_bounded_market_features.py` (`python -m tools.powerunits_option_d_bounded_market_features`)
+
+**Optional Hermes entry (gated):** Tool `execute_powerunits_option_d_bounded_slice` (toolset `powerunits_option_d_execute`, env `HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED`) may spawn **exactly one** `python -m tools.powerunits_option_d_bounded_market_features` subprocess per invocation. See `docs/powerunits_option_d_execute_tool_operator_v1.md`. Preflight-only planning remains `preflight_powerunits_option_d_bounded_slice` / `powerunits_option_d_preflight`.
 
 ---
 

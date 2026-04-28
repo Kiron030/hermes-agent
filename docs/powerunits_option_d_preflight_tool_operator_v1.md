@@ -15,3 +15,5 @@ Gating: set **`HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED`** to a truthy value
 The **operator-run bounded wrapper** (`python -m tools.powerunits_option_d_bounded_market_features`) performs env checks and delegates to the Powerunits product job (writes when you run it). That remains **operator-only** and is **not** invoked by the preflight tool.
 
 See also: `docs/powerunits_option_d_bounded_wrapper_operator_v1.md`.
+
+**Related:** Gated Hermes **execute** (separate env and toolset) is documented in `docs/powerunits_option_d_execute_tool_operator_v1.md`. Preflight never calls it.

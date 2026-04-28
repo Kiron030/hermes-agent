@@ -112,6 +112,7 @@ _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
     "powerunits_timescale_read",
     "powerunits_repo_b_read",
     "powerunits_option_d_preflight",
+    "powerunits_option_d_execute",
 }
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.
