@@ -229,6 +229,17 @@ TOOLSETS = {
         "tools": ["read_powerunits_repo_b_allowlisted"],
         "includes": [],
     },
+
+    "powerunits_option_d_preflight": {
+        "description": (
+            "Option D bounded slice **preflight only** (PL / v1 / ≤24h UTC): validates "
+            "arguments and returns operator CLI + rollback SQL. "
+            "Gated by HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED; **no** wrapper execution "
+            "and **no** DB writes from Hermes."
+        ),
+        "tools": ["preflight_powerunits_option_d_bounded_slice"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

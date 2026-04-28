@@ -11,6 +11,7 @@
 | **Memory / session search / todo** | Allowed | Part of first_safe bounded set for continuity and tasks. |
 | **Timescale read** (`read_powerunits_timescale_dataset`) | Allowed **only** when gated | `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` + `DATABASE_URL_TIMESCALE`; single view `public.market_price_model_dataset_v`; fixed patterns only. |
 | **Repo B file read** (`read_powerunits_repo_b_allowlisted`) | Allowed **only** when gated | `HERMES_POWERUNITS_REPO_B_READ_ENABLED` + GitHub read token; actions `list_repo_b_keys` / `read_repo_b_key` only (snake_case keys from `config/powerunits_repo_b_read_allowlist.json`); not the doc manifest tool. |
+| **Option D preflight** (`preflight_powerunits_option_d_bounded_slice`) | Allowed **only** when gated | `HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED`; validates PL / `v1` / ≤24h UTC slice and returns operator CLI + rollback SQL only — **no** wrapper execution, **no** shell, **no** DB writes from Hermes. |
 | **General web / browser / terminal / file / code-exec / MCP / cron** | **Not** in first_safe Telegram surface | Fail-closed for Powerunits internal profile — do not “temporarily” widen without policy change. |
 | **Broad DB / free SQL / schema writes** | Forbidden | Hermes has no such tool in this profile; Repo B owns schema. |
 | **Repo B direct git writes from Hermes** | Forbidden | Product changes go through human/CI workflows, not agent. |
