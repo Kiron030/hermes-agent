@@ -7,7 +7,9 @@
 **Spec:** `docs/powerunits_option_d_bounded_wrapper_spec_v1.md`  
 **Implementation:** `tools/powerunits_option_d_bounded_market_features.py` (`python -m tools.powerunits_option_d_bounded_market_features`)
 
-**Optional Hermes entry (gated):** Tool `execute_powerunits_option_d_bounded_slice` (toolset `powerunits_option_d_execute`, env `HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED`) may spawn **exactly one** `python -m tools.powerunits_option_d_bounded_market_features` subprocess per invocation. See `docs/powerunits_option_d_execute_tool_operator_v1.md`. Preflight-only planning remains `preflight_powerunits_option_d_bounded_slice` / `powerunits_option_d_preflight`.
+**Hermes live (Railway):** Bounded execute uses **one HTTP POST** to the Powerunits internal API (see `docs/powerunits_option_d_execute_tool_operator_v1.md`); it does **not** use this local CLI on the Hermes host.
+
+**Operator fallback:** `python -m tools.powerunits_option_d_bounded_market_features` remains for **manual / dev** runs where a product checkout and `POWERUNITS_OPTION_D_PRODUCT_ROOT` are available — not the Hermes Railway execute path. Preflight-only planning remains `preflight_powerunits_option_d_bounded_slice` / `powerunits_option_d_preflight`.
 
 ---
 

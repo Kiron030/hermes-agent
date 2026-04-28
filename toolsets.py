@@ -243,10 +243,10 @@ TOOLSETS = {
 
     "powerunits_option_d_execute": {
         "description": (
-            "Option D **bounded execute**: one subprocess to "
-            "`tools.powerunits_option_d_bounded_market_features` only (PL / v1 / ≤24h UTC). "
-            "Gated by HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED. First Hermes write test path — "
-            "not a general SQL writer."
+            "Option D **bounded execute**: one HTTP POST to the Powerunits internal "
+            "`/internal/hermes/bounded/v1/market-features-hourly/recompute` API (PL / v1 / ≤24h UTC). "
+            "Requires HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. Not a general SQL writer."
         ),
         "tools": ["execute_powerunits_option_d_bounded_slice"],
         "includes": [],

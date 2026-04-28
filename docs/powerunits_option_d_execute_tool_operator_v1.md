@@ -2,23 +2,32 @@
 
 ## What this is
 
-This is the **first real Hermes write test** for Powerunits: tool **`execute_powerunits_option_d_bounded_slice`** (toolset **`powerunits_option_d_execute`**), gated by **`HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED`**.
+**Live Railway path:** tool **`execute_powerunits_option_d_bounded_slice`** (toolset **`powerunits_option_d_execute`**) calls the Powerunits backend **once per invocation**:
 
-Hermes runs **exactly one** subprocess per invocation:
+`POST {POWERUNITS_INTERNAL_EXECUTE_BASE_URL}/internal/hermes/bounded/v1/market-features-hourly/recompute`
 
-`python -m tools.powerunits_option_d_bounded_market_features --country … --start … --end … --version …`
+with JSON `country_code` / `version` / `window_start_utc` / `window_end_utc` (same PL / `v1` / ≤24h UTC rules as preflight). Auth: **`Authorization: Bearer`** using the same shared secret the API expects: **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**.
 
-(using the Hermes process interpreter). That module performs validation again and delegates to the product `market_feature_job` as already documented for the operator wrapper.
+**Gates / env (Hermes Railway):**
+
+| Variable | Role |
+|----------|------|
+| `HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED` | Truthy to expose the tool. |
+| `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | HTTPS origin of the Powerunits API (no trailing slash). |
+| `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | Bearer token (must match the value set on the Powerunits API service). |
+| `POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S` | Optional read timeout seconds (default 3600). |
+
+Hermes performs **no** direct SQL; execution is delegated to Repo B’s bounded internal route and existing `market_feature_job` there.
 
 ## What this is not
 
-- **Not** a general-purpose DB or SQL writer: no ad-hoc queries, no other jobs, no extra shell commands from this tool.
-- **Not** a replacement for operator discipline: Railway must still supply product root (`POWERUNITS_OPTION_D_PRODUCT_ROOT`), database URLs, `MARKET_FEATURES_WRITE_TARGET=timescale`, and a working `uv` + product checkout — same as manual wrapper runs.
+- **Not** a general-purpose DB writer.
+- **Not** the local subprocess path: `python -m tools.powerunits_option_d_bounded_market_features` remains **operator-only / fallback** (needs `POWERUNITS_OPTION_D_PRODUCT_ROOT` and product checkout). See `docs/powerunits_option_d_bounded_wrapper_operator_v1.md`.
 
 ## Pairing with preflight
 
-**`preflight_powerunits_option_d_bounded_slice`** remains **plan-only** (separate gate). Use preflight to confirm slice and rollback SQL; enable execute only when you intentionally allow Hermes to trigger the bounded wrapper.
+**`preflight_powerunits_option_d_bounded_slice`** stays **plan-only** (separate gate). Use it to validate slice and rollback SQL before enabling execute.
 
 ## Safety
 
-Fail-closed on invalid **PL** / **v1** / **≤ 24 h UTC** window. No automatic rollback, no follow-up jobs, no multi-country. Stdout/stderr summaries returned to the model are **redacted** (e.g. database URLs) and length-capped.
+Fail-closed client validation before any HTTP call. Responses are summarized with URL redaction. No automatic rollback.
