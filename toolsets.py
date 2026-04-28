@@ -251,6 +251,17 @@ TOOLSETS = {
         "tools": ["execute_powerunits_option_d_bounded_slice"],
         "includes": [],
     },
+
+    "powerunits_option_d_validate": {
+        "description": (
+            "Option D **bounded validate-window**: one HTTP POST to Powerunits internal read-only "
+            "`/internal/hermes/bounded/v1/market-features-hourly/validate-window` (PL / v1 / ≤24h UTC). "
+            "Requires HERMES_POWERUNITS_OPTION_D_VALIDATE_ENABLED, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["validate_powerunits_option_d_bounded_window"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",

@@ -28,6 +28,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_repo_b_read",
     "powerunits_option_d_preflight",
     "powerunits_option_d_execute",
+    "powerunits_option_d_validate",
 ]
 
 DISABLED_PLATFORMS = [

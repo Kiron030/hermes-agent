@@ -28,6 +28,10 @@ Hermes performs **no** direct SQL; execution is delegated to Repo B’s bounded 
 
 **`preflight_powerunits_option_d_bounded_slice`** stays **plan-only** (separate gate). Use it to validate slice and rollback SQL before enabling execute.
 
+## Post-execute validation
+
+**`validate_powerunits_option_d_bounded_window`** (separate gate) calls the read-only validate-window API — see `docs/powerunits_option_d_validate_tool_operator_v1.md`.
+
 ## Safety
 
 Fail-closed client validation before any HTTP call. Responses are summarized with URL redaction. No automatic rollback.
