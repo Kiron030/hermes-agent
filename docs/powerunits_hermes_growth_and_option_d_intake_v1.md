@@ -21,33 +21,33 @@
 
 ---
 
-## Option D (future minimal Timescale write experiment) — current direction
+## Option D (minimal Timescale write experiment) — current direction
 
-**Intent:** Explore a **very narrow** first write test (e.g. **PL**, **one UTC day**, Timescale-related slice) under **safety > speed** — **design/intake first**, no writer, no new DB roles yet.
+**Intent:** Very narrow first write path (**PL**, **one UTC day**, **`market_features_hourly`**) under **safety > speed**. **Stage 1 Hermes** remains read-only; writes stay **human-operated** until a separate capsule/wrapper + Stage-2 gate exists.
 
-**Process decision:** **Facts before design** — confirm target DB URLs (primary vs Timescale), DDL parity, input coverage for the slice, rollback predicate, then choose mechanism.
+**Proven (experiment #1):** Human-run `market_feature_job` with **`MARKET_FEATURES_WRITE_TARGET=timescale`**, slice **PL / v1 / [2024-01-01Z, 2024-01-02Z)`**, **`rows_written=24`**, clean post-checks, rollback **not** applied. Recorded in **`docs/powerunits_option_d_pl_one_day_staging_gonogo_v1.md`**.
 
-**Likely candidate write surface:** `public.market_features_hourly` — product job already implements **DELETE window + `INSERT … ON CONFLICT (country_code, timestamp_utc, version) DO UPDATE`**; Timescale target via `MARKET_FEATURES_WRITE_TARGET=timescale` + `DATABASE_URL_TIMESCALE` while **reads** stay on `get_app_db_url()` (primary) in current code path.
+**Candidate write surface (unchanged):** `public.market_features_hourly` — same job semantics (delete window + upsert on **`(country_code, timestamp_utc, version)`**).
 
-**Execution preference (provisional):** **Operator-run `market_feature_job` once** on staging/pilot with explicit `--countries PL --start/--end` **before** any Hermes-invoked write capsule. Capsule / stored procedure + `EXECUTE`-only role remains the **longer-term** safest shape for Stage 2 if Hermes must trigger writes — not the first physical experiment.
+**Next design focus:** **Bounded wrapper** delegating to the existing job (then optional **DB capsule** if `EXECUTE`-only enforcement is required) — see **`docs/powerunits_option_d_next_write_capsule_step_v1.md`**. **Not** Hermes writer activation yet.
 
 ---
 
 ## Open questions (unresolved)
 
-- **Schema attestation:** Exact PK / hypertable / index state on the **specific** Timescale URL vs `backend/db/011_create_market_features_hourly.sql` (verify with `verify_timescale_worker_schema.py` or `\d+`, not assumed from chat).
-- **Input completeness:** For chosen PL day + `version`, are **24** hours present on **primary** for demand, generation-by-type, and weather (job prerequisites)?
-- **Environment proof:** Non-prod fingerprint for both `DATABASE_URL` and `DATABASE_URL_TIMESCALE`; resolver discipline (`auto` vs explicit timescale — see Repo B `driver_db_resolver_verification_v1.md`, not Hermes-allowlisted today).
-- **Downstream scope:** Whether a one-day PL test **must** include `market_driver_feature_job` for the org’s definition of “done”.
-- **Hermes coupling:** Whether first staging write stays **fully outside** Hermes forever vs later **single** `CALL` capsule behind separate gates.
+- **Per-slice repeat:** Each new day/country still needs its own preflight (inputs + schema + policy) — experiment #1 does not generalize automatically.
+- **Environment / prod boundary:** Operators must still classify Railway URLs; Hermes docs do not assert prod vs staging.
+- **Resolver discipline:** `auto` vs explicit timescale for scripts — Repo B `driver_db_resolver_verification_v1.md` (not allowlisted).
+- **Downstream scope:** Whether a slice test **must** include `market_driver_feature_job` for org “done”.
+- **Hermes coupling:** Wrapper vs eventual **`CALL`** capsule + DB role — see next-step doc.
 
 ---
 
 ## Next planned steps
 
-1. **Allowlist v5 (Repo A):** **Done** — keys `apply_market_pipeline_schema_to_timescale`, `wave1_country_readiness_it_pl_se`, `ddl_011_create_market_features_hourly` (see `config/powerunits_repo_b_read_allowlist.json` and **Allowlist v5** in `docs/powerunits_repo_b_read_operator_v1.md`).
-2. **Operator intake:** Run read-only counts / schema verify on **target** staging URLs; record **Go/No-Go** one-pager (still no `MARKET_FEATURES_WRITE_TARGET=timescale` until green).
-3. **If Go:** first **mutating** attempt remains **human-operated job** + documented rollback `DELETE` matching job predicate; **then** specify DB capsule + role model for Hermes Stage 2 — separate checklist (`CHECKLIST.hermes-writer-activation.md` path in Repo A as already referenced elsewhere).
+1. **Allowlist v5 (Repo A):** **Done** — Option D read keys live (see `docs/powerunits_repo_b_read_operator_v1.md`).
+2. **First human recompute (PL / v1 / one day):** **Done** — see **`docs/powerunits_option_d_pl_one_day_staging_gonogo_v1.md`** (experiment #1).
+3. **Next:** **Design** smallest bounded wrapper / future capsule — **`docs/powerunits_option_d_next_write_capsule_step_v1.md`** and follow-up prompt therein; **no** Hermes writer until separate activation checklist.
 
 ---
 
@@ -58,5 +58,8 @@
 | `docs/powerunits_repo_b_read_operator_v1.md` | Allowlist contract + source precedence |
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual UI preview (read-only) |
 | `RUNBOOK.hermes-stage1-validation.md` | Repeatable Stage 1 checks |
+| `docs/powerunits_option_d_pl_one_day_staging_gonogo_v1.md` | PL one-day `market_features_hourly` — Go/No-Go + **executed experiment #1** record. |
+| `docs/powerunits_option_d_next_write_capsule_step_v1.md` | **Next safe Option D step** — wrapper vs capsule design (no writer). |
+| `docs/powerunits_option_d_bounded_wrapper_operator_v1.md` | **Operator** bounded wrapper (`python -m tools.powerunits_option_d_bounded_market_features`). |
 
 *Version: v1 — amend in place when Stage 2 scope or Option D facts materially change.*
