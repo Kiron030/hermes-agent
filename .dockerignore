@@ -14,3 +14,11 @@ node_modules
 .env
 
 *.md
+
+# Allowlisted Powerunits docs bundle (operator-generated; v3.6)
+!docker/powerunits_docs/
+!docker/powerunits_docs/*.md
+!docker/powerunits_docs/MANIFEST.json
+
+# Runtime data (bind-mounted at /opt/data; must not leak into build context)
+data/

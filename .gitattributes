@@ -1,2 +1,5 @@
 # Auto-generated files — collapse diffs and exclude from language stats
 web/package-lock.json linguist-generated=true
+
+# Keep shell scripts LF-normalized across Windows/Linux checkouts.
+*.sh text eol=lf

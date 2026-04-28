@@ -36,20 +36,19 @@ Das Ziel ist daher kontrollierte Capability-Shaping fuer den ersten Live-Betrieb
 
 ## Part B - Tiered policy
 
-### 1) Allowed now
+### 1) Allowed now (Telegram toolsets, first-safe Stand)
 
 - Telegram als einzige aktive Messaging-Plattform
-- Core Conversation + Memory
+- Eng zugelassene Toolsets (siehe `apply_powerunits_runtime_policy.py` / `model_tools.py`): `memory`, `session_search`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace` (ohne `clarify` im Telegram-first-safe Pfad)
 - Session Search (read-only conversation recall)
-- Skills read/list/view
-- Todo/Plan-Orchestrierung ohne Mutations-Tools
+- Manifest-keyed Powerunits-Doku (`read_powerunits_doc` auf gebündeltem `docker/powerunits_docs/`)
+- Todo/Plan-Orchestrierung ohne breite Mutations-/File-/Repo-Tools
 
 ### 2) Installed but disabled / not exposed now
 
 - Browser-Tooling
 - Delegation/Subagents
 - Cron-Operations
-- GitHub-nahe Faehigkeiten
 - File write/patch pathways
 - Discord/Slack/Email/weitere Messaging-Plattformen
 - MCP-/weitere externe Integrationen
@@ -82,7 +81,8 @@ Implementiert wurde eine kleine policy-basierte Laufzeit-Restriktion:
 ### Effekt der Policy
 
 - `platform_toolsets.telegram` wird auf eine enge Allowlist gesetzt:
-  - `memory`, `session_search`, `skills`, `todo`, `no_mcp`
+  - `memory`, `session_search`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace`
+  - (Historisch: `skills` / `no_mcp` / `clarify` — `clarify` entfernt wegen fehlendem Gateway-Callback und Modell-Loops.)
 - Alle anderen relevanten Plattformen werden toolset-seitig auf `[]` gesetzt.
 - Plattform-Exposure:
   - `platforms.telegram.enabled = true`
@@ -114,3 +114,39 @@ Nach diesem Repo-Change in Railway:
 ## Part E - One exact next recommendation
 
 `Redeploy Hermes with the tiered first-safe runtime policy next`
+
+---
+
+## Post-policy verification linkage (v2.5)
+
+Die nachgelagerte Runtime-Verifikation (inkl. Effektivitaetseinstufung und Rest-Blocker) ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v1.md`
+
+## Final enforcement linkage (v2.6b)
+
+- `docs/powerunits_runtime_enforcement_v2.md`
+
+## Post-enforcement verification linkage (v2.7)
+
+- `docs/powerunits_runtime_verification_v2.md`
+
+## Final cleanup linkage (v2.8)
+
+- `docs/powerunits_runtime_cleanup_v1.md`
+
+## First safe Telegram review linkage (v3.0)
+
+- `docs/powerunits_first_safe_telegram_review_v1.md`
+
+## Docs allowlist integration linkage (v3.5)
+
+- `docs/powerunits_docs_allowlist_integration_v1.md`
+
+## Docs reader linkage (v3.7)
+
+- `docs/powerunits_docs_reader_v1.md`
+
+## Bundled docs freshness linkage
+
+- `docs/powerunits_docs_freshness_v1.md`

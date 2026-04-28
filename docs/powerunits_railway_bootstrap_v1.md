@@ -21,6 +21,10 @@ Der Auftrag ist bewusst **minimaler Railway-Bootstrap** fuer einen sicheren inte
 - Fuer Cloud/Container-Run ist im Repo klar der Foreground-Gateway-Modus vorgesehen:
   - `hermes gateway run`
   - In `hermes_cli/main.py` ist `gateway run` explizit als empfohlen fuer Docker-Umgebungen markiert.
+- Docker-Default ist jetzt repo-seitig explizit auf Gateway gesetzt:
+  - `Dockerfile`: `CMD ["gateway", "run"]`
+  - `docker/entrypoint.sh`: fallback auf `gateway run`, wenn kein Command uebergeben wurde.
+  - Entrypoint wird im Image explizit mit `chmod 0755` gesetzt (unabhaengig vom Host-Git-Filemode, wichtig fuer Windows/`railway up`).
 
 ### Docker vs. non-Docker on Railway
 
@@ -158,3 +162,85 @@ Dann Third-Party-Pfad als nicht-kanonisch stilllegen.
 Der konkrete First-Switchover-Ablauf (Source-Switch + Post-Deploy-Checks) ist dokumentiert in:
 
 - `docs/powerunits_railway_switchover_v1.md`
+
+---
+
+## Runtime verification linkage (v2.5)
+
+Die Verifikation des Post-Policy Runtime-Zustands ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v1.md`
+
+## Telegram connectivity debug linkage (v3.1)
+
+Bei laufendem Service ohne Telegram-Antworten (z. B. `/start`, `/help`, Text),
+siehe:
+
+- `docs/powerunits_telegram_connectivity_debug_v1.md`
+
+## Telegram gateway activation debug linkage (v3.2)
+
+Wenn zwar Startup/Banner sichtbar ist, aber keine Telegram-Connection-Line erscheint,
+siehe:
+
+- `docs/powerunits_telegram_gateway_activation_v1.md`
+
+## Primary provider routing linkage (v3.3)
+
+Bei erfolgreicher Telegram-Connectivity aber 401-LLM-Fehlern (Provider/Model mismatch), siehe:
+
+- `docs/powerunits_primary_provider_routing_v1.md`
+
+## OpenAI request compatibility linkage (v3.4)
+
+Bei HTTP 400 auf OpenAI (`include` / encrypted content) trotz gueltigem Key und korrektem Routing, siehe:
+
+- `docs/powerunits_openai_request_compatibility_v1.md`
+
+## Docs allowlist integration linkage (v3.5)
+
+Erste sichere Powerunits-Wissensflaeche (nur explizit gebundelte Docs, kein breites Repo-Scannen), siehe:
+
+- `docs/powerunits_docs_allowlist_integration_v1.md`
+
+## Docs read surface linkage (v3.6)
+
+Build-Zeit-Bundle (`scripts/bundle_powerunits_docs.py`), gestufte Dateien unter `docker/powerunits_docs/`, `.dockerignore`-Ausnahme fuer diesen Pfad, **keine** zusaetzlichen Railway-Env-Variablen fuer docs-only v1:
+
+- `docs/powerunits_docs_read_surface_v1.md`
+
+## Docs reader linkage (v3.7)
+
+First-safe Telegram-Toolset um `powerunits_docs` / `read_powerunits_doc` erweitert; optional nur fuer Tests: `HERMES_POWERUNITS_DOCS_BUNDLE`.
+
+- `docs/powerunits_docs_reader_v1.md`
+
+## GitHub docs reader linkage
+
+Narrow read-only GitHub docs tools (`powerunits_github_docs`) fuer genau einen allowgelisteten privaten Doku-Subtree:
+
+- `docs/powerunits_github_docs_reader_v1.md`
+
+## Workspace reader/writer linkage
+
+Bounded persistent Hermes workspace unter `/opt/data/hermes_workspace` mit allowgelisteten Subdirs (`analysis|notes|drafts|exports`):
+
+- `docs/powerunits_workspace_v1.md`
+
+## Operator setup + staged roadmap
+
+- `docs/powerunits_operator_setup_and_roadmap_v1.md`
+
+## Internal deploy artifact contract (docs reader)
+
+`read_powerunits_doc` funktioniert nur, wenn das Build-Artefakt `docker/powerunits_docs/` inkl. `MANIFEST.json` **im deployten Image enthalten** ist.
+
+- Public-safe Code ohne dieses Artefakt bleibt deploybar, aber der Docs-Reader ist dann zur Laufzeit deaktiviert (Tool via `check_fn` versteckt, Warn-Log sichtbar).
+- Das ist erwartetes fail-closed Verhalten; keine Live-Repo-/DB-Fallbacks.
+
+Empfehlung fuer internen Betrieb: interner Build-Job erzeugt zuerst das Bundle (`scripts/bundle_powerunits_docs.py`), validiert `docker/powerunits_docs/MANIFEST.json`, baut dann erst das Railway-Image.
+
+### Local `railway up` packaging note (Windows)
+
+`docker/powerunits_docs/` bleibt in `.gitignore`, damit interne Docs nicht in den Public-Repo-Flow geraten.
+Fuer lokalen Railway-Deploy wird das Bundle ueber `.railwayignore` explizit wieder eingeschlossen.

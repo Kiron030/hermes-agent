@@ -1,0 +1,222 @@
+{
+  "version": 5,
+  "description": "Allowlisted Repo B paths for Hermes read_powerunits_repo_b_allowlisted (GitHub API read-only). v1 core + v2 pipeline/ADR + v3 frontend/product + v4 Option A + v5 Option D fact-gathering (read-only). No secrets.",
+  "entries": [
+    {
+      "key": "implementation_state",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/implementation_state.md",
+      "content_type": "markdown",
+      "rationale": "Canonical what-exists vs planned listing for the product repo."
+    },
+    {
+      "key": "repo_boundaries",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/repo_boundaries_and_growth.md",
+      "content_type": "markdown",
+      "rationale": "Monorepo boundaries and where batch/API logic must not leak."
+    },
+    {
+      "key": "runbook",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/runbook.md",
+      "content_type": "markdown",
+      "rationale": "Operator commands and DB check entrypoints aligned to the platform."
+    },
+    {
+      "key": "architecture_overview",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/architecture_overview.md",
+      "content_type": "markdown",
+      "rationale": "High-level stack and layer relationships; doc-level complement to Timescale row facts."
+    },
+    {
+      "key": "job_market_feature",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/market_feature_job.py",
+      "content_type": "python",
+      "rationale": "Single high-signal hourly market_feature pipeline entrypoint (not whole jobs tree)."
+    },
+    {
+      "key": "job_entsoe_market",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/entsoe_market_job.py",
+      "content_type": "python",
+      "rationale": "v2: Core ENTSO-E market ingestion job wiring alongside market_feature."
+    },
+    {
+      "key": "adr_013_entsoe_raw_object_store",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/013_entsoe_raw_object_store.md",
+      "content_type": "markdown",
+      "rationale": "v2: Normative raw archive / bucket semantics for ENTSO-E pipeline questions."
+    },
+    {
+      "key": "job_era5_weather",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/era5_weather_job.py",
+      "content_type": "python",
+      "rationale": "v2: ERA5 weather ingestion entrypoint; pairs with weather ADR and Timescale facts."
+    },
+    {
+      "key": "adr_010_weather_ingestion_mvp",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/010_weather_ingestion_mvp_decisions.md",
+      "content_type": "markdown",
+      "rationale": "v2: Weather MVP semantics (indices, windows) for analyst questions vs code."
+    },
+    {
+      "key": "job_market_driver_feature",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/market_driver_feature_job.py",
+      "content_type": "python",
+      "rationale": "v2: Modeling-driver feature job; bridges hourly features to driver layer."
+    },
+    {
+      "key": "agent_repo_overview",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/agent_repo_overview.md",
+      "content_type": "markdown",
+      "rationale": "v2: Where code vs docs vs jobs live — reduces cross-repo confusion for operators."
+    },
+    {
+      "key": "target_architecture_v04",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/target_architecture_v0.4.md",
+      "content_type": "markdown",
+      "rationale": "v2: Target architecture reference; read alongside implementation_state for drift awareness."
+    },
+    {
+      "key": "adr_014_entsoe_generation_outages",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/014_entsoe_generation_outages_v1.md",
+      "content_type": "markdown",
+      "rationale": "v2: Generation outages pipeline semantics (A80/B) for outage-related analyst questions."
+    },
+    {
+      "key": "frontend_product_ux_principles",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_product_ux_principles.md",
+      "content_type": "markdown",
+      "rationale": "v3: Product/UX principles for Trusted Analyst answers on experience and tone."
+    },
+    {
+      "key": "frontend_ui_architecture",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_ui_architecture.md",
+      "content_type": "markdown",
+      "rationale": "v3: UI shell/layering blueprint without diving into component trees."
+    },
+    {
+      "key": "frontend_punkt4_risiken",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/frontend_punkt4_risiken.md",
+      "content_type": "markdown",
+      "rationale": "v3: Documented UX/product risks for explicit caveat framing."
+    },
+    {
+      "key": "feature_policy",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/feature_policy.md",
+      "content_type": "markdown",
+      "rationale": "v3: Feature gating and product constraints Hermes must respect when advising."
+    },
+    {
+      "key": "adr_0008_monorepo_frontend_backend",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/0008-monorepo-frontend-backend.md",
+      "content_type": "markdown",
+      "rationale": "v3: ADR for frontend vs backend monorepo boundary questions."
+    },
+    {
+      "key": "adr_013_hybrid_postgis_timescale_strategy",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/013_hybrid_postgis_timescale_strategy.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: PostGIS vs Timescale hybrid strategy for geo vs time-series placement."
+    },
+    {
+      "key": "job_outage_country_hourly",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/outage_country_hourly_job.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: Country-hourly outage aggregation (step B) alongside ADR014."
+    },
+    {
+      "key": "job_entsoe_generation_outage",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/jobs/entsoe_generation_outage_job.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: ENTSO-E generation outage ingest job entrypoint (pairs ADR014)."
+    },
+    {
+      "key": "adr_011_era5_raw_storage_object_store",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/adr/011_era5_raw_storage_object_store.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: Normative ERA5 raw artifact object-store semantics with weather jobs."
+    },
+    {
+      "key": "agent_onboarding",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/agent_onboarding.md",
+      "content_type": "markdown",
+      "rationale": "v4 Option A: Agent/operator onboarding and repo workflow discipline for Powerunits."
+    },
+    {
+      "key": "ops_backfill_entsoe_outages",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/services/data_ingestion/ops/backfill_entsoe_outages.py",
+      "content_type": "python",
+      "rationale": "v4 Option A: Chunked outage backfill ops script; complements outage jobs and ADR014."
+    },
+    {
+      "key": "apply_market_pipeline_schema_to_timescale",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "scripts/migrations/apply_market_pipeline_schema_to_timescale.py",
+      "content_type": "python",
+      "rationale": "v5 Option D: Canonical DDL file order applied to DATABASE_URL_TIMESCALE (includes 011 market_features_hourly)."
+    },
+    {
+      "key": "wave1_country_readiness_it_pl_se",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "docs/operations/wave1_country_readiness_it_pl_se.md",
+      "content_type": "markdown",
+      "rationale": "v5 Option D: PL (and IT/SE) Wave-1 ENTSO-E / archive readiness — passthrough prices, DE–PL flows context."
+    },
+    {
+      "key": "ddl_011_create_market_features_hourly",
+      "repo": "Kiron030/Powerunits.io",
+      "branch": "starting_the_seven_phases",
+      "path": "backend/db/011_create_market_features_hourly.sql",
+      "content_type": "sql",
+      "rationale": "v5 Option D: DDL for market_features_hourly — PK/hypertable/index facts for Timescale parity checks vs job upsert."
+    }
+  ]
+}

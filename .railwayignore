@@ -1,0 +1,6 @@
+# Railway local deploy packaging override for internal Powerunits docs bundle.
+# Keep the bundle git-ignored in public workflows, but include it for `railway up`
+# when present locally.
+!docker/powerunits_docs/
+!docker/powerunits_docs/*.md
+!docker/powerunits_docs/MANIFEST.json

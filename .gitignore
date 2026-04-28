@@ -1,3 +1,4 @@
+.DS_Store
 /venv/
 /_pycache/
 *.pyc*
@@ -68,3 +69,16 @@ mini-swe-agent/
 .nix-stamps/
 result
 website/static/api/skills-index.json
+
+
+# Powerunits internal generated bundles / context packaging
+artifacts/
+docker/powerunits_docs/
+scripts/bundle_agent_context_for_cursor*.ps1
+*context_bundle*.txt
+*context_bundle*.json
+
+# Optional: generated manifests or local bundles from internal workflows
+*.manifest.local.json
+
+models-dev-upstream/

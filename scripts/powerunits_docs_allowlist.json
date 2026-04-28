@@ -1,0 +1,83 @@
+{
+  "allowlist_version": 2,
+  "source_repo_name": "EU-PP-Database",
+  "entries": [
+    {
+      "key": "implementation_state.md",
+      "source_relative": "docs/implementation_state.md",
+      "doc_class": "implementation_state",
+      "freshness_tier": "volatile",
+      "summary": "Live implementation inventory; changes frequently."
+    },
+    {
+      "key": "roadmap.md",
+      "source_relative": "docs/roadmap.md",
+      "doc_class": "roadmap",
+      "freshness_tier": "medium",
+      "summary": "Phases and priorities; updates on cadence."
+    },
+    {
+      "key": "target_architecture_v0.4.md",
+      "source_relative": "docs/target_architecture_v0.4.md",
+      "doc_class": "architecture",
+      "freshness_tier": "stable",
+      "summary": "Target architecture reference."
+    },
+    {
+      "key": "runbook.md",
+      "source_relative": "docs/runbook.md",
+      "doc_class": "operations",
+      "freshness_tier": "volatile",
+      "summary": "Commands and ops checks; high churn."
+    },
+    {
+      "key": "agent_repo_overview.md",
+      "source_relative": "docs/agent_repo_overview.md",
+      "doc_class": "orientation",
+      "freshness_tier": "stable",
+      "summary": "Repo layout for agents."
+    },
+    {
+      "key": "README.md",
+      "source_relative": "docs/README.md",
+      "doc_class": "index",
+      "freshness_tier": "stable",
+      "summary": "Documentation map."
+    },
+    {
+      "key": "merit_order_roadmap_v1.md",
+      "source_relative": "docs/architecture/merit_order_roadmap_v1.md",
+      "doc_class": "architecture",
+      "freshness_tier": "medium",
+      "summary": "Merit-order roadmap."
+    },
+    {
+      "key": "merit_order_model_readiness_gap_v1.md",
+      "source_relative": "docs/architecture/merit_order_model_readiness_gap_v1.md",
+      "doc_class": "architecture",
+      "freshness_tier": "medium",
+      "summary": "Model readiness gaps."
+    },
+    {
+      "key": "ai_content_layer.md",
+      "source_relative": "docs/architecture/ai_content_layer.md",
+      "doc_class": "architecture",
+      "freshness_tier": "stable",
+      "summary": "AI content layer architecture."
+    },
+    {
+      "key": "f_track_country_weather_spatial_roadmap.md",
+      "source_relative": "docs/architecture/f_track_country_weather_spatial_roadmap.md",
+      "doc_class": "architecture",
+      "freshness_tier": "medium",
+      "summary": "F-track and spatial weather roadmap."
+    },
+    {
+      "key": "ex_ante_ftrack_monthly_gaps.md",
+      "source_relative": "docs/operations/ex_ante_ftrack_monthly_gaps.md",
+      "doc_class": "operations",
+      "freshness_tier": "volatile",
+      "summary": "Ex-ante / F-track operational notes."
+    }
+  ]
+}

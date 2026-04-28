@@ -121,3 +121,11 @@ Danach:
 ## Part F - One exact next recommendation
 
 `Switch the Railway Hermes service to the Powerunits-controlled fork next`
+
+---
+
+## Post-policy verification linkage (v2.5)
+
+Die Runtime-Verifikation nach Policy-Redeploy (Wirksamkeit + Rest-Blocker) ist dokumentiert in:
+
+- `docs/powerunits_runtime_verification_v1.md`

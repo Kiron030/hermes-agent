@@ -292,6 +292,7 @@ class TestBuiltinDiscovery:
     def test_matches_previous_manual_builtin_tool_set(self):
         expected = {
             "tools.browser_cdp_tool",
+            "tools.browser_dialog_tool",
             "tools.browser_tool",
             "tools.clarify_tool",
             "tools.code_execution_tool",
@@ -306,6 +307,14 @@ class TestBuiltinDiscovery:
             "tools.memory_tool",
             "tools.mixture_of_agents_tool",
             "tools.process_registry",
+            "tools.powerunits_docs_tool",
+            "tools.powerunits_github_docs_tool",
+            "tools.powerunits_option_d_execute_tool",
+            "tools.powerunits_option_d_preflight_tool",
+            "tools.powerunits_option_d_validate_tool",
+            "tools.powerunits_repo_b_read_tool",
+            "tools.powerunits_timescale_read_tool",
+            "tools.powerunits_workspace_tool",
             "tools.rl_training_tool",
             "tools.send_message_tool",
             "tools.session_search_tool",
@@ -316,6 +325,7 @@ class TestBuiltinDiscovery:
             "tools.tts_tool",
             "tools.vision_tools",
             "tools.web_tools",
+            "tools.yuanbao_tools",
         }
 
         with patch("tools.registry.importlib.import_module"):
