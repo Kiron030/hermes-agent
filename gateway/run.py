@@ -2208,7 +2208,7 @@ class GatewayRunner:
         # Build initial channel directory for send_message name resolution
         try:
             from gateway.channel_directory import build_channel_directory
-            directory = build_channel_directory(self.adapters)
+            directory = await build_channel_directory(self.adapters)
             ch_count = sum(len(chs) for chs in directory.get("platforms", {}).values())
             logger.info("Channel directory built: %d target(s)", ch_count)
         except Exception as e:
@@ -2483,7 +2483,7 @@ class GatewayRunner:
                         # Rebuild channel directory with the new adapter
                         try:
                             from gateway.channel_directory import build_channel_directory
-                            build_channel_directory(self.adapters)
+                            await build_channel_directory(self.adapters)
                         except Exception:
                             pass
                     else:
@@ -10747,7 +10747,13 @@ def _start_cron_ticker(stop_event: threading.Event, adapters=None, loop=None, in
         if tick_count % CHANNEL_DIR_EVERY == 0 and adapters:
             try:
                 from gateway.channel_directory import build_channel_directory
-                build_channel_directory(adapters)
+                if loop is not None:
+                    fut = asyncio.run_coroutine_threadsafe(
+                        build_channel_directory(adapters), loop
+                    )
+                    fut.result(timeout=120)
+                else:
+                    logger.debug("Channel directory refresh skipped (no event loop)")
             except Exception as e:
                 logger.debug("Channel directory refresh error: %s", e)
 

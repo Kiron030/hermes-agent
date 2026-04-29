@@ -2180,6 +2180,16 @@ class AIAgent:
         url = (base_url or self._base_url_lower).lower()
         return "api.openai.com" in url and "openrouter" not in url
 
+    def _is_azure_openai_url(self, base_url: str = None) -> bool:
+        """Return True when a base URL targets Azure OpenAI (not api.openai.com)."""
+        url = (base_url or self._base_url_lower or "").lower()
+        if not url:
+            return False
+        # Standard Azure OpenAI resource host pattern
+        if "openai.azure.com" in url:
+            return True
+        return False
+
     def _resolved_api_call_timeout(self) -> float:
         """Resolve the effective per-call request timeout in seconds.
 
