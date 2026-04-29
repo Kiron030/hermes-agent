@@ -30,6 +30,8 @@ Hermes performs **no** direct SQL; execution is delegated to Repo B’s bounded 
 
 ## Post-execute validation
 
+**`readiness_powerunits_option_d_bounded_window`** (separate gate) calls the read-only readiness-window API on normalized **inputs** — see `docs/powerunits_option_d_readiness_tool_operator_v1.md`.
+
 **`validate_powerunits_option_d_bounded_window`** (separate gate) calls the read-only validate-window API — see `docs/powerunits_option_d_validate_tool_operator_v1.md`.
 
 ## Safety

@@ -109,7 +109,11 @@ class TestPlatformReconnectWatcher:
         real_sleep = asyncio.sleep
 
         with patch.object(runner, "_create_adapter", return_value=succeed_adapter):
-            with patch("gateway.run.build_channel_directory", create=True):
+            with patch(
+                "gateway.channel_directory.build_channel_directory",
+                new_callable=AsyncMock,
+                return_value={"platforms": {}},
+            ):
                 # Run one iteration of the watcher then stop
                 async def run_one_iteration():
                     runner._running = True
