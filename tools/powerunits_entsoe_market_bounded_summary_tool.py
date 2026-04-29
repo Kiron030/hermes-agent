@@ -120,7 +120,8 @@ def summarize_powerunits_entsoe_market_bounded_window(
 
     base_statement = (
         "Hermes performed no direct SQL. Summary used exactly one HTTP POST to the "
-        "Powerunits bounded internal entsoe-market-sync summary-window API."
+        "Powerunits bounded internal entsoe-market-sync summary-window API. "
+        "Validation subset includes `normalized_time_grain` and `semantics_notes` from Repo B."
     )
 
     country_s = (country or "").strip()
@@ -261,7 +262,9 @@ def summarize_powerunits_entsoe_market_bounded_window(
 SUMMARY_ENTSOE_SCHEMA = {
     "name": "summarize_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync summary-window** — DE / v1 / ≤24h; one HTTP POST. "
+        "**Bounded ENTSO-E market sync summary-window** — DE / v1 / ≤7d; one HTTP POST. "
+        "Includes the same **normalized hourly UTC** semantics as validate (see Repo B "
+        "`checks.normalized_time_grain` / `semantics_notes`). "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {

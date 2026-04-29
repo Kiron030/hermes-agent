@@ -120,7 +120,9 @@ def validate_powerunits_entsoe_market_bounded_window(
 
     base_statement = (
         "Hermes performed no direct SQL. Validation used exactly one HTTP POST to the "
-        "Powerunits bounded internal entsoe-market-sync validate-window API."
+        "Powerunits bounded internal entsoe-market-sync validate-window API. "
+        "Repo B returns `checks.normalized_time_grain` and `semantics_notes` describing "
+        "UTC hour-bucket normalized tables (raw ENTSO-E may be sub-hourly)."
     )
 
     country_s = (country or "").strip()
@@ -263,7 +265,10 @@ def validate_powerunits_entsoe_market_bounded_window(
 VALIDATE_ENTSOE_SCHEMA = {
     "name": "validate_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync validate-window** — DE / v1 / ≤24h; one HTTP POST. "
+        "**Bounded ENTSO-E market sync validate-window** — DE / v1 / ≤7d; one HTTP POST. "
+        "Repo B returns counts on **normalized UTC hour-bucket** tables (`market_*_hourly`); raw ENTSO-E "
+        "may be sub-hourly but this path persists hourly rows. Generation is long-format by "
+        "`technology_group`, so `row_count` ≫ `distinct_timestamps` is normal. "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {

@@ -10,6 +10,7 @@ import pytest
 from tools import powerunits_entsoe_market_bounded_execute_tool as exec_mod
 from tools import powerunits_entsoe_market_bounded_preflight_tool as pre_mod
 from tools import powerunits_entsoe_market_bounded_validate_tool as val_mod
+from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
 
 def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -86,6 +87,42 @@ def test_validate_wrong_country(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     )
     assert out["validation_attempted"] is False
+
+
+def test_validate_schema_mentions_normalized_hourly_semantics() -> None:
+    desc = val_mod.VALIDATE_ENTSOE_SCHEMA["description"]
+    assert "hour-bucket" in desc or "UTC hour" in desc
+    assert "technology_group" in desc or "long-format" in desc
+    assert "7d" in desc or "≤7" in desc or "7 d" in desc.lower()
+
+
+def test_summary_schema_mentions_normalized_hourly_semantics() -> None:
+    from tools import powerunits_entsoe_market_bounded_summary_tool as sum_mod
+
+    desc = sum_mod.SUMMARY_ENTSOE_SCHEMA["description"]
+    assert "hourly" in desc.lower()
+    assert "7d" in desc or "≤7" in desc or "7 d" in desc.lower()
+
+
+def test_entsoe_bounded_slice_accepts_7d() -> None:
+    cc, start, end = validate_entsoe_bounded_slice(
+        "DE",
+        "2024-01-01T00:00:00Z",
+        "2024-01-08T00:00:00Z",
+        "v1",
+    )
+    assert cc == "DE"
+    assert (end - start).total_seconds() == 7 * 24 * 3600
+
+
+def test_entsoe_bounded_slice_rejects_over_7d() -> None:
+    with pytest.raises(ValueError, match="7 days"):
+        validate_entsoe_bounded_slice(
+            "DE",
+            "2024-01-01T00:00:00Z",
+            "2024-01-09T00:00:00Z",
+            "v1",
+        )
 
 
 def test_preflight_valid_de(monkeypatch: pytest.MonkeyPatch) -> None:

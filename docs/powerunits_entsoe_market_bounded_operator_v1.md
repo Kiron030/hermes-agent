@@ -16,7 +16,7 @@ Same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** and **`POWERUNITS_HERMES_INTERNA
 ## Slice rules (v1)
 
 - `country_code` = **DE**, `version` = **v1**
-- `window_start_utc` inclusive, `window_end_utc` exclusive, duration **≤ 24 h**
+- `window_start_utc` inclusive, `window_end_utc` exclusive, duration **≤ 7 days** UTC
 
 ## Railway / Hermes env
 
@@ -34,3 +34,10 @@ Repo B API must have **`ENTSOE_API_KEY`** or **`ENTSOE_API_TOKEN`** for execute 
 ## Validate caveat (v1)
 
 Validate counts run against **primary** `DATABASE_URL` only. If normalized ENTSO-E tables are written to Timescale per env, counts may look empty until a follow-up read-target alignment.
+
+## Count semantics (validate / summary)
+
+- **Raw ENTSO-E** load, prices, and generation can arrive **sub-hourly** (e.g. 15-minute).
+- The bounded **`entsoe_market_job`** path still **writes UTC hour buckets** to `market_demand_hourly`, `market_prices_day_ahead`, and `market_generation_by_type_hourly` (see Repo B `entsoe_to_market` + ADR 042).
+- **Generation** is **long-format** (one row per hour **per `technology_group`**), so **`row_count` ≫ `distinct_timestamps`** is expected.
+- Repo B responses include **`checks.normalized_time_grain`** (`utc_hour_bucket`) and **`checks.semantics_notes`**. A large **`distinct_timestamps`** means many distinct hour starts in the filter window — **not** “quarter-hour rows persisted as the intended grain” of those hourly target tables.

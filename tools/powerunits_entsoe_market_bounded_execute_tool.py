@@ -246,7 +246,7 @@ EXECUTE_ENTSOE_SCHEMA = {
     "name": "execute_powerunits_entsoe_market_bounded_slice",
     "description": (
         "**Bounded ENTSO-E market sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤24h UTC). Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
+        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",

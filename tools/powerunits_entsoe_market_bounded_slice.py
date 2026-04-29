@@ -1,5 +1,5 @@
 """
-Shared local slice validation for bounded ENTSO-E market sync Hermes tools (DE / v1 / ≤24h).
+Shared local slice validation for bounded ENTSO-E market sync Hermes tools (DE / v1 / ≤7d).
 
 No registry.register — imported by entsoe bounded tool modules only.
 """
@@ -39,6 +39,6 @@ def validate_entsoe_bounded_slice(
     delta = end - start
     if delta <= timedelta(0):
         raise ValueError("window must be > 0")
-    if delta > timedelta(hours=24):
-        raise ValueError("window must be <= 24 hours")
+    if delta > timedelta(days=7):
+        raise ValueError("window must be <= 7 days")
     return cc, start, end

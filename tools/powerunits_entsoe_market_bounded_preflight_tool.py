@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ENTSO-E market sync (DE / v1 / ≤24h).
+Hermes local **preflight** for bounded ENTSO-E market sync (DE / v1 / ≤7d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED``.
 """
@@ -95,7 +95,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
 PREFLIGHT_ENTSOE_SCHEMA = {
     "name": "preflight_powerunits_entsoe_market_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E market sync preflight** — local DE / v1 / ≤24h slice check only; "
+        "**Bounded ENTSO-E market sync preflight** — local DE / v1 / ≤7d slice check only; "
         f"no HTTP. Requires {_FEATURE_ENV}."
     ),
     "parameters": {
