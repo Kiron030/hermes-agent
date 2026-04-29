@@ -8,6 +8,8 @@ Tool **`validate_powerunits_option_d_bounded_window`** (toolset **`powerunits_op
 
 Same **PL / v1 / ≤24h UTC** slice rules as execute/preflight (validated locally before the request). Optional **`pipeline_run_id`** (from execute response) is echoed from `data_pipeline_runs` when found; otherwise the API returns a **warning** (`run_not_found`) per ADR 039.
 
+For **input** gap detection **before** execute, use **`readiness_powerunits_option_d_bounded_window`** instead (`docs/powerunits_option_d_readiness_tool_operator_v1.md`).
+
 ## Environment (Hermes Railway)
 
 | Variable | Role |

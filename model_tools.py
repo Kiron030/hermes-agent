@@ -25,7 +25,6 @@ import asyncio
 import logging
 import os
 import threading
-import time
 from typing import Dict, Any, List, Optional, Tuple
 
 from tools.registry import discover_builtin_tools, registry
@@ -47,6 +46,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_option_d_preflight",
     "powerunits_option_d_execute",
     "powerunits_option_d_validate",
+    "powerunits_option_d_readiness",
 )
 
 
@@ -126,15 +126,9 @@ def _run_async(coro):
     if loop and loop.is_running():
         # Inside an async context (gateway, RL env) — run in a fresh thread.
         import concurrent.futures
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(asyncio.run, coro)
-        try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, coro)
             return future.result(timeout=300)
-        except concurrent.futures.TimeoutError:
-            future.cancel()
-            raise
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
 
     # If we're on a worker thread (e.g., parallel tool execution in
     # delegate_task), use a per-thread persistent loop.  This avoids
@@ -155,18 +149,12 @@ def _run_async(coro):
 
 discover_builtin_tools()
 
-# MCP tool discovery (external MCP servers from config) used to run here as
-# a module-level side effect.  It was removed because discover_mcp_tools()
-# internally uses a blocking future.result(timeout=120) wait, and the
-# gateway lazy-imports this module from inside the asyncio event loop on
-# the first user message — freezing Discord/Telegram heartbeats for up to
-# 120s whenever any configured MCP server was slow or unreachable (#16856).
-#
-# Each entry point now runs discovery explicitly at its own startup:
-#   - gateway/run.py            -> start_gateway() uses run_in_executor
-#   - cli.py, hermes_cli/*      -> inline on startup (no event loop)
-#   - tui_gateway/server.py     -> inline on startup (no event loop)
-#   - acp_adapter/server.py     -> asyncio.to_thread on session init
+# MCP tool discovery (external MCP servers from config)
+try:
+    from tools.mcp_tool import discover_mcp_tools
+    discover_mcp_tools()
+except Exception as e:
+    logger.debug("MCP tool discovery failed: %s", e)
 
 # Plugin tool discovery (user/project/pip plugins)
 try:
@@ -320,34 +308,30 @@ def get_tool_definitions(
                 filtered_tools[i] = {"type": "function", "function": dynamic_schema}
                 break
 
-    # Rebuild discord / discord_admin schemas based on the bot's privileged
-    # intents (detected from GET /applications/@me) and the user's action
-    # allowlist in config.  Hides actions the bot's intents don't support so
-    # the model never attempts them, and annotates fetch_messages when the
+    # Rebuild discord_server schema based on the bot's privileged intents
+    # (detected from GET /applications/@me) and the user's action allowlist
+    # in config.  Hides actions the bot's intents don't support so the
+    # model never attempts them, and annotates fetch_messages when the
     # MESSAGE_CONTENT intent is missing.
-    _discord_schema_fns = {
-        "discord": "get_dynamic_schema_core",
-        "discord_admin": "get_dynamic_schema_admin",
-    }
-    for discord_tool_name in _discord_schema_fns:
-        if discord_tool_name in available_tool_names:
-            try:
-                from tools import discord_tool as _dt
-                schema_fn = getattr(_dt, _discord_schema_fns[discord_tool_name])
-                dynamic = schema_fn()
-            except Exception:
-                dynamic = None
-            if dynamic is None:
-                filtered_tools = [
-                    t for t in filtered_tools
-                    if t.get("function", {}).get("name") != discord_tool_name
-                ]
-                available_tool_names.discard(discord_tool_name)
-            else:
-                for i, td in enumerate(filtered_tools):
-                    if td.get("function", {}).get("name") == discord_tool_name:
-                        filtered_tools[i] = {"type": "function", "function": dynamic}
-                        break
+    if "discord_server" in available_tool_names:
+        try:
+            from tools.discord_tool import get_dynamic_schema
+            dynamic = get_dynamic_schema()
+        except Exception:  # pragma: no cover — defensive, fall back to static
+            dynamic = None
+        if dynamic is None:
+            # Tool filtered out entirely (empty allowlist or detection disabled
+            # the only remaining actions).  Drop it from the schema list.
+            filtered_tools = [
+                t for t in filtered_tools
+                if t.get("function", {}).get("name") != "discord_server"
+            ]
+            available_tool_names.discard("discord_server")
+        else:
+            for i, td in enumerate(filtered_tools):
+                if td.get("function", {}).get("name") == "discord_server":
+                    filtered_tools[i] = {"type": "function", "function": dynamic}
+                    break
 
     # Strip web tool cross-references from browser_navigate description when
     # web_search / web_extract are not available.  The static schema says
@@ -378,18 +362,6 @@ def get_tool_definitions(
 
     global _last_resolved_tool_names
     _last_resolved_tool_names = [t["function"]["name"] for t in filtered_tools]
-
-    # Sanitize schemas for broad backend compatibility. llama.cpp's
-    # json-schema-to-grammar converter (used by its OAI server to build
-    # GBNF tool-call parsers) rejects some shapes that cloud providers
-    # silently accept — bare "type": "object" with no properties,
-    # string-valued schema nodes from malformed MCP servers, etc. This
-    # is a no-op for schemas that are already well-formed.
-    try:
-        from tools.schema_sanitizer import sanitize_tool_schemas
-        filtered_tools = sanitize_tool_schemas(filtered_tools)
-    except Exception as e:  # pragma: no cover — defensive
-        logger.warning("Schema sanitization skipped: %s", e)
 
     return filtered_tools
 
@@ -440,27 +412,24 @@ def coerce_tool_args(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         if not prop_schema:
             continue
         expected = prop_schema.get("type")
-        if not expected and not _schema_allows_null(prop_schema):
+        if not expected:
             continue
-        coerced = _coerce_value(value, expected, schema=prop_schema)
+        coerced = _coerce_value(value, expected)
         if coerced is not value:
             args[key] = coerced
 
     return args
 
 
-def _coerce_value(value: str, expected_type, schema: dict | None = None):
+def _coerce_value(value: str, expected_type):
     """Attempt to coerce a string *value* to *expected_type*.
 
     Returns the original string when coercion is not applicable or fails.
     """
-    if _schema_allows_null(schema) and value.strip().lower() == "null":
-        return None
-
     if isinstance(expected_type, list):
         # Union type — try each in order, return first successful coercion
         for t in expected_type:
-            result = _coerce_value(value, t, schema=schema)
+            result = _coerce_value(value, t)
             if result is not value:
                 return result
         return value
@@ -469,57 +438,6 @@ def _coerce_value(value: str, expected_type, schema: dict | None = None):
         return _coerce_number(value, integer_only=(expected_type == "integer"))
     if expected_type == "boolean":
         return _coerce_boolean(value)
-    if expected_type == "array":
-        return _coerce_json(value, list)
-    if expected_type == "object":
-        return _coerce_json(value, dict)
-    if expected_type == "null" and value.strip().lower() == "null":
-        return None
-    return value
-
-
-def _schema_allows_null(schema: dict | None) -> bool:
-    """Return True when a JSON Schema fragment explicitly permits null."""
-    if not isinstance(schema, dict):
-        return False
-
-    schema_type = schema.get("type")
-    if schema_type == "null":
-        return True
-    if isinstance(schema_type, list) and "null" in schema_type:
-        return True
-    if schema.get("nullable") is True:
-        return True
-
-    for union_key in ("anyOf", "oneOf"):
-        variants = schema.get(union_key)
-        if not isinstance(variants, list):
-            continue
-        for variant in variants:
-            if isinstance(variant, dict) and variant.get("type") == "null":
-                return True
-
-    return False
-
-
-def _coerce_json(value: str, expected_python_type: type):
-    """Parse *value* as JSON when the schema expects an array or object.
-
-    Handles model output drift where a complex oneOf/discriminated-union schema
-    causes the LLM to emit the array/object as a JSON string instead of a native
-    structure.  Returns the original string if parsing fails or yields the wrong
-    Python type.
-    """
-    try:
-        parsed = json.loads(value)
-    except (ValueError, TypeError):
-        return value
-    if isinstance(parsed, expected_python_type):
-        logger.debug(
-            "coerce_tool_args: coerced string to %s via json.loads",
-            expected_python_type.__name__,
-        )
-        return parsed
     return value
 
 
@@ -529,9 +447,9 @@ def _coerce_number(value: str, integer_only: bool = False):
         f = float(value)
     except (ValueError, OverflowError):
         return value
-    # Guard against inf/nan — not JSON-serializable, keep original string
+    # Guard against inf/nan before int() conversion
     if f != f or f == float("inf") or f == float("-inf"):
-        return value
+        return f
     # If it looks like an integer (no fractional part), return int
     if f == int(f):
         return int(f)
@@ -628,14 +546,6 @@ def handle_function_call(
             except Exception:
                 pass  # file_tools may not be loaded yet
 
-        # Measure tool dispatch latency so post_tool_call and
-        # transform_tool_result hooks can observe per-tool duration.
-        # Inspired by Claude Code 2.1.119, which added ``duration_ms`` to
-        # PostToolUse hook inputs so plugin authors can build latency
-        # dashboards, budget alerts, and regression canaries without having
-        # to wrap every tool manually.  We use monotonic() so the value is
-        # unaffected by wall-clock adjustments during the call.
-        _dispatch_start = time.monotonic()
         if function_name == "execute_code":
             # Prefer the caller-provided list so subagents can't overwrite
             # the parent's tool set via the process-global.
@@ -651,7 +561,6 @@ def handle_function_call(
                 task_id=task_id,
                 user_task=user_task,
             )
-        duration_ms = int((time.monotonic() - _dispatch_start) * 1000)
 
         try:
             from hermes_cli.plugins import invoke_hook
@@ -663,36 +572,9 @@ def handle_function_call(
                 task_id=task_id or "",
                 session_id=session_id or "",
                 tool_call_id=tool_call_id or "",
-                duration_ms=duration_ms,
             )
         except Exception:
             pass
-
-        # Generic tool-result canonicalization seam: plugins receive the
-        # final result string (JSON, usually) and may replace it by
-        # returning a string from transform_tool_result. Runs after
-        # post_tool_call (which stays observational) and before the result
-        # is appended back into conversation context. Fail-open; the first
-        # valid string return wins; non-string returns are ignored.
-        try:
-            from hermes_cli.plugins import invoke_hook
-            hook_results = invoke_hook(
-                "transform_tool_result",
-                tool_name=function_name,
-                args=function_args,
-                result=result,
-                task_id=task_id or "",
-                session_id=session_id or "",
-                tool_call_id=tool_call_id or "",
-                duration_ms=duration_ms,
-            )
-            for hook_result in hook_results:
-                if isinstance(hook_result, str):
-                    result = hook_result
-                    break
-        except Exception:
-            pass
-
 
         return result
 
