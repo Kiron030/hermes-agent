@@ -115,6 +115,7 @@ _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
     "powerunits_option_d_execute",
     "powerunits_option_d_validate",
     "powerunits_option_d_readiness",
+    "powerunits_option_d_summary",
 }
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.

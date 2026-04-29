@@ -312,6 +312,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_option_d_execute_tool",
             "tools.powerunits_option_d_preflight_tool",
             "tools.powerunits_option_d_readiness_tool",
+            "tools.powerunits_option_d_summary_tool",
             "tools.powerunits_option_d_validate_tool",
             "tools.powerunits_repo_b_read_tool",
             "tools.powerunits_timescale_read_tool",

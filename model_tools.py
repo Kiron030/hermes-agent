@@ -47,6 +47,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_option_d_execute",
     "powerunits_option_d_validate",
     "powerunits_option_d_readiness",
+    "powerunits_option_d_summary",
 )
 
 

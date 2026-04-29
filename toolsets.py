@@ -233,9 +233,9 @@ TOOLSETS = {
     "powerunits_option_d_preflight": {
         "description": (
             "Option D bounded slice **preflight only** (PL / v1 / ≤24h UTC): validates "
-            "arguments and returns operator CLI + rollback SQL. "
-            "Gated by HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED; **no** wrapper execution "
-            "and **no** DB writes from Hermes."
+            "arguments locally and returns slice, rollback SQL, optional legacy wrapper CLI, "
+            "and bounded HTTP operator hint. **No** Powerunits HTTP, **no** wrapper execution, "
+            "**no** DB writes from Hermes. Gated by HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED."
         ),
         "tools": ["preflight_powerunits_option_d_bounded_slice"],
         "includes": [],
@@ -271,6 +271,17 @@ TOOLSETS = {
             "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
         ),
         "tools": ["readiness_powerunits_option_d_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_option_d_summary": {
+        "description": (
+            "Option D **bounded summary-window**: one HTTP POST to Powerunits internal read-only "
+            "`/internal/hermes/bounded/v1/market-features-hourly/summary-window` (PL / v1 / ≤24h UTC). "
+            "Requires HERMES_POWERUNITS_OPTION_D_SUMMARY_ENABLED, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["summarize_powerunits_option_d_bounded_window"],
         "includes": [],
     },
     
