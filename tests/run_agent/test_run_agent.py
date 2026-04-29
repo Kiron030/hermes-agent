@@ -1354,6 +1354,25 @@ class TestBuildApiKwargs:
         kwargs = agent._build_api_kwargs(messages)
         assert kwargs.get("extra_body", {}).get("think") is None
 
+    def test_openai_direct_custom_skips_think_extra_body(self, agent):
+        """Official OpenAI rejects unknown ``think`` in extra_body (HTTP 400)."""
+        agent.provider = "custom"
+        agent.base_url = "https://api.openai.com/v1"
+        agent._base_url_lower = agent.base_url.lower()
+        agent.reasoning_config = {"enabled": False}
+        messages = [{"role": "user", "content": "hi"}]
+        kwargs = agent._build_api_kwargs(messages)
+        assert kwargs.get("extra_body", {}).get("think") is None
+
+    def test_azure_openai_custom_skips_think_extra_body(self, agent):
+        agent.provider = "custom"
+        agent.base_url = "https://my-resource.openai.azure.com/openai/v1"
+        agent._base_url_lower = agent.base_url.lower()
+        agent.reasoning_config = {"effort": "none"}
+        messages = [{"role": "user", "content": "hi"}]
+        kwargs = agent._build_api_kwargs(messages)
+        assert kwargs.get("extra_body", {}).get("think") is None
+
 
 
 class TestBuildAssistantMessage:

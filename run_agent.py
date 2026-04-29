@@ -7457,22 +7457,25 @@ class AIAgent:
         if _is_nous:
             extra_body["tags"] = ["product=hermes-agent"]
 
-        # Ollama num_ctx: override the 2048 default so the model actually
-        # uses the context window it was trained for.  Passed via the OpenAI
-        # SDK's extra_body → options.num_ctx, which Ollama's OpenAI-compat
-        # endpoint forwards to the runner as --ctx-size.
-        if self._ollama_num_ctx:
+        # Ollama num_ctx: only for Ollama-style endpoints (not official OpenAI).
+        if self._ollama_num_ctx and not self._is_direct_openai_url() and not self._is_azure_openai_url():
             options = extra_body.get("options", {})
             options["num_ctx"] = self._ollama_num_ctx
             extra_body["options"] = options
 
-        # Ollama / custom provider: pass think=false when reasoning is disabled.
+        # Ollama / local OpenAI-compat: pass think=false when reasoning is disabled.
         # Ollama does not recognise the OpenRouter-style `reasoning` extra_body
         # field, so we use its native `think` parameter instead.
-        # This prevents thinking-capable models (Qwen3, etc.) from generating
-        # <think> blocks and producing empty-response errors when the user has
-        # set reasoning_effort: none.
-        if self.provider == "custom" and self.reasoning_config and isinstance(self.reasoning_config, dict):
+        # Official OpenAI (api.openai.com) and Azure OpenAI reject unknown
+        # ``extra_body`` keys such as ``think`` with HTTP 400 — never send this
+        # for those routes even when provider is ``custom`` (Powerunits).
+        if (
+            self.provider == "custom"
+            and self.reasoning_config
+            and isinstance(self.reasoning_config, dict)
+            and not self._is_direct_openai_url()
+            and not self._is_azure_openai_url()
+        ):
             _effort = (self.reasoning_config.get("effort") or "").strip().lower()
             _enabled = self.reasoning_config.get("enabled", True)
             if _effort == "none" or _enabled is False:
