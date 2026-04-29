@@ -2,8 +2,9 @@
 """
 Hermes-facing **preflight only** for Option D bounded `market_features_hourly` slice.
 
-Validates slice parameters and returns operator instructions. **Does not** run the
-wrapper, subprocess, or any DB write. Gated by ``HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED``.
+Validates slice parameters locally and returns operator-facing planning fields.
+**Does not** call Powerunits HTTP, run a subprocess, or perform any DB write.
+Gated by ``HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED``.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from tools.powerunits_option_d_bounded_market_features import _validate_slice
 logger = logging.getLogger(__name__)
 
 _FEATURE_ENV = "HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED"
-_WRAPPER_MODULE = "tools.powerunits_option_d_bounded_market_features"
 _SURFACE = "powerunits_option_d_preflight"
 
 _REQUIRED_ENV_DOCS = [
@@ -82,10 +82,17 @@ def preflight_powerunits_option_d_bounded_slice(
         "hermes_executed_write": False,
         "hermes_ran_bounded_wrapper": False,
         "hermes_statement": (
-            "Hermes did not execute the bounded wrapper, run shell commands, "
-            "or perform any database write."
+            "Hermes did not call Powerunits HTTP, run the legacy local wrapper, execute shell "
+            "commands, or perform any database write. Live bounded writes use the Hermes "
+            "execute tool (single POST to Powerunits internal recompute) after readiness."
         ),
         "required_environment_variables": list(_REQUIRED_ENV_DOCS),
+        "bounded_http_operator_hint": (
+            "Live path: readiness → preflight (this tool) → execute_powerunits_option_d_bounded_slice "
+            "(POST /internal/hermes/bounded/v1/market-features-hourly/recompute) → "
+            "validate_powerunits_option_d_bounded_window. Requires "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET on Hermes."
+        ),
     }
 
     try:
@@ -121,10 +128,10 @@ def preflight_powerunits_option_d_bounded_slice(
         ),
         "rollback_sql_template": _rollback_sql(cc, version_s, start_z, end_z),
         "operator_notes": (
-            "Run from hermes-agent repo root with uv on PATH. Export "
-            "`MARKET_FEATURES_WRITE_TARGET=timescale`, set `POWERUNITS_OPTION_D_PRODUCT_ROOT` "
-            "to the Powerunits product repo root, and ensure DATABASE_URL / "
-            "DATABASE_URL_TIMESCALE match your target before running the wrapper."
+            "Default production flow is Hermes bounded HTTP (execute tool), not the line below. "
+            "The `operator_wrapper_command` is an optional legacy local path for advanced operators "
+            "with a full product checkout, uv, and DATABASE_URL / DATABASE_URL_TIMESCALE / "
+            "MARKET_FEATURES_WRITE_TARGET configured for direct job runs."
         ),
     }
     return json.dumps(payload, ensure_ascii=False)
@@ -133,10 +140,10 @@ def preflight_powerunits_option_d_bounded_slice(
 PREFLIGHT_OPTION_D_SCHEMA = {
     "name": "preflight_powerunits_option_d_bounded_slice",
     "description": (
-        "**Option D preflight only** — validates a bounded PL / v1 / ≤24h UTC window for "
-        "`market_features_hourly` recompute planning. Returns normalized slice, required env "
-        "names, exact **manual** wrapper CLI line, and rollback SQL. **Does not** execute the "
-        "wrapper, shell, or database writes. Requires "
+        "**Option D preflight only** — validates a bounded PL / v1 / ≤24h UTC window locally for "
+        "`market_features_hourly` planning. Returns normalized slice, optional legacy local wrapper "
+        "CLI line, rollback SQL template, and a bounded HTTP operator hint. **Does not** call "
+        "Powerunits, run the wrapper, shell, or database writes. Requires "
         f"{_FEATURE_ENV}."
     ),
     "parameters": {

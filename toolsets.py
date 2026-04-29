@@ -233,9 +233,9 @@ TOOLSETS = {
     "powerunits_option_d_preflight": {
         "description": (
             "Option D bounded slice **preflight only** (PL / v1 / ≤24h UTC): validates "
-            "arguments and returns operator CLI + rollback SQL. "
-            "Gated by HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED; **no** wrapper execution "
-            "and **no** DB writes from Hermes."
+            "arguments locally and returns slice, rollback SQL, optional legacy wrapper CLI, "
+            "and bounded HTTP operator hint. **No** Powerunits HTTP, **no** wrapper execution, "
+            "**no** DB writes from Hermes. Gated by HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED."
         ),
         "tools": ["preflight_powerunits_option_d_bounded_slice"],
         "includes": [],
@@ -271,6 +271,61 @@ TOOLSETS = {
             "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
         ),
         "tools": ["readiness_powerunits_option_d_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_option_d_summary": {
+        "description": (
+            "Option D **bounded summary-window**: one HTTP POST to Powerunits internal read-only "
+            "`/internal/hermes/bounded/v1/market-features-hourly/summary-window` (PL / v1 / ≤24h UTC). "
+            "Requires HERMES_POWERUNITS_OPTION_D_SUMMARY_ENABLED, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["summarize_powerunits_option_d_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_preflight": {
+        "description": (
+            "Bounded ENTSO-E market sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
+            "bounded HTTP operator hint. **No** Powerunits HTTP. "
+            "Gated by HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED."
+        ),
+        "tools": ["preflight_powerunits_entsoe_market_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_execute": {
+        "description": (
+            "Bounded ENTSO-E market sync **execute**: one HTTP POST to "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/recompute` (DE / v1 / ≤7d). "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED, "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["execute_powerunits_entsoe_market_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_validate": {
+        "description": (
+            "Bounded ENTSO-E market sync **validate-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/validate-window` (DE / v1 / ≤7d). "
+            "Counts are on **normalized UTC hour-bucket** tables; generation is long-format by "
+            "technology_group (see Repo B `semantics_notes`). "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED + same base URL and bearer."
+        ),
+        "tools": ["validate_powerunits_entsoe_market_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_summary": {
+        "description": (
+            "Bounded ENTSO-E market sync **summary-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/summary-window` (DE / v1 / ≤7d). "
+            "Same hourly-normalized semantics as validate (compact validation subset). "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED + same base URL and bearer."
+        ),
+        "tools": ["summarize_powerunits_entsoe_market_bounded_window"],
         "includes": [],
     },
     

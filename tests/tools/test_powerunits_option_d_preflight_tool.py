@@ -32,7 +32,10 @@ def test_valid_pl_slice(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["normalization_errors"] == []
     assert out["hermes_executed_write"] is False
     assert out["hermes_ran_bounded_wrapper"] is False
-    assert "Hermes did not execute" in out.get("hermes_statement", "")
+    assert "Powerunits HTTP" in out.get("hermes_statement", "")
+    assert "bounded_http_operator_hint" in out
+    assert "recompute" in out["bounded_http_operator_hint"]
+    assert "validate_powerunits_option_d_bounded_window" in out["bounded_http_operator_hint"]
     assert out["slice"]["country"] == "PL"
     assert out["slice"]["version"] == "v1"
     assert out["slice"]["start_utc"] == "2024-01-01T00:00:00Z"
