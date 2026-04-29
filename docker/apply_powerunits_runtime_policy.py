@@ -31,6 +31,10 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_option_d_validate",
     "powerunits_option_d_readiness",
     "powerunits_option_d_summary",
+    "powerunits_entsoe_market_bounded_preflight",
+    "powerunits_entsoe_market_bounded_execute",
+    "powerunits_entsoe_market_bounded_validate",
+    "powerunits_entsoe_market_bounded_summary",
 ]
 
 DISABLED_PLATFORMS = [

@@ -284,6 +284,47 @@ TOOLSETS = {
         "tools": ["summarize_powerunits_option_d_bounded_window"],
         "includes": [],
     },
+
+    "powerunits_entsoe_market_bounded_preflight": {
+        "description": (
+            "Bounded ENTSO-E market sync **preflight** (DE / v1 / ≤24h UTC): local slice check only; "
+            "bounded HTTP operator hint. **No** Powerunits HTTP. "
+            "Gated by HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED."
+        ),
+        "tools": ["preflight_powerunits_entsoe_market_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_execute": {
+        "description": (
+            "Bounded ENTSO-E market sync **execute**: one HTTP POST to "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/recompute` (DE / v1 / ≤24h). "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED, "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["execute_powerunits_entsoe_market_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_validate": {
+        "description": (
+            "Bounded ENTSO-E market sync **validate-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/validate-window`. "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED + same base URL and bearer."
+        ),
+        "tools": ["validate_powerunits_entsoe_market_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_market_bounded_summary": {
+        "description": (
+            "Bounded ENTSO-E market sync **summary-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/summary-window`. "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED + same base URL and bearer."
+        ),
+        "tools": ["summarize_powerunits_entsoe_market_bounded_window"],
+        "includes": [],
+    },
     
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
