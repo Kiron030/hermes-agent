@@ -312,6 +312,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_era5_weather_bounded_preflight_tool",
             "tools.powerunits_era5_weather_bounded_summary_tool",
             "tools.powerunits_era5_weather_bounded_validate_tool",
+            "tools.powerunits_entsoe_market_bounded_campaign_tool",
             "tools.powerunits_entsoe_market_bounded_execute_tool",
             "tools.powerunits_entsoe_market_bounded_preflight_tool",
             "tools.powerunits_entsoe_market_bounded_summary_tool",

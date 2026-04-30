@@ -20,6 +20,7 @@
 | **Bounded ENTSO-E market sync execute** (`execute_powerunits_entsoe_market_bounded_slice`) | Allowed **only** when gated | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` + same base URL and bearer; **one** HTTP POST to `…/entsoe-market-sync/recompute` — **no** SQL from Hermes; Repo B runs `entsoe_market_job.run` in-process. |
 | **Bounded ENTSO-E market sync validate** (`validate_powerunits_entsoe_market_bounded_window`) | Allowed **only** when gated | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` + same base URL and bearer; **one** HTTP POST to read-only validate-window — **no** SQL from Hermes. |
 | **Bounded ENTSO-E market sync summary** (`summarize_powerunits_entsoe_market_bounded_window`) | Allowed **only** when gated | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` + same base URL and bearer; **one** HTTP POST to read-only summary-window — **no** SQL from Hermes. |
+| **Bounded ENTSO-E market sync campaign DE** (`campaign_powerunits_entsoe_market_bounded_de`) | Allowed **only** when gated | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` **and** bounded execute + summary flags + base URL/bearer; **sequential** recompute + summary per ≤7d sub-window (campaign ≤31d, ≤5 windows), **fail-fast** — **no** `market_feature_job` / `market_driver_feature_job` / `expand_market_data`; still **DE only**. |
 | **Bounded ERA5 weather sync preflight** (`preflight_powerunits_era5_weather_bounded_slice`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED`; local DE / `v1` / ≤7d slice + bounded HTTP hint — **no** Powerunits HTTP, **no** job execution. |
 | **Bounded ERA5 weather sync execute** (`execute_powerunits_era5_weather_bounded_slice`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` + same base URL and bearer; **one** HTTP POST to `…/era5-weather/recompute` — **no** SQL from Hermes; Repo B runs `era5_weather_job.run` only (**does not** auto-run `market_feature_job` / `market_driver_feature_job`). |
 | **Bounded ERA5 weather sync validate** (`validate_powerunits_era5_weather_bounded_window`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` + same base URL and bearer; **one** HTTP POST to read-only validate-window on `weather_country_hourly` — **no** SQL from Hermes. |
@@ -36,6 +37,7 @@
 | `SOUL.hermes.md` | Profile and intent. |
 | `RUNBOOK.hermes-trusted-analyst.md` | Operator context and triage table. |
 | `ACCESS_MATRIX.md` | This matrix — allowed / gated / forbidden. |
+| `docs/powerunits_entsoe_market_bounded_operator_v1.md` | Bounded ENTSO-E Hermes tools + campaign v1 env gates. |
 | `docs/powerunits_era5_weather_bounded_operator_v1.md` | Bounded ERA5 Hermes tools + env gates + no auto feature job reminder. |
 | `RUNBOOK.hermes-stage1-validation.md` | Checklists, post-deploy verification, rollback basics. |
 | `SOUL.hermes-writer.md` / `RUNBOOK.hermes-writer.md` | **Stage 2 scaffolding only** — not live until explicitly enabled. |

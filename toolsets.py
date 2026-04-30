@@ -329,6 +329,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_entsoe_market_bounded_campaign": {
+        "description": (
+            "Bounded ENTSO-E market sync **campaign (v1 DE)**: sequential execute + summary over "
+            "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED plus ENTSO-E bounded "
+            "execute + summary flags, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. Does not run market_feature_job "
+            "or expand_market_data."
+        ),
+        "tools": ["campaign_powerunits_entsoe_market_bounded_de"],
+        "includes": [],
+    },
+
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "

@@ -10,7 +10,11 @@ import pytest
 from tools import powerunits_entsoe_market_bounded_execute_tool as exec_mod
 from tools import powerunits_entsoe_market_bounded_preflight_tool as pre_mod
 from tools import powerunits_entsoe_market_bounded_validate_tool as val_mod
-from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
+from tools import powerunits_entsoe_market_bounded_campaign_tool as camp_mod
+from tools.powerunits_entsoe_market_bounded_slice import (
+    validate_entsoe_bounded_campaign,
+    validate_entsoe_bounded_slice,
+)
 
 
 def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -137,3 +141,123 @@ def test_preflight_valid_de(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert out["syntactically_valid"] is True
     assert "execute_powerunits_entsoe_market_bounded_slice" in out["bounded_http_operator_hint"]
+
+
+def test_entsoe_bounded_campaign_plan_contiguous_three_windows() -> None:
+    cc, ver, wins = validate_entsoe_bounded_campaign(
+        "DE",
+        "2024-01-01T00:00:00Z",
+        "2024-01-16T00:00:00Z",
+        "v1",
+    )
+    assert cc == "DE"
+    assert ver == "v1"
+    assert len(wins) == 3
+    assert wins[0][1] == wins[1][0]
+    assert wins[1][1] == wins[2][0]
+
+
+def test_entsoe_bounded_campaign_rejects_over_31d() -> None:
+    with pytest.raises(ValueError, match="31"):
+        validate_entsoe_bounded_campaign(
+            "DE",
+            "2024-01-01T00:00:00Z",
+            "2024-02-02T00:00:00Z",
+            "v1",
+        )
+
+
+def _with_campaign_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED", "1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED", "1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED", "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+
+def test_campaign_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED", "1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED", "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED", raising=False)
+    out = json.loads(
+        camp_mod.campaign_powerunits_entsoe_market_bounded_de(
+            campaign_start_utc="2024-01-01T00:00:00Z",
+            campaign_end_utc="2024-01-08T00:00:00Z",
+        )
+    )
+    assert out.get("stopped_reason") == "feature_disabled"
+
+
+def test_campaign_fail_fast_on_second_execute_of_three(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two full windows planned (9 days); succeed window 1; fail execute on window 2."""
+    _with_campaign_env(monkeypatch)
+
+    class RExeOk:
+        status_code = 200
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "11111111-1111-1111-1111-111111111111",
+                "correlation_id": "cid",
+                "rows_written": 42,
+            }
+        )
+        content = b"{}"
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    class RExeFail:
+        status_code = 502
+        text = json.dumps({"success": False, "message": "job failed"})
+        content = b"{}"
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    class RSumOk:
+        status_code = 200
+        text = json.dumps(
+            {
+                "success": True,
+                "outcome_class": "ok",
+                "correlation_id": "sid",
+                "operator_next": "ok",
+            }
+        )
+        content = b"{}"
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    exec_calls = {"n": 0}
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> Any:
+        if "entsoe-market-sync/recompute" in url:
+            exec_calls["n"] += 1
+            if exec_calls["n"] == 1:
+                return RExeOk()
+            return RExeFail()
+        if "summary-window" in url:
+            return RSumOk()
+        raise AssertionError(f"unexpected url {url!r}")
+
+    out = json.loads(
+        camp_mod.campaign_powerunits_entsoe_market_bounded_de(
+            campaign_start_utc="2024-01-01T00:00:00Z",
+            campaign_end_utc="2024-01-10T00:00:00Z",
+            _http_post=fake_post,
+        )
+    )
+    assert out["windows_planned"] == 2
+    assert exec_calls["n"] == 2
+    assert out["windows_attempted"] == 2
+    assert out["windows_succeeded"] == 1
+    assert out["stopped_reason"] == "execute_failed"
+    assert len(out["windows"]) == 2
+    assert out["windows"][0]["execute_success"] is True
+    assert out["windows"][0]["summary_success"] is True
+    assert out["windows"][1]["execute_success"] is False
