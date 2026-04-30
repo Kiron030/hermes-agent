@@ -35,6 +35,10 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_entsoe_market_bounded_execute",
     "powerunits_entsoe_market_bounded_validate",
     "powerunits_entsoe_market_bounded_summary",
+    "powerunits_era5_weather_bounded_preflight",
+    "powerunits_era5_weather_bounded_execute",
+    "powerunits_era5_weather_bounded_validate",
+    "powerunits_era5_weather_bounded_summary",
 ]
 
 DISABLED_PLATFORMS = [
