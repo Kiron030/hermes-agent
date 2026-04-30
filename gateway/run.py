@@ -120,6 +120,11 @@ _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
     "powerunits_entsoe_market_bounded_execute",
     "powerunits_entsoe_market_bounded_validate",
     "powerunits_entsoe_market_bounded_summary",
+    "powerunits_entsoe_market_bounded_campaign",
+    "powerunits_era5_weather_bounded_preflight",
+    "powerunits_era5_weather_bounded_execute",
+    "powerunits_era5_weather_bounded_validate",
+    "powerunits_era5_weather_bounded_summary",
 }
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.

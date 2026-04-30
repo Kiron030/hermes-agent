@@ -100,6 +100,12 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 3. **Reject** — `{"action": "read_repo_b_key", "key": "__nonexistent_key__"}` (expect JSON error, no secrets).
 4. **Wrong-tool check** — `read_powerunits_doc` with `{"action": "list_keys"}` → keys look like `implementation_state.md` and `surface: powerunits_doc_key_manifest` — **different** from step 1.
 
+### Bounded ERA5 weather (Hermes → Repo B)
+
+- [ ] **Preflight:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool.
+- [ ] **Execute gate off:** with execute flag falsy, execute tool absent or returns `feature_disabled` — no Repo B HTTP from that tool path.
+- [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
+
 ### Rollback (Repo B read only)
 
 - [ ] Set `HERMES_POWERUNITS_REPO_B_READ_ENABLED` to **falsy** or remove it; redeploy or restart if your platform caches env — tool should disappear or return disabled without touching Repo B or GitHub.
@@ -120,6 +126,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Webhook:** point Telegram webhook back to last-known-good Hermes URL (previous Railway service / project) if this service is bad.
 - [ ] **Timescale:** set `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` to falsy / unset to drop DB reads without redeploying Hermes logic.
 - [ ] **Repo B read:** unset or falsify `HERMES_POWERUNITS_REPO_B_READ_ENABLED` (see Repo B read subsection).
+- [ ] **Bounded ERA5:** unset or falsify `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_*_ENABLED` flags to drop the Hermes HTTP surface without changing Repo B.
 - [ ] **Policy:** do not remove `first_safe_v1` casually; rollback to prior image/env snapshot per your Railway practice, then re-run this validation pack.
 
 ---
