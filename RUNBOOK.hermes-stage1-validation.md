@@ -12,6 +12,7 @@
 | **This file** | Repeatable checks + post-change verification + rollback basics. |
 | `docs/powerunits_timescale_read_operator_v1.md` | Timescale tool env gates and scope. |
 | `docs/powerunits_repo_b_read_operator_v1.md` | Repo B allowlisted read (`read_powerunits_repo_b_allowlisted`); env-gated. |
+| `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (Hermes POST to Repo B; read-only, DE). |
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual browser/preview smoke (read-only; no Hermes URL fetch). |
 | `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
 | `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
@@ -105,6 +106,11 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Preflight:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool.
 - [ ] **Execute gate off:** with execute flag falsy, execute tool absent or returns `feature_disabled` — no Repo B HTTP from that tool path.
 - [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
+
+### Bounded baseline layer-coverage preview (read-only; optional)
+
+- [ ] **Feature gate:** with `HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED` falsy, `preview_powerunits_baseline_layer_coverage_de` absent or returns **`feature_disabled`** — no Repo B HTTP.
+- [ ] **Gate on:** bounded base URL + bearer set; tool **`preview_powerunits_baseline_layer_coverage_de`** with DE / v1 / ≤31d `[preview_start_utc, preview_end_utc)` → JSON **`preview_attempted: true`**, Repo B **`rollup`**, **`hermes_statement`** reflects **no jobs / no campaigns / read-only preview** (`read_only_baseline_preview_no_jobs` on Repo B). **`rollup.suggested_next_bounded_action`** is Repo B-authored only — Hermes does not append local steps.
 
 ### Rollback (Repo B read only)
 
