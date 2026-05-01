@@ -13,6 +13,7 @@
 | `docs/powerunits_timescale_read_operator_v1.md` | Timescale tool env gates and scope. |
 | `docs/powerunits_repo_b_read_operator_v1.md` | Repo B allowlisted read (`read_powerunits_repo_b_allowlisted`); env-gated. |
 | `docs/powerunits_bounded_flags_consolidated_v1.md` | Consolidated bounded env naming & migration table. |
+| `docs/powerunits_entsoe_forecast_bounded_operator_v1.md` | Bounded ENTSO-E **forecast** Hermes tools (`entsoe_forecast_job` only; not market sync / features). |
 | `docs/powerunits_market_features_bounded_de_operator_v1.md` | Bounded DE `market_features_hourly` Hermes tools (separate from PL Option D). |
 | `docs/powerunits_market_driver_features_bounded_de_operator_v1.md` | Bounded DE `market_driver_features_hourly` Hermes tools (separate from market-features DE + Option D). |
 | `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (Hermes POST to Repo B; read-only, DE). |
@@ -120,6 +121,15 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
 - [ ] **Campaign:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED=1` + primary `=1` (or legacy execute+summary) + base URL/bearer.
 
+### Bounded ENTSO-E forecast (Hermes → Repo B; forecast family only)
+
+- [ ] **Orthogonal:** This path is **`…/entsoe-forecast/*`** → **`entsoe_forecast_job`** only — **not** **`…/entsoe-market-sync/*`**, **not** `market_feature_job`, **not** `market_driver_feature_job`.
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (DE / v1 / ≤7d) → `syntactically_valid: true`, bounded hint names execute tool.
+- [ ] **Preflight — legacy:** primary off + `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED=1` → same behavior.
+- [ ] **Primary + empty allowlist:** `…_ALLOWED_COUNTRIES=` (empty) with primary truthy → **fail-closed** (`feature_disabled` or equivalent).
+- [ ] **Execute gate off:** primary falsy **and** all four legacy falsy → execute **`feature_disabled`** — no Repo B HTTP.
+- [ ] **Execute on:** bounded POST **`…/entsoe-forecast/recompute`**; response states **no downstream** features/market/auto-expand if Repo B echoes that field.
+
 ### Bounded DE market features hourly (Hermes → Repo B; optional)
 
 - [ ] **Separate from Option D:** `HERMES_POWERUNITS_OPTION_D_*` unchanged; DE bounded market-features use **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** (**recommended**) or legacy **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*`** per tool.
@@ -160,7 +170,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Webhook:** point Telegram webhook back to last-known-good Hermes URL (previous Railway service / project) if this service is bad.
 - [ ] **Timescale:** set `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` to falsy / unset to drop DB reads without redeploying Hermes logic.
 - [ ] **Repo B read:** unset or falsify `HERMES_POWERUNITS_REPO_B_READ_ENABLED` (see Repo B read subsection).
-- [ ] **Bounded ENTSO-E / ERA5:** unset or falsify **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** / **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** and legacy **`…_PREFLIGHT/_EXECUTE/_VALIDATE/_SUMMARY_ENABLED`** as needed to drop Hermes HTTP for those families without changing Repo B. Campaign and coverage-scan modifiers remain separate.
+- [ ] **Bounded ENTSO-E / ERA5:** unset or falsify **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** / **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** and legacy **`…_PREFLIGHT/_EXECUTE/_VALIDATE/_SUMMARY_ENABLED`** as needed to drop Hermes HTTP for those families without changing Repo B. **Forecast:** **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`** and its four legacy **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_*_ENABLED`** are **separate** — drop them independently of market ERA5/market-sync flags. Campaign and coverage-scan modifiers remain separate.
 - [ ] **Bounded DE market features:** unset or falsify `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*_ENABLED` (execute/validate/readiness/summary as needed) without touching PL Option D flags.
 - [ ] **Policy:** do not remove `first_safe_v1` casually; rollback to prior image/env snapshot per your Railway practice, then re-run this validation pack.
 

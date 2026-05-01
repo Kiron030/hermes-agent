@@ -449,6 +449,57 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_entsoe_forecast_bounded_preflight": {
+        "description": (
+            "Bounded ENTSO-E **forecast** sync **preflight** (DE / v1 / ≤7d UTC): local slice check; "
+            "**no** Powerunits HTTP. F3b+F4 **day-ahead forecasts** only — not realized market. "
+            "**Primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED` (optional "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED`."
+        ),
+        "tools": ["preflight_powerunits_entsoe_forecast_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_forecast_bounded_execute": {
+        "description": (
+            "Bounded ENTSO-E forecast **execute**: one HTTP POST to "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/recompute` (DE / v1 / ≤7d). "
+            "Runs **entsoe_forecast_job** only. **Primary:** "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED` (+ optional "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_EXECUTE_ENABLED`; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
+            "Does **not** run market_feature_job, market_driver_feature_job, expand_market_data, or "
+            "entsoe_market_job."
+        ),
+        "tools": ["execute_powerunits_entsoe_forecast_bounded_slice"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_forecast_bounded_validate": {
+        "description": (
+            "Bounded ENTSO-E forecast **validate-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (DE / v1 / ≤7d). "
+            "Counts on `market_entsoe_load_forecast_hourly` + `market_entsoe_wind_solar_forecast_hourly`. "
+            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_VALIDATE_ENABLED` + "
+            "same base URL and bearer."
+        ),
+        "tools": ["validate_powerunits_entsoe_forecast_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_entsoe_forecast_bounded_summary": {
+        "description": (
+            "Bounded ENTSO-E forecast **summary-window**: one HTTP POST to read-only "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/summary-window` (DE / v1 / ≤7d). "
+            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED` + "
+            "same base URL and bearer."
+        ),
+        "tools": ["summarize_powerunits_entsoe_forecast_bounded_window"],
+        "includes": [],
+    },
+
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "

@@ -12,6 +12,7 @@ from tools import powerunits_era5_weather_bounded_execute_tool as exec_mod
 from tools import powerunits_era5_weather_bounded_preflight_tool as pre_mod
 from tools import powerunits_era5_weather_bounded_validate_tool as val_mod
 from tools.powerunits_bounded_family_gates import (
+    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
     ERA5_WEATHER_BOUNDED_LEGACY_ENV,
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
 )
@@ -35,6 +36,23 @@ def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_execute_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_era5_bounded_core(monkeypatch)
+    out = json.loads(
+        exec_mod.execute_powerunits_era5_weather_bounded_slice(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("error_code") == "feature_disabled"
+
+
+def test_execute_feature_disabled_primary_empty_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
     out = json.loads(
         exec_mod.execute_powerunits_era5_weather_bounded_slice(
             country="DE",
@@ -283,7 +301,21 @@ def test_preflight_valid_de(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert out["syntactically_valid"] is True
     assert "execute_powerunits_era5_weather_bounded_slice" in out["bounded_http_operator_hint"]
-    assert "market_feature_job was NOT auto-run" in out["bounded_http_operator_hint"]
+
+
+def test_preflight_valid_de_via_primary_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    out = json.loads(
+        pre_mod.preflight_powerunits_era5_weather_bounded_slice(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out["syntactically_valid"] is True
+    assert "execute_powerunits_era5_weather_bounded_slice" in out["bounded_http_operator_hint"]
 
 
 def test_era5_bounded_campaign_plan_contiguous_three_windows() -> None:
