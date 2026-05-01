@@ -18,7 +18,8 @@ _SURFACE = "powerunits_era5_weather_bounded_preflight"
 _NOT_AUTO = (
     "After a successful bounded ERA5 execute, Repo B runs only era5_weather_job — "
     "market_feature_job was NOT auto-run and market_driver_feature_job was NOT auto-run. "
-    "For weather-dependent market_features_hourly, use bounded Option D tools next."
+    "Bounded Hermes Option D execute is PL-only for DE workflows; refresh DE "
+    "market_features_hourly via Repo B worker/runbook/CLI instead."
 )
 
 

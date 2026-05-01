@@ -13,6 +13,24 @@
 
 Same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** and **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`** as Option D and ENTSO-E bounded routes.
 
+### Coverage-scan v1 (read-only, optional)
+
+Tool: **`scan_powerunits_era5_weather_bounded_coverage_de`** (toolset **`powerunits_era5_weather_bounded_coverage_scan`**) → **`POST …/era5-weather/coverage-scan`**.
+
+- **DE** / **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded ERA5 campaign partitioning.
+- **Read-only:** **no** `era5_weather_job` / bounded recompute, **no** `market_feature_job`, **no** `market_driver_feature_job`. Response includes **`hermes_statement`: `read_only_scan_no_writes`** and per-sub-window checks on **`weather_country_hourly`** (same semantics as validate-window).
+- **`rollup.suggested_next_bounded_action`** is produced by **Repo B only**; Hermes forwards the JSON and does **not** add local remediation suggestions (see tool `hermes_statement` in outputs on parse errors as well).
+- Gated separately: **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED`** (plus same base URL and bearer as other bounded ERA5 POSTs).
+
+### Campaign v1 (optional, fail-fast)
+
+Tool: **`campaign_powerunits_era5_weather_bounded_de`** (toolset **`powerunits_era5_weather_bounded_campaign`**).
+
+- Chains **only** bounded `recompute` + `summary-window` per sub-window (same contract as single-slice tools).
+- **DE** / **v1**. Range `[campaign_start_utc, campaign_end_utc)` **exclusive end**; span **≤ 31 days**; **≤ 5** contiguous sub-windows each **≤ 7 days**.
+- **Fail-fast** on first failed execute (HTTP ≠ 200 or `success: false`) or first unsuccessful summary (`ok` / `ok_with_warnings` rule matches the single-slice summary tool).
+- **Does not** invoke `market_feature_job`, `market_driver_feature_job`, or `expand_market_data`.
+
 ## What was **not** auto-triggered
 
 After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` only**.
@@ -20,7 +38,7 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 - **`market_feature_job`** was **NOT** auto-run.
 - **`market_driver_feature_job`** was **NOT** auto-run.
 
-**Next manual step** if weather-dependent **`market_features_hourly`** should be updated: use **bounded Option D** Hermes tools (`preflight_powerunits_option_d_bounded_slice` → execute → validate → summary) for the same slice, or the Repo B runbook path for `market_feature_job`.
+**Next manual step** if weather-dependent **`market_features_hourly`** should be updated for **DE**: use **`market_feature_job`** via Repo B worker/runbook/CLI. Bounded Hermes **Option D execute** is **PL-only** — it is **not** the DE feature-refresh path after ERA5.
 
 ## Slice rules (v1)
 
@@ -29,15 +47,19 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 
 ## Railway / Hermes env
 
-| Variable | Execute | Validate | Summary | Preflight |
-|----------|---------|----------|---------|-----------|
-| `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | — |
-| `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | — |
-| `POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S` | optional | optional | optional | — |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` | ✓ | | | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` | | ✓ | | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` | | | ✓ | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED` | | | | ✓ |
+| Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
+|----------|---------|----------|---------|---------------|-----------|
+| `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | ✓ | — |
+| `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | ✓ | — |
+| `POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S` | optional | optional | optional | optional | — |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` | ✓ | | | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` | | ✓ | | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` | | | ✓ | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED` | | | | ✓ | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED` | | | | | ✓ |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` | ✓† | | ✓† | | |
+
+† **Campaign** (`campaign_powerunits_era5_weather_bounded_de`) requires this flag **and** both `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` and `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` truthy, with the same base URL and bearer.
 
 **Telegram / first_safe:** toolsets must appear in `gateway/run.py` `_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS`, `model_tools.py` `_POWERUNITS_ALLOWED_TOOLSETS`, and `docker/apply_powerunits_runtime_policy.py` `ALLOWED_TELEGRAM_TOOLSETS` (policy apply).
 

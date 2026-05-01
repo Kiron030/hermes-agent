@@ -342,6 +342,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_entsoe_market_bounded_coverage_scan": {
+        "description": (
+            "Bounded ENTSO-E market sync **coverage-scan** (read-only, v1 DE): one HTTP POST to "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/coverage-scan` — multi-subwindow rollup "
+            "on normalized hourly ENTSO-E tables (**no** recompute / **no** job triggers). "
+            "Span ≤31d partitioned like campaign (≤5 × ≤7d). "
+            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_COVERAGE_SCAN_ENABLED plus "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["scan_powerunits_entsoe_market_bounded_coverage_de"],
+        "includes": [],
+    },
+
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
@@ -381,6 +394,32 @@ TOOLSETS = {
             "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED + same base URL and bearer."
         ),
         "tools": ["summarize_powerunits_era5_weather_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_era5_weather_bounded_campaign": {
+        "description": (
+            "Bounded ERA5 weather sync **campaign (v1 DE)**: sequential execute + summary over "
+            "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
+            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED plus ERA5 bounded "
+            "execute + summary flags, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. Does not run market_feature_job "
+            "or expand_market_data."
+        ),
+        "tools": ["campaign_powerunits_era5_weather_bounded_de"],
+        "includes": [],
+    },
+
+    "powerunits_era5_weather_bounded_coverage_scan": {
+        "description": (
+            "Bounded ERA5 weather sync **coverage-scan** (read-only, v1 DE): one HTTP POST to "
+            "`/internal/hermes/bounded/v1/era5-weather/coverage-scan` — multi-subwindow rollup on "
+            "`weather_country_hourly` (**no** execute, **no** era5_weather_job, **no** feature jobs). "
+            "Span ≤31d partitioned like campaign (≤5 × ≤7d). "
+            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED plus "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["scan_powerunits_era5_weather_bounded_coverage_de"],
         "includes": [],
     },
 

@@ -13,6 +13,14 @@
 
 Same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** and **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`** as Option D bounded routes.
 
+### Coverage-scan v1 (read-only, optional)
+
+Tool: **`scan_powerunits_entsoe_market_bounded_coverage_de`** (toolset **`powerunits_entsoe_market_bounded_coverage_scan`**) → **`POST …/entsoe-market-sync/coverage-scan`**.
+
+- **DE** / **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded campaign partitioning.
+- **Read-only**: no `entsoe_market_job`, no bounded recompute path, no downstream feature jobs — response includes **`hermes_statement`: `read_only_scan_no_writes`** and per-sub-window checks on `market_demand_hourly`, `market_prices_day_ahead`, `market_generation_by_type_hourly`.
+- Gated separately: **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_COVERAGE_SCAN_ENABLED`** (plus same base URL and bearer as bounded validate/summary/campaign POSTs).
+
 ### Campaign v1 (optional, fail-fast)
 
 Tool: **`campaign_powerunits_entsoe_market_bounded_de`** (requires toolset `powerunits_entsoe_market_bounded_campaign`).
@@ -29,15 +37,16 @@ Tool: **`campaign_powerunits_entsoe_market_bounded_de`** (requires toolset `powe
 
 ## Railway / Hermes env
 
-| Variable | Execute | Validate | Summary | Preflight |
-|----------|---------|----------|---------|-----------|
-| `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | — |
-| `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | — |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` | ✓ | | | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` | | ✓ | | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` | | | ✓ | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED` | | | | ✓ |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` | ✓† | | ✓† | |
+| Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
+|----------|---------|----------|---------|---------------|-----------|
+| `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | ✓ | — |
+| `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | ✓ | — |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` | ✓ | | | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` | | ✓ | | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` | | | ✓ | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_COVERAGE_SCAN_ENABLED` | | | | ✓ | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED` | | | | | ✓ |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` | ✓† | | ✓† | | |
 
 † **Campaign** (`campaign_powerunits_entsoe_market_bounded_de`) requires this flag **and** both `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` and `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` truthy, with the same base URL and bearer.
 

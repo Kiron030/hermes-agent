@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+_MAX_SUBWINDOW_DAYS = 7
+_MAX_CAMPAIGN_SPAN_DAYS = 31
+_MAX_CAMPAIGN_WINDOWS = 5
+
 
 def _parse_utc_iso(s: str) -> datetime:
     raw = (s or "").strip()
@@ -42,3 +46,57 @@ def validate_era5_bounded_slice(
     if delta > timedelta(days=7):
         raise ValueError("window must be <= 7 days")
     return cc, start, end
+
+
+def plan_era5_bounded_campaign_windows(
+    start: datetime,
+    end: datetime,
+) -> list[tuple[datetime, datetime]]:
+    """
+    Partition [start, end) into contiguous sub-windows each with duration ≤ 7 days.
+
+    Assumes ``end > start``. Caller validates campaign span separately.
+    """
+    max_chunk = timedelta(days=_MAX_SUBWINDOW_DAYS)
+    windows: list[tuple[datetime, datetime]] = []
+    cur = start
+    while cur < end:
+        nxt = min(cur + max_chunk, end)
+        if nxt <= cur:
+            break
+        windows.append((cur, nxt))
+        cur = nxt
+    return windows
+
+
+def validate_era5_bounded_campaign(
+    country: str,
+    campaign_start_s: str,
+    campaign_end_s: str,
+    version_s: str,
+) -> tuple[str, str, list[tuple[datetime, datetime]]]:
+    """
+    DE / v1 only. Campaign [start,end) exclusive; total span ≤ 31 days;
+    contiguous ≤7d slices; resulting slice count ≤ 5.
+    """
+    cc = (country or "").strip().upper()
+    if cc != "DE":
+        raise ValueError("country must be DE for bounded era5_weather_sync v1 campaign")
+    ver = (version_s or "").strip()
+    if ver != "v1":
+        raise ValueError("version must be v1 for this release")
+    start = _parse_utc_iso(campaign_start_s)
+    end = _parse_utc_iso(campaign_end_s)
+    if end <= start:
+        raise ValueError(
+            "campaign_end_utc must be strictly after campaign_start_utc (exclusive end semantics)"
+        )
+    delta = end - start
+    if delta > timedelta(days=_MAX_CAMPAIGN_SPAN_DAYS):
+        raise ValueError(f"campaign span must be <= {_MAX_CAMPAIGN_SPAN_DAYS} days")
+    windows = plan_era5_bounded_campaign_windows(start, end)
+    if len(windows) > _MAX_CAMPAIGN_WINDOWS:
+        raise ValueError(
+            f"campaign splits into more than {_MAX_CAMPAIGN_WINDOWS} windows; reduce span"
+        )
+    return cc, ver, windows

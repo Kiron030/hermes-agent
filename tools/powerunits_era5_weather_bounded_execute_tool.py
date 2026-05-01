@@ -32,9 +32,8 @@ _MAX_SUMMARY_CHARS = 8000
 
 _OPERATOR_NOT_AUTO = (
     "market_feature_job was NOT auto-run. market_driver_feature_job was NOT auto-run. "
-    "If weather-dependent market_features_hourly should be refreshed, the next manual step is "
-    "bounded Option D (preflight_powerunits_option_d_bounded_slice → execute → validate → summary) "
-    "for the same country/version/window, or the Repo B runbook path for market_feature_job."
+    "Bounded Hermes Option D execute is PL-only — it does not refresh DE market_features_hourly. "
+    "For DE, use market_feature_job via Repo B worker/runbook/CLI."
 )
 
 _SECRET_URL_RE = re.compile(
