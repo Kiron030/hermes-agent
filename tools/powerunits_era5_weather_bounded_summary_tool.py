@@ -29,8 +29,8 @@ _MAX_SUMMARY_CHARS = 8000
 
 _OPERATOR_NOT_AUTO = (
     "Summary reflects ERA5 + validate only; market_feature_job was NOT auto-run and "
-    "market_driver_feature_job was NOT auto-run. Next manual step for weather-dependent "
-    "market_features_hourly: bounded Option D tools (same slice) or Repo B runbook."
+    "market_driver_feature_job was NOT auto-run. Bounded Hermes Option D execute is PL-only; "
+    "for DE market_features_hourly refresh after weather, use Repo B worker/runbook/CLI."
 )
 
 _SECRET_URL_RE = re.compile(
