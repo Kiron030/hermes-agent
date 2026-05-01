@@ -643,6 +643,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_bounded_coverage_inventory": {
+        "description": (
+            "**Bounded coverage inventory (multi-country read-only)** — one HTTP POST to "
+            "`/internal/hermes/bounded/v1/coverage-inventory` (Repo B). Aggregates ERA5 normalized + "
+            "ENTSO‑E **market** evaluators where inventory v1 applies; skips FR for ENTSO‑E market DE-only "
+            "semantics inside Repo B responses. Requires `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`, "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. "
+            "**No Hermes-side matrix**, no writes — rerun after bounded repairs."
+        ),
+        "tools": ["inventory_powerunits_bounded_coverage_v1"],
+        "includes": [],
+    },
+
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
         "tools": ["execute_code"],

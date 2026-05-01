@@ -263,3 +263,18 @@ def campaign_era5_bounded_http_primitives_enabled() -> bool:
     return era5_weather_bounded_core_step_enabled("execute") and era5_weather_bounded_core_step_enabled(
         "summary"
     )
+
+
+# Cross-cutting read-only **coverage inventory** (multi-family POST to Repo B v1 inventory route).
+BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED"
+
+
+def bounded_coverage_inventory_enabled() -> bool:
+    return _truthy(BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV)
+
+
+def bounded_coverage_inventory_requirement_text() -> str:
+    return (
+        f"{BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV} must be truthy (read-only Repo B aggregation; "
+        "Hermes carries no authoritative inventory matrix)"
+    )
