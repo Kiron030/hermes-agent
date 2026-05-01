@@ -28,6 +28,9 @@ def _clear_bounded_env(monkeypatch: pytest.MonkeyPatch) -> None:
         g.OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV,
         g.OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES_ENV,
         *g.OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV.values(),
+        g.OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV,
+        g.OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        *g.OUTAGE_REPAIR_BOUNDED_LEGACY_ENV.values(),
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -171,3 +174,19 @@ def test_outage_awareness_legacy_validate_only_does_not_open_summary(monkeypatch
     import tools.powerunits_outage_awareness_bounded_summary_tool as sum_mod
 
     assert sum_mod.check_powerunits_outage_awareness_bounded_summary_requirements() is False
+
+
+def test_outage_repair_primary_unlocks_execute(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV, "1")
+    assert g.outage_repair_bounded_core_step_enabled("execute") is True
+
+
+def test_outage_repair_primary_empty_allowlist_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV, "")
+    assert g.outage_repair_bounded_core_step_enabled("execute") is False
+
+
+def test_outage_repair_legacy_execute_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_REPAIR_BOUNDED_LEGACY_ENV["execute"], "1")
+    assert g.outage_repair_bounded_core_step_enabled("execute") is True

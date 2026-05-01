@@ -103,6 +103,189 @@ def test_execute_http_200_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["success"] is True
 
 
+def test_execute_primary_implicit_de_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    def boom(*a: Any, **k: Any) -> None:
+        raise AssertionError("no http")
+
+    out = json.loads(
+        exec_mod.execute_powerunits_era5_weather_bounded_slice(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=boom,
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"
+    assert out.get("execution_attempted") is False
+
+
+def test_execute_primary_allows_fr_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,FR")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "rid",
+                "correlation_id": "cid",
+                "rows_written": 24,
+                "downstream_not_auto_triggered": ["market_feature_job", "market_driver_feature_job"],
+            }
+        )
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    def fake_post(
+        url: str, headers: dict[str, Any], json_body: dict[str, Any], timeout_s: float
+    ) -> Any:
+        assert json_body["country_code"] == "FR"
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_era5_weather_bounded_slice(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
+def test_legacy_execute_allows_fr_without_primary_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Legacy path ignores Hermes allowlist narrowing; Repo B still validates HTTP."""
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_LEGACY_ENV["execute"], "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "rid",
+                "correlation_id": "cid",
+                "rows_written": 24,
+                "downstream_not_auto_triggered": ["market_feature_job", "market_driver_feature_job"],
+            }
+        )
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    def fake_post(
+        url: str, headers: dict[str, Any], json_body: dict[str, Any], timeout_s: float
+    ) -> Any:
+        assert json_body["country_code"] == "FR"
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_era5_weather_bounded_slice(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
+def test_preflight_primary_implicit_de_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    out = json.loads(
+        pre_mod.preflight_powerunits_era5_weather_bounded_slice(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"
+    assert out["syntactically_valid"] is False
+
+
+def test_validate_primary_implicit_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://x")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "y")
+
+    def boom(*a: Any, **k: Any) -> None:
+        raise AssertionError("no http")
+
+    out = json.loads(
+        val_mod.validate_powerunits_era5_weather_bounded_window(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=boom,
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"
+
+
+def test_summary_primary_implicit_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tools import powerunits_era5_weather_bounded_summary_tool as sum_mod
+
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://x")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "y")
+
+    def boom(*a: Any, **k: Any) -> None:
+        raise AssertionError("no http")
+
+    out = json.loads(
+        sum_mod.summarize_powerunits_era5_weather_bounded_window(
+            country="FR",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=boom,
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"
+
+
+def test_campaign_primary_implicit_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv("HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED", "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    out = json.loads(
+        camp_mod.campaign_powerunits_era5_weather_bounded_de(
+            campaign_start_utc="2024-01-01T00:00:00Z",
+            campaign_end_utc="2024-01-08T00:00:00Z",
+            country="FR",
+        )
+    )
+    assert out.get("stopped_reason") == "country_not_permitted"
+    assert out["windows_planned"] == 0
+
+
 def test_legacy_execute_only_does_not_open_validate(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_era5_bounded_core(monkeypatch)
     monkeypatch.setenv(ERA5_WEATHER_BOUNDED_LEGACY_ENV["execute"], "1")

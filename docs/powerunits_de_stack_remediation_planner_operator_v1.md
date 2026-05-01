@@ -6,7 +6,7 @@ Hermes tool **`plan_powerunits_de_stack_remediation`** issues **exactly one** au
 
 - **`POST /internal/hermes/bounded/v1/remediation/de-stack-plan`**
 
-Repo B aggregates **existing** bounded read-only evaluators (coverage scans, baseline preview rolled signals, chunked market‑features / driver summaries, forecast validation outputs).  
+Repo B aggregates **existing** bounded read-only evaluators (coverage scans, baseline preview rolled signals, chunked **generation_outages / outage-awareness** summaries, market‑features / driver summaries, forecast validation outputs).  
 
 **Hermes performs no SQL**, **starts no ingestion jobs**, **no campaigns**, **no orchestration**.
 
@@ -60,12 +60,13 @@ Repo B ordering intent (see **`notes`** in live JSON):
 
 1. Normalized **ENTSO‑E market** before **market_features** when demand / ENTSO-derived inputs are flagged.  
 2. **ERA5** before **market_features** when weather gaps correlate with summaries (weather duplicate / missing semantics).  
-3. **Market features** before **market driver features** (`market_features_hourly` is the driver's sole compute input table).  
-4. **Forecast** ingestion is treated as **parallel** / informational unless forecast validators report issues — forecast is **not** modeled as blocking the realized market stack in this v1 planner.
+3. **Generation outages** (``generation_outages`` family) — bounded **repair** hints can precede **market_features** when outage-awareness rollups indicate **missing/stale** hourly outage coverage (**read‑only** rollup inside planner; planner itself runs no jobs); duplicate merge-key scenarios suggest **read‑only outage awareness validate** rather than bounded repair execute.  
+4. **Market features** before **market driver features** (`market_features_hourly` is the driver's sole compute input table).  
+5. **Forecast** ingestion is treated as **parallel** / informational unless forecast validators report issues — forecast is **not** modeled as blocking the realized market stack in this v1 planner.
 
 ## Caveats
 
 - **Latency:** For maximum span (31 d), Repo B runs internal rollups across many **≤24 h** feature/driver sub-windows plus coverage partitions — budget **timeouts** generously.  
 - **Grounding:** Planner never invents telemetry; **`family_states`** are projections of evaluator outputs currently wired in Repo B **`hermes_bounded_de_stack_remediation_plan`**.  
 - **Mixed states:** Operators should still read **`key_findings[]`** family-by-family — rollup **`plan_outcome`** is coarse.  
-- **Outage duplication blockers:** `market_features` readiness **`outage_duplicate_keys`** cannot be cured by ERA5 bounded execute — outage jobs / runbooks are **out of bounded Hermes planner scope** unless separately documented.
+- **Outage duplication blockers:** `market_features` readiness **`outage_duplicate_keys`** cannot be cured by bounded outage execute — remediation recommends **`validate_powerunits_outage_awareness_bounded_window`**; bounded **`execute_powerunits_outage_repair_bounded_slice`** is for **missing/stale** outage hourly coverage (duplicate keys need DB reconciliation / ops). When outage interpretation is incomplete, **`generation_outages`** can appear **`before`** **`market_features_hourly`** in **`recommended_sequence`**; **`market_driver_features_hourly`** still depends on **`market_features_hourly`**.

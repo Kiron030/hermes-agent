@@ -2,6 +2,8 @@
 
 ## What this is
 
+**Related:** Bounded **repair** writes (Step A+B) live under **`docs/powerunits_outage_repair_bounded_operator_v1.md`** — separate Hermes **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_*`** gate family.
+
 Hermes tools issue **exactly one** authenticated POST each (**no chaining**, **no SQL**):
 
 | Hermes tool | Repo B route |

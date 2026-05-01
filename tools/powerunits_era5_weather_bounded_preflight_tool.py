@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ERA5 weather sync (DE / v1 / ≤7d).
+Hermes local **preflight** for bounded ERA5 weather sync (DE/FR slices / v1 / ≤7d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED``.
@@ -16,6 +16,7 @@ from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
     era5_weather_bounded_core_step_enabled,
     era5_weather_bounded_gate_requirement_text,
+    era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
 
@@ -26,8 +27,8 @@ _SURFACE = "powerunits_era5_weather_bounded_preflight"
 _NOT_AUTO = (
     "After a successful bounded ERA5 execute, Repo B runs only era5_weather_job — "
     "market_feature_job was NOT auto-run and market_driver_feature_job was NOT auto-run. "
-    "Bounded Hermes Option D execute is PL-only for DE workflows; refresh DE "
-    "market_features_hourly via Repo B worker/runbook/CLI instead."
+    "Bounded Hermes Option D executes DE/PL market-feature slices separately; refresh "
+    "DE market_features_hourly via Repo B worker/runbook/CLI when needed."
 )
 
 
@@ -86,6 +87,27 @@ def preflight_powerunits_era5_weather_bounded_slice(
             ensure_ascii=False,
         )
 
+    if not era5_weather_bounded_request_country_permitted(cc):
+        slim = {
+            "country": cc,
+            "version": (version or "").strip(),
+            "start_utc": start_dt.isoformat().replace("+00:00", "Z"),
+            "end_utc_exclusive": end_dt.isoformat().replace("+00:00", "Z"),
+        }
+        return json.dumps(
+            {
+                **base,
+                "error_code": "country_not_permitted",
+                "syntactically_valid": False,
+                "validation_messages": [
+                    f"`{cc}` is not permitted: set `{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` "
+                    f"when `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is enabled (unset ⇒ DE only)."
+                ],
+                "slice": slim,
+            },
+            ensure_ascii=False,
+        )
+
     slice_obj = {
         "country": cc,
         "version": (version or "").strip(),
@@ -114,7 +136,10 @@ PREFLIGHT_ERA5_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {
+                "type": "string",
+                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
+            },
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

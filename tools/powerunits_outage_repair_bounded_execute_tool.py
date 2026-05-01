@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Hermes bounded ERA5 weather sync **execute** — one HTTP POST to Repo B.
+Hermes bounded **outage repair** execute — one HTTP POST to Repo B Step A+B chain.
 
-Core gate: ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`` (or legacy execute flag).
+Runs ``entsoe_generation_outage_sync`` then ``outage_country_hourly_compute`` only.
 """
 
 from __future__ import annotations
@@ -17,31 +17,30 @@ from typing import Any
 import httpx
 
 from tools.powerunits_bounded_family_gates import (
-    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
-    ERA5_WEATHER_BOUNDED_LEGACY_ENV,
-    ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
-    era5_weather_bounded_core_step_enabled,
-    era5_weather_bounded_gate_requirement_text,
-    era5_weather_bounded_request_country_permitted,
+    OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    OUTAGE_REPAIR_BOUNDED_LEGACY_ENV,
+    OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV,
+    outage_repair_bounded_core_step_enabled,
+    outage_repair_bounded_gate_requirement_text,
 )
-from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
+from tools.powerunits_outage_repair_bounded_slice import validate_outage_repair_bounded_slice
 
 logger = logging.getLogger(__name__)
 
 _STEP = "execute"
-_LEGACY_ENV = ERA5_WEATHER_BOUNDED_LEGACY_ENV[_STEP]
+_LEGACY_ENV = OUTAGE_REPAIR_BOUNDED_LEGACY_ENV[_STEP]
 _BASE_ENV = "POWERUNITS_INTERNAL_EXECUTE_BASE_URL"
 _SECRET_ENV = "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET"
 _TIMEOUT_ENV = "POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S"
-_SURFACE = "powerunits_era5_weather_bounded_execute"
-_EXECUTE_PATH = "/internal/hermes/bounded/v1/era5-weather/recompute"
+_SURFACE = "powerunits_outage_repair_bounded_execute"
+_EXECUTE_PATH = "/internal/hermes/bounded/v1/outage-repair/recompute"
 _DEFAULT_TIMEOUT_S = 3600
 _MAX_SUMMARY_CHARS = 8000
 
 _OPERATOR_NOT_AUTO = (
     "market_feature_job was NOT auto-run. market_driver_feature_job was NOT auto-run. "
-    "Bounded market-features Hermes execute supports DE/PL slices (≤24 h) — use it or "
-    "market_feature_job via Repo B worker/runbook/CLI for other country merge refresh needs."
+    "expand_market_data was NOT auto-run. Refresh DE outage columns on market_features_hourly "
+    "(bounded market-features execute / CLI / worker) separately when needed."
 )
 
 _SECRET_URL_RE = re.compile(
@@ -50,8 +49,8 @@ _SECRET_URL_RE = re.compile(
 )
 
 
-def check_powerunits_era5_weather_bounded_execute_requirements() -> bool:
-    if not era5_weather_bounded_core_step_enabled(_STEP):
+def check_powerunits_outage_repair_bounded_execute_requirements() -> bool:
+    if not outage_repair_bounded_core_step_enabled(_STEP):
         return False
     if not (os.getenv(_BASE_ENV) or "").strip():
         return False
@@ -97,7 +96,7 @@ def _default_http_post(
         return client.post(url, headers=headers, json=json_body)
 
 
-def execute_powerunits_era5_weather_bounded_slice(
+def execute_powerunits_outage_repair_bounded_slice(
     *,
     country: str,
     start: str,
@@ -107,13 +106,13 @@ def execute_powerunits_era5_weather_bounded_slice(
 ) -> str:
     poster = _http_post or _default_http_post
 
-    if not check_powerunits_era5_weather_bounded_execute_requirements():
+    if not check_powerunits_outage_repair_bounded_execute_requirements():
         return json.dumps(
             {
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
                 "message": (
-                    f"{era5_weather_bounded_gate_requirement_text(_STEP)}; "
+                    f"{outage_repair_bounded_gate_requirement_text(_STEP)}; "
                     f"and {_BASE_ENV} / {_SECRET_ENV} must be set."
                 ),
                 "slice": None,
@@ -125,8 +124,10 @@ def execute_powerunits_era5_weather_bounded_slice(
         )
 
     base_statement = (
-        "Hermes performed no direct SQL. Execution used exactly one HTTP POST to the "
-        f"Powerunits bounded internal era5-weather recompute API (`POST {_EXECUTE_PATH}`)."
+        "Hermes performed no SQL. Exactly **one** HTTP POST to Powerunits bounded internal "
+        f"outage repair (`POST {_EXECUTE_PATH}`): **Step A** `entsoe_generation_outage_sync` then "
+        "**Step B** `outage_country_hourly_compute`; **does not auto-run** `market_feature_job`, "
+        "`market_driver_feature_job`, or `expand_market_data`."
     )
 
     country_s = (country or "").strip()
@@ -135,7 +136,7 @@ def execute_powerunits_era5_weather_bounded_slice(
     version_s = (version or "").strip()
 
     try:
-        cc, start_dt, end_dt = validate_era5_bounded_slice(country_s, start_s, end_s, version_s)
+        cc, start_dt, end_dt = validate_outage_repair_bounded_slice(country_s, start_s, end_s, version_s)
     except ValueError as e:
         return json.dumps(
             {
@@ -146,32 +147,6 @@ def execute_powerunits_era5_weather_bounded_slice(
                 "success": False,
                 "http_status": None,
                 "hermes_statement": base_statement,
-            },
-            ensure_ascii=False,
-        )
-
-    if not era5_weather_bounded_request_country_permitted(cc):
-        return json.dumps(
-            {
-                "error_code": "country_not_permitted",
-                "surface": _SURFACE,
-                "slice": {
-                    "country": cc,
-                    "version": version_s,
-                    "start_utc": start_dt.isoformat().replace("+00:00", "Z"),
-                    "end_utc_exclusive": end_dt.isoformat().replace("+00:00", "Z"),
-                },
-                "execution_attempted": False,
-                "success": False,
-                "http_status": None,
-                "hermes_statement": base_statement,
-                "message": (
-                    f"Bounded ERA5 Hermes: country `{cc}` not permitted. When "
-                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on, set "
-                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` to include that ISO2 "
-                    "(unset ⇒ implicit **DE** only). Repo B allowlist is authoritative; "
-                    "legacy per-step ERA5 flags ignore this env narrowing."
-                ),
             },
             ensure_ascii=False,
         )
@@ -216,7 +191,7 @@ def execute_powerunits_era5_weather_bounded_slice(
     try:
         resp = poster(url, headers, body, timeout_s)
     except httpx.TimeoutException:
-        logger.warning("era5 bounded execute: HTTP timeout")
+        logger.warning("outage repair bounded execute: HTTP timeout")
         return json.dumps(
             {
                 "surface": _SURFACE,
@@ -230,7 +205,7 @@ def execute_powerunits_era5_weather_bounded_slice(
             ensure_ascii=False,
         )
     except httpx.RequestError as e:
-        logger.warning("era5 bounded execute: HTTP error %s", e)
+        logger.warning("outage repair bounded execute: HTTP error %s", e)
         return json.dumps(
             {
                 "surface": _SURFACE,
@@ -263,23 +238,28 @@ def execute_powerunits_era5_weather_bounded_slice(
         "success": ok,
         "http_status": status,
         "pipeline_run_id": parsed.get("pipeline_run_id"),
+        "step_a_pipeline_run_id": parsed.get("step_a_pipeline_run_id"),
+        "step_b_pipeline_run_id": parsed.get("step_b_pipeline_run_id"),
         "correlation_id": parsed.get("correlation_id") or correlation_id,
         "status": parsed.get("status"),
         "rows_written": parsed.get("rows_written"),
+        "step_a": parsed.get("step_a"),
+        "step_b": parsed.get("step_b"),
         "response_body_summary": summary,
-        "hermes_statement": base_statement,
+        "hermes_statement": parsed.get("hermes_statement") or base_statement,
         "downstream_not_auto_triggered": parsed.get("downstream_not_auto_triggered")
         if isinstance(parsed.get("downstream_not_auto_triggered"), list)
         else None,
-        "operator_next_manual": parsed.get("operator_next_manual")
-        if isinstance(parsed.get("operator_next_manual"), str)
+        "operator_statement": parsed.get("operator_statement")
+        if isinstance(parsed.get("operator_statement"), str)
         else None,
     }
     if ok:
         out["operator_statement"] = (
-            "ERA5 weather sync succeeded on Repo B (bounded era5_weather_job). "
+            (out.get("operator_statement") or "")
+            + " "
             + _OPERATOR_NOT_AUTO
-        )
+        ).strip()
     if status == 400:
         out["error_class"] = "server_validation"
         out["server_message"] = parsed.get("message")
@@ -290,23 +270,19 @@ def execute_powerunits_era5_weather_bounded_slice(
     return json.dumps(out, ensure_ascii=False)
 
 
-EXECUTE_ERA5_SCHEMA = {
-    "name": "execute_powerunits_era5_weather_bounded_slice",
+EXECUTE_OUTAGE_REPAIR_SCHEMA = {
+    "name": "execute_powerunits_outage_repair_bounded_slice",
     "description": (
-        "**Bounded ERA5 weather sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). "
-        f"Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
-        f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}. "
-        "On success, Repo B ran era5_weather_job only; market_feature_job and market_driver_feature_job "
-        "were NOT auto-run — refresh features manually if needed."
+        "**Bounded DE outage repair execute** — one HTTP POST to Powerunits "
+        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). Runs Step A + Step B only; **no** auto "
+        "`market_feature_job` / `market_driver_feature_job`. "
+        f"Gate `{OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
+        f"`{OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {
-                "type": "string",
-                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
-            },
+            "country": {"type": "string", "description": "Must be DE (v1)."},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},
@@ -319,22 +295,22 @@ EXECUTE_ERA5_SCHEMA = {
 from tools.registry import registry
 
 registry.register(
-    name="execute_powerunits_era5_weather_bounded_slice",
-    toolset="powerunits_era5_weather_bounded_execute",
-    schema=EXECUTE_ERA5_SCHEMA,
-    handler=lambda args, **kw: execute_powerunits_era5_weather_bounded_slice(
+    name="execute_powerunits_outage_repair_bounded_slice",
+    toolset="powerunits_outage_repair_bounded_execute",
+    schema=EXECUTE_OUTAGE_REPAIR_SCHEMA,
+    handler=lambda args, **kw: execute_powerunits_outage_repair_bounded_slice(
         country=str((args or {}).get("country", "")),
         start=str((args or {}).get("start", "")),
         end=str((args or {}).get("end", "")),
         version=str((args or {}).get("version", "")),
     ),
-    check_fn=check_powerunits_era5_weather_bounded_execute_requirements,
+    check_fn=check_powerunits_outage_repair_bounded_execute_requirements,
     requires_env=[
-        ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
-        ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV,
+        OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV,
         _LEGACY_ENV,
         _BASE_ENV,
         _SECRET_ENV,
     ],
-    emoji="⚡",
+    emoji="🔧",
 )

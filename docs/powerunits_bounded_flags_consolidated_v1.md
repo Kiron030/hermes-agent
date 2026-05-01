@@ -15,6 +15,7 @@ These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor 
 | **Baseline preview** | `BASELINE_LAYER_PREVIEW_ENABLED` | Already **single** gate; fits target model as-is. |
 | **DE stack remediation planner** | **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** | **Read-only** cross-family aggregator (**one** Repo B planner POST; starts **no** jobs). |
 | **Outage awareness bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_{VALIDATE,SUMMARY}_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES` | **Read-only** Hermes POSTs to **`…/outage-awareness/*`** — **no** outage ingest, **no** hourly outage recompute, **no** market-feature or driver jobs. |
+| **Outage repair bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES`; **legacy:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED` | **Write** bounded path (**Step A + Step B**) via **`…/outage-repair/recompute`**; **no auto** **`market_feature_job`** / **`market_driver_feature_job`**. Separate family from awareness. |
 | **Timescale read / Repo B read** | One primary each | Fits model. |
 
 ## 2. Design target principles
@@ -109,6 +110,20 @@ Recommended primary:
 ### DE bounded stack remediation planner (read-only)
 
 Single Hermes gate: **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`**. Enables **`plan_powerunits_de_stack_remediation`** (**one** HTTP POST to Repo B **`…/remediation/de-stack-plan`**). Independent of ENTSO‑E / ERA5 / forecast / market‑features execute primaries; still requires **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** + **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**. **No job execution** on this surface — JSON **`tool_hint_hermes`** values are manual operator hints only.
+
+### Outage repair bounded (execute-only family)
+
+Hermes **`execute_powerunits_outage_repair_bounded_slice`** is gated separately from **outage awareness** (validate/summary are read-only; repair runs Step A+B on Repo B).
+
+- **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED=1`** unlocks bounded outage repair execute (with base URL + bearer).
+- Optional **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES`** — unset ⇒ implicit **DE**; empty ⇒ fail-closed when primary is on.
+- **Legacy** when primary is falsy: **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED`**.
+
+**Deprecated (still read when primary is falsy):**
+
+```text
+HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED
+```
 
 ### Outage awareness bounded (read-only)
 

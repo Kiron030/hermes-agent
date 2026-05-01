@@ -342,6 +342,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_option_d_validate_tool",
             "tools.powerunits_outage_awareness_bounded_summary_tool",
             "tools.powerunits_outage_awareness_bounded_validate_tool",
+            "tools.powerunits_outage_repair_bounded_execute_tool",
             "tools.powerunits_repo_b_read_tool",
             "tools.powerunits_timescale_read_tool",
             "tools.powerunits_workspace_tool",
