@@ -2,17 +2,25 @@
 """
 Hermes local **preflight** for bounded ERA5 weather sync (DE / v1 / ≤7d).
 
-No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED``.
+No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED``
+(optional allowlist) or legacy ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED``.
 """
 
 from __future__ import annotations
 
 import json
-import os
 
+from tools.powerunits_bounded_family_gates import (
+    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ERA5_WEATHER_BOUNDED_LEGACY_ENV,
+    ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+    era5_weather_bounded_core_step_enabled,
+    era5_weather_bounded_gate_requirement_text,
+)
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
 
-_FEATURE_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED"
+_STEP = "preflight"
+_LEGACY_ENV = ERA5_WEATHER_BOUNDED_LEGACY_ENV[_STEP]
 _SURFACE = "powerunits_era5_weather_bounded_preflight"
 
 _NOT_AUTO = (
@@ -23,12 +31,8 @@ _NOT_AUTO = (
 )
 
 
-def _truthy_env(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def check_powerunits_era5_weather_bounded_preflight_requirements() -> bool:
-    return _truthy_env(_FEATURE_ENV)
+    return era5_weather_bounded_core_step_enabled(_STEP)
 
 
 def preflight_powerunits_era5_weather_bounded_slice(
@@ -43,7 +47,7 @@ def preflight_powerunits_era5_weather_bounded_slice(
             {
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
-                "message": f"{_FEATURE_ENV} must be truthy for this tool.",
+                "message": f"{era5_weather_bounded_gate_requirement_text(_STEP)}.",
             },
             ensure_ascii=False,
         )
@@ -103,7 +107,8 @@ PREFLIGHT_ERA5_SCHEMA = {
     "name": "preflight_powerunits_era5_weather_bounded_slice",
     "description": (
         "**Bounded ERA5 weather sync preflight** — local DE / v1 / ≤7d slice check only; "
-        f"no HTTP. Requires {_FEATURE_ENV}. "
+        f"no HTTP. Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
+        f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}`. "
         "Execute path does not auto-run market_feature_job or market_driver_feature_job."
     ),
     "parameters": {
@@ -132,6 +137,10 @@ registry.register(
         version=str((args or {}).get("version", "")),
     ),
     check_fn=check_powerunits_era5_weather_bounded_preflight_requirements,
-    requires_env=[_FEATURE_ENV],
+    requires_env=[
+        ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+        ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        _LEGACY_ENV,
+    ],
     emoji="✅",
 )

@@ -6,7 +6,7 @@
 
 ## Live path (Hermes)
 
-1. `preflight_powerunits_era5_weather_bounded_slice` (local; `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED`)
+1. `preflight_powerunits_era5_weather_bounded_slice` (local; **recommended:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED`)
 2. `execute_powerunits_era5_weather_bounded_slice` → `POST …/era5-weather/recompute`
 3. `validate_powerunits_era5_weather_bounded_window` → `POST …/era5-weather/validate-window`
 4. `summarize_powerunits_era5_weather_bounded_window` → `POST …/era5-weather/summary-window`
@@ -47,19 +47,25 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 
 ## Railway / Hermes env
 
+**Recommended:** **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** (same semantics as ENTSO‑E primary allowlist above). Primary unset ⇒ **legacy** per-step `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` unchanged.
+
 | Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
 |----------|---------|----------|---------|---------------|-----------|
 | `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | ✓ | — |
 | `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | ✓ | — |
 | `POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S` | optional | optional | optional | optional | — |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` | ✓ | | | | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` | | ✓ | | | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` | | | ✓ | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` | ✓ | ✓ | ✓ | | ✓ |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` | optional † | optional † | optional † | | optional † |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` (legacy) | ✓ | | | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` (legacy) | | ✓ | | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` (legacy) | | | ✓ | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED` (legacy) | | | | | ✓ |
 | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED` | | | | ✓ | |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED` | | | | | ✓ |
-| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` | ✓† | | ✓† | | |
+| `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` | ✓‡ | | ✓‡ | | |
 
-† **Campaign** (`campaign_powerunits_era5_weather_bounded_de`) requires this flag **and** both `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED` and `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` truthy, with the same base URL and bearer.
+† Primary path only; ignored on legacy-only configs.
+
+‡ **Campaign** requires this flag **and** **execute + summary** eligibility via **primary** or both legacy execute+summary flags, plus base URL and bearer.
 
 **Telegram / first_safe:** toolsets must appear in `gateway/run.py` `_POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS`, `model_tools.py` `_POWERUNITS_ALLOWED_TOOLSETS`, and `docker/apply_powerunits_runtime_policy.py` `ALLOWED_TELEGRAM_TOOLSETS` (policy apply).
 

@@ -11,10 +11,20 @@ from tools import powerunits_entsoe_market_bounded_execute_tool as exec_mod
 from tools import powerunits_entsoe_market_bounded_preflight_tool as pre_mod
 from tools import powerunits_entsoe_market_bounded_validate_tool as val_mod
 from tools import powerunits_entsoe_market_bounded_campaign_tool as camp_mod
+from tools.powerunits_bounded_family_gates import (
+    ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
+    ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+)
 from tools.powerunits_entsoe_market_bounded_slice import (
     validate_entsoe_bounded_campaign,
     validate_entsoe_bounded_slice,
 )
+
+
+def _clear_entso_bounded_core(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, raising=False)
+    for env_name in ENTSOE_MARKET_BOUNDED_LEGACY_ENV.values():
+        monkeypatch.delenv(env_name, raising=False)
 
 
 def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,7 +34,7 @@ def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_execute_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED", raising=False)
+    _clear_entso_bounded_core(monkeypatch)
     out = json.loads(
         exec_mod.execute_powerunits_entsoe_market_bounded_slice(
             country="DE",
@@ -34,6 +44,53 @@ def test_execute_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     )
     assert out.get("error_code") == "feature_disabled"
+
+
+def test_execute_http_200_via_primary_family_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_entso_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "rid",
+                "correlation_id": "cid",
+                "rows_written": 10,
+            }
+        )
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-market-sync/recompute" in url
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_market_bounded_slice(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
+def test_legacy_execute_only_does_not_open_validate(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_entso_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_LEGACY_ENV["execute"], "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://x")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "y")
+
+    assert val_mod.check_powerunits_entsoe_market_bounded_validate_requirements() is False
 
 
 def test_execute_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,6 +222,16 @@ def test_entsoe_bounded_campaign_rejects_over_31d() -> None:
             "2024-02-02T00:00:00Z",
             "v1",
         )
+
+
+def test_campaign_via_primary_execute_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Campaign works when ENTSO_PRIMARY replaces legacy execute+summary flags."""
+    _clear_entso_bounded_core(monkeypatch)
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED", "1")
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+    assert camp_mod.check_powerunits_entsoe_market_bounded_campaign_requirements() is True
 
 
 def _with_campaign_env(monkeypatch: pytest.MonkeyPatch) -> None:

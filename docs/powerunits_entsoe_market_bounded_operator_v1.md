@@ -6,7 +6,7 @@
 
 ## Live path (Hermes)
 
-1. `preflight_powerunits_entsoe_market_bounded_slice` (local; `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED`)
+1. `preflight_powerunits_entsoe_market_bounded_slice` (local; **recommended:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED`)
 2. `execute_powerunits_entsoe_market_bounded_slice` → `POST …/entsoe-market-sync/recompute`
 3. `validate_powerunits_entsoe_market_bounded_window` → `POST …/entsoe-market-sync/validate-window`
 4. `summarize_powerunits_entsoe_market_bounded_window` → `POST …/entsoe-market-sync/summary-window`
@@ -37,18 +37,24 @@ Tool: **`campaign_powerunits_entsoe_market_bounded_de`** (requires toolset `powe
 
 ## Railway / Hermes env
 
+**Recommended (fewer Railway variables):** set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2; unset ⇒ implicit **DE** for current tools; empty string ⇒ fail-closed on the primary path). When the primary flag is unset/falsy, each step still honors its **legacy** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` — **no broadening** vs pre-consolidation behavior.
+
 | Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
 |----------|---------|----------|---------|---------------|-----------|
 | `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` | ✓ | ✓ | ✓ | ✓ | — |
 | `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` | ✓ | ✓ | ✓ | ✓ | — |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` | ✓ | | | | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` | | ✓ | | | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` | | | ✓ | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` | ✓ | ✓ | ✓ | | ✓ |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` | optional † | optional † | optional † | | optional † |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` (legacy) | ✓ | | | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` (legacy) | | ✓ | | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` (legacy) | | | ✓ | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED` (legacy) | | | | | ✓ |
 | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_COVERAGE_SCAN_ENABLED` | | | | ✓ | |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED` | | | | | ✓ |
-| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` | ✓† | | ✓† | | |
+| `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` | ✓‡ | | ✓‡ | | |
 
-† **Campaign** (`campaign_powerunits_entsoe_market_bounded_de`) requires this flag **and** both `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED` and `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` truthy, with the same base URL and bearer.
+† Applies **only** when **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** is truthy (primary path); ignored if you use legacy per-step flags only.
+
+‡ **Campaign** (`campaign_powerunits_entsoe_market_bounded_de`) requires this flag **and** bounded **execute + summary** eligibility: either **primary** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (with allowlist not excluding DE) **or** both legacy **`…_EXECUTE_ENABLED`** and **`…_SUMMARY_ENABLED`**, plus base URL and bearer.
 
 Repo B API must have **`ENTSOE_API_KEY`** or **`ENTSOE_API_TOKEN`** for execute to succeed.
 
