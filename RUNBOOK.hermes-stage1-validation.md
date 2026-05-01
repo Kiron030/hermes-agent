@@ -104,11 +104,21 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 3. **Reject** — `{"action": "read_repo_b_key", "key": "__nonexistent_key__"}` (expect JSON error, no secrets).
 4. **Wrong-tool check** — `read_powerunits_doc` with `{"action": "list_keys"}` → keys look like `implementation_state.md` and `surface: powerunits_doc_key_manifest` — **different** from step 1.
 
+### Bounded ENTSO-E market (Hermes → Repo B)
+
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_market_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, bounded HTTP hint names the execute tool.
+- [ ] **Preflight — legacy:** same as above with primary off and `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED=1` only.
+- [ ] **Primary + allowlist:** unset `…_ALLOWED_COUNTRIES` still allows DE-shaped tools; explicit `…_ALLOWED_COUNTRIES=` (empty) keeps primary on but fail-closed — execute tool returns **`feature_disabled`**.
+- [ ] **Execute gate off:** primary falsy and all four legacy core flags falsy → execute returns **`feature_disabled`** — no Repo B HTTP from that path.
+- [ ] **Campaign:** with `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED=1`, primary `=1` suffices for execute+summary gating (plus base URL/bearer); legacy configs still need execute+summary legacy flags.
+
 ### Bounded ERA5 weather (Hermes → Repo B)
 
-- [ ] **Preflight:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool.
-- [ ] **Execute gate off:** with execute flag falsy, execute tool absent or returns `feature_disabled` — no Repo B HTTP from that tool path.
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool.
+- [ ] **Preflight — legacy:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED=1` with primary off → same preflight behavior.
+- [ ] **Execute gate off:** primary falsy and all four legacy core flags falsy → execute returns **`feature_disabled`** — no Repo B HTTP from that tool path.
 - [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
+- [ ] **Campaign:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED=1` + primary `=1` (or legacy execute+summary) + base URL/bearer.
 
 ### Bounded DE market features hourly (Hermes → Repo B; optional)
 
@@ -150,7 +160,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Webhook:** point Telegram webhook back to last-known-good Hermes URL (previous Railway service / project) if this service is bad.
 - [ ] **Timescale:** set `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` to falsy / unset to drop DB reads without redeploying Hermes logic.
 - [ ] **Repo B read:** unset or falsify `HERMES_POWERUNITS_REPO_B_READ_ENABLED` (see Repo B read subsection).
-- [ ] **Bounded ERA5:** unset or falsify `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_*_ENABLED` flags to drop the Hermes HTTP surface without changing Repo B.
+- [ ] **Bounded ENTSO-E / ERA5:** unset or falsify **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** / **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** and legacy **`…_PREFLIGHT/_EXECUTE/_VALIDATE/_SUMMARY_ENABLED`** as needed to drop Hermes HTTP for those families without changing Repo B. Campaign and coverage-scan modifiers remain separate.
 - [ ] **Bounded DE market features:** unset or falsify `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*_ENABLED` (execute/validate/readiness/summary as needed) without touching PL Option D flags.
 - [ ] **Policy:** do not remove `first_safe_v1` casually; rollback to prior image/env snapshot per your Railway practice, then re-run this validation pack.
 

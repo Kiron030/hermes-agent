@@ -376,7 +376,9 @@ TOOLSETS = {
         "description": (
             "Bounded ENTSO-E market sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
             "bounded HTTP operator hint. **No** Powerunits HTTP. "
-            "Gated by HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED."
+            "**Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (optional "
+            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED`."
         ),
         "tools": ["preflight_powerunits_entsoe_market_bounded_slice"],
         "includes": [],
@@ -386,8 +388,10 @@ TOOLSETS = {
         "description": (
             "Bounded ENTSO-E market sync **execute**: one HTTP POST to "
             "`/internal/hermes/bounded/v1/entsoe-market-sync/recompute` (DE / v1 / ≤7d). "
-            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED, "
-            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+            "**Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (+ optional "
+            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED`; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`."
         ),
         "tools": ["execute_powerunits_entsoe_market_bounded_slice"],
         "includes": [],
@@ -399,7 +403,8 @@ TOOLSETS = {
             "`/internal/hermes/bounded/v1/entsoe-market-sync/validate-window` (DE / v1 / ≤7d). "
             "Counts are on **normalized UTC hour-bucket** tables; generation is long-format by "
             "technology_group (see Repo B `semantics_notes`). "
-            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED + same base URL and bearer."
+            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` + "
+            "same base URL and bearer."
         ),
         "tools": ["validate_powerunits_entsoe_market_bounded_window"],
         "includes": [],
@@ -410,7 +415,8 @@ TOOLSETS = {
             "Bounded ENTSO-E market sync **summary-window**: one HTTP POST to read-only "
             "`/internal/hermes/bounded/v1/entsoe-market-sync/summary-window` (DE / v1 / ≤7d). "
             "Same hourly-normalized semantics as validate (compact validation subset). "
-            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED + same base URL and bearer."
+            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` + "
+            "same base URL and bearer."
         ),
         "tools": ["summarize_powerunits_entsoe_market_bounded_window"],
         "includes": [],
@@ -420,9 +426,10 @@ TOOLSETS = {
         "description": (
             "Bounded ENTSO-E market sync **campaign (v1 DE)**: sequential execute + summary over "
             "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
-            "Requires HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED plus ENTSO-E bounded "
-            "execute + summary flags, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
-            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. Does not run market_feature_job "
+            "Requires `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` plus **primary** "
+            "(or legacy execute+summary) for ENTSO-E bounded HTTP primitives, "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, "
+            "`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. Does not run market_feature_job "
             "or expand_market_data."
         ),
         "tools": ["campaign_powerunits_entsoe_market_bounded_de"],
@@ -446,7 +453,9 @@ TOOLSETS = {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
             "bounded HTTP operator hint. **No** Powerunits HTTP. "
-            "Gated by HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED."
+            "**Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` (optional "
+            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
+            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED`."
         ),
         "tools": ["preflight_powerunits_era5_weather_bounded_slice"],
         "includes": [],
@@ -456,8 +465,10 @@ TOOLSETS = {
         "description": (
             "Bounded ERA5 weather sync **execute**: one HTTP POST to "
             "`/internal/hermes/bounded/v1/era5-weather/recompute` (DE / v1 / ≤7d). "
-            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED, "
-            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. "
+            "**Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` (+ optional "
+            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED`; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
             "Does not auto-run market_feature_job or market_driver_feature_job."
         ),
         "tools": ["execute_powerunits_era5_weather_bounded_slice"],
@@ -468,7 +479,8 @@ TOOLSETS = {
         "description": (
             "Bounded ERA5 weather sync **validate-window**: one HTTP POST to read-only "
             "`/internal/hermes/bounded/v1/era5-weather/validate-window` (DE / v1 / ≤7d). "
-            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED + same base URL and bearer."
+            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` + "
+            "same base URL and bearer."
         ),
         "tools": ["validate_powerunits_era5_weather_bounded_window"],
         "includes": [],
@@ -478,7 +490,8 @@ TOOLSETS = {
         "description": (
             "Bounded ERA5 weather sync **summary-window**: one HTTP POST to read-only "
             "`/internal/hermes/bounded/v1/era5-weather/summary-window` (DE / v1 / ≤7d). "
-            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED + same base URL and bearer."
+            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` + "
+            "same base URL and bearer."
         ),
         "tools": ["summarize_powerunits_era5_weather_bounded_window"],
         "includes": [],
@@ -488,9 +501,10 @@ TOOLSETS = {
         "description": (
             "Bounded ERA5 weather sync **campaign (v1 DE)**: sequential execute + summary over "
             "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
-            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED plus ERA5 bounded "
-            "execute + summary flags, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
-            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. Does not run market_feature_job "
+            "Requires `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` plus **primary** "
+            "(or legacy execute+summary) for ERA5 bounded HTTP primitives, "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, "
+            "`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. Does not run market_feature_job "
             "or expand_market_data."
         ),
         "tools": ["campaign_powerunits_era5_weather_bounded_de"],

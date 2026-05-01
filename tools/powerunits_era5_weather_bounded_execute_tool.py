@@ -2,8 +2,7 @@
 """
 Hermes bounded ERA5 weather sync **execute** — one HTTP POST to Repo B.
 
-``POST /internal/hermes/bounded/v1/era5-weather/recompute``. Gated by
-``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED``.
+Core gate: ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`` (or legacy execute flag).
 """
 
 from __future__ import annotations
@@ -17,11 +16,19 @@ from typing import Any
 
 import httpx
 
+from tools.powerunits_bounded_family_gates import (
+    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ERA5_WEATHER_BOUNDED_LEGACY_ENV,
+    ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+    era5_weather_bounded_core_step_enabled,
+    era5_weather_bounded_gate_requirement_text,
+)
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
 
 logger = logging.getLogger(__name__)
 
-_FEATURE_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED"
+_STEP = "execute"
+_LEGACY_ENV = ERA5_WEATHER_BOUNDED_LEGACY_ENV[_STEP]
 _BASE_ENV = "POWERUNITS_INTERNAL_EXECUTE_BASE_URL"
 _SECRET_ENV = "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET"
 _TIMEOUT_ENV = "POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S"
@@ -42,12 +49,8 @@ _SECRET_URL_RE = re.compile(
 )
 
 
-def _truthy_env(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def check_powerunits_era5_weather_bounded_execute_requirements() -> bool:
-    if not _truthy_env(_FEATURE_ENV):
+    if not era5_weather_bounded_core_step_enabled(_STEP):
         return False
     if not (os.getenv(_BASE_ENV) or "").strip():
         return False
@@ -109,7 +112,8 @@ def execute_powerunits_era5_weather_bounded_slice(
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
                 "message": (
-                    f"{_FEATURE_ENV} must be truthy and {_BASE_ENV} / {_SECRET_ENV} must be set."
+                    f"{era5_weather_bounded_gate_requirement_text(_STEP)}; "
+                    f"and {_BASE_ENV} / {_SECRET_ENV} must be set."
                 ),
                 "slice": None,
                 "execution_attempted": False,
@@ -263,7 +267,9 @@ EXECUTE_ERA5_SCHEMA = {
     "name": "execute_powerunits_era5_weather_bounded_slice",
     "description": (
         "**Bounded ERA5 weather sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}. "
+        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). "
+        f"Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
+        f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}. "
         "On success, Repo B ran era5_weather_job only; market_feature_job and market_driver_feature_job "
         "were NOT auto-run — refresh features manually if needed."
     ),
@@ -293,6 +299,12 @@ registry.register(
         version=str((args or {}).get("version", "")),
     ),
     check_fn=check_powerunits_era5_weather_bounded_execute_requirements,
-    requires_env=[_FEATURE_ENV, _BASE_ENV, _SECRET_ENV],
+    requires_env=[
+        ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+        ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        _LEGACY_ENV,
+        _BASE_ENV,
+        _SECRET_ENV,
+    ],
     emoji="⚡",
 )

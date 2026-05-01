@@ -5,11 +5,15 @@ Design:
 - Optional ``HERMES_*_ALLOWED_COUNTRIES`` comma list (uppercase ISO2). When the primary
   flag is set, an empty / missing allowlist defaults to **DE** for the current
   DE-only tool implementations. Empty string → no countries → fail-closed.
-- **Legacy** per-step / ``_DE_`` flags remain supported so existing Railway configs keep
-  working until operators migrate. Legacy path does **not** consult the allowlist
-  (preserves prior behavior and avoids accidental lockout).
+- **Legacy** per-step flags remain supported so existing Railway configs keep working
+  until operators migrate (including ENTSO‑E / ERA5 names without `_DE_` suffix).
+  Legacy path does **not** consult the allowlist (preserves prior behavior).
 
 Repo B remains authoritative for country / version / window validation on HTTP.
+
+**Modifiers** (campaign, coverage-scan) stay on separate ``*_CAMPAIGN_ENABLED`` /
+``*_COVERAGE_SCAN_ENABLED`` env vars — higher blast radius or different semantics than
+single-slice bounded POSTs.
 """
 
 from __future__ import annotations
@@ -19,6 +23,8 @@ from typing import Literal
 
 MarketFeaturesStep = Literal["execute", "validate", "readiness", "summary"]
 MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
+EntsoeMarketBoundedStep = Literal["preflight", "execute", "validate", "summary"]
+Era5WeatherBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 
 MARKET_FEATURES_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED"
 _MARKET_FEATURES_PRIMARY = MARKET_FEATURES_BOUNDED_PRIMARY_ENV
@@ -47,6 +53,34 @@ MARKET_DRIVER_FEATURES_BOUNDED_LEGACY_ENV: dict[MarketDriverStep, str] = {
     "summary": "HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_SUMMARY_ENABLED",
 }
 _MARKET_DRIVER_LEGACY = MARKET_DRIVER_FEATURES_BOUNDED_LEGACY_ENV
+
+ENTSOE_MARKET_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED"
+_ENTSOE_PRIMARY = ENTSOE_MARKET_BOUNDED_PRIMARY_ENV
+ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV = (
+    "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES"
+)
+_ENTSOE_ALLOWED = ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV
+ENTSOE_MARKET_BOUNDED_LEGACY_ENV: dict[EntsoeMarketBoundedStep, str] = {
+    "preflight": "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED",
+    "execute": "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED",
+    "validate": "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED",
+    "summary": "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED",
+}
+_ENTSOE_LEGACY = ENTSOE_MARKET_BOUNDED_LEGACY_ENV
+
+ERA5_WEATHER_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED"
+_ERA5_PRIMARY = ERA5_WEATHER_BOUNDED_PRIMARY_ENV
+ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV = (
+    "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES"
+)
+_ERA5_ALLOWED = ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV
+ERA5_WEATHER_BOUNDED_LEGACY_ENV: dict[Era5WeatherBoundedStep, str] = {
+    "preflight": "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED",
+    "execute": "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED",
+    "validate": "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED",
+    "summary": "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED",
+}
+_ERA5_LEGACY = ERA5_WEATHER_BOUNDED_LEGACY_ENV
 
 # Current Hermes tools for both families only emit **DE**; allowlist must include DE
 # when primary is used (or unset allowlist → implicit DE).
@@ -93,4 +127,43 @@ def market_driver_features_bounded_gate_requirement_text(step: MarketDriverStep)
     return (
         f"{_MARKET_DRIVER_PRIMARY} (recommended) or legacy {_MARKET_DRIVER_LEGACY[step]}, "
         f"and when using the primary flag optionally {_MARKET_DRIVER_ALLOWED} (default DE for current tools)"
+    )
+
+
+def entsoe_market_bounded_core_step_enabled(step: EntsoeMarketBoundedStep) -> bool:
+    if _truthy(_ENTSOE_PRIMARY):
+        return _impl_country_allowed(_ENTSOE_ALLOWED)
+    return _truthy(_ENTSOE_LEGACY[step])
+
+
+def entsoe_market_bounded_gate_requirement_text(step: EntsoeMarketBoundedStep) -> str:
+    return (
+        f"{_ENTSOE_PRIMARY} (recommended) or legacy {_ENTSOE_LEGACY[step]}; "
+        f"when using primary optionally {_ENTSOE_ALLOWED} (implicit DE when unset)"
+    )
+
+
+def era5_weather_bounded_core_step_enabled(step: Era5WeatherBoundedStep) -> bool:
+    if _truthy(_ERA5_PRIMARY):
+        return _impl_country_allowed(_ERA5_ALLOWED)
+    return _truthy(_ERA5_LEGACY[step])
+
+
+def era5_weather_bounded_gate_requirement_text(step: Era5WeatherBoundedStep) -> str:
+    return (
+        f"{_ERA5_PRIMARY} (recommended) or legacy {_ERA5_LEGACY[step]}; "
+        f"when using primary optionally {_ERA5_ALLOWED} (implicit DE when unset)"
+    )
+
+
+def campaign_entsoe_bounded_http_primitives_enabled() -> bool:
+    """Execute + summary must both be acceptable for chained campaign POSTs."""
+    return entsoe_market_bounded_core_step_enabled("execute") and entsoe_market_bounded_core_step_enabled(
+        "summary"
+    )
+
+
+def campaign_era5_bounded_http_primitives_enabled() -> bool:
+    return era5_weather_bounded_core_step_enabled("execute") and era5_weather_bounded_core_step_enabled(
+        "summary"
     )

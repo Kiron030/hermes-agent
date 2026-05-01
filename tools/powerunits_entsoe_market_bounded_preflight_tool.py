@@ -2,26 +2,31 @@
 """
 Hermes local **preflight** for bounded ENTSO-E market sync (DE / v1 / ≤7d).
 
-No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED``.
+No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED``
+(optional allowlist) or legacy ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED``.
 """
 
 from __future__ import annotations
 
 import json
-import os
 
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
-_FEATURE_ENV = "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED"
+from tools.powerunits_bounded_family_gates import (
+    ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
+    ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+    entsoe_market_bounded_core_step_enabled,
+    entsoe_market_bounded_gate_requirement_text,
+)
+
+_STEP = "preflight"
+_LEGACY_ENV = ENTSOE_MARKET_BOUNDED_LEGACY_ENV[_STEP]
 _SURFACE = "powerunits_entsoe_market_bounded_preflight"
 
 
-def _truthy_env(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def check_powerunits_entsoe_market_bounded_preflight_requirements() -> bool:
-    return _truthy_env(_FEATURE_ENV)
+    return entsoe_market_bounded_core_step_enabled(_STEP)
 
 
 def preflight_powerunits_entsoe_market_bounded_slice(
@@ -36,7 +41,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
             {
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
-                "message": f"{_FEATURE_ENV} must be truthy for this tool.",
+                "message": f"{entsoe_market_bounded_gate_requirement_text(_STEP)}.",
             },
             ensure_ascii=False,
         )
@@ -96,7 +101,9 @@ PREFLIGHT_ENTSOE_SCHEMA = {
     "name": "preflight_powerunits_entsoe_market_bounded_slice",
     "description": (
         "**Bounded ENTSO-E market sync preflight** — local DE / v1 / ≤7d slice check only; "
-        f"no HTTP. Requires {_FEATURE_ENV}."
+        "no HTTP. "
+        f"Gate: `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
+        f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
     ),
     "parameters": {
         "type": "object",
@@ -124,6 +131,10 @@ registry.register(
         version=str((args or {}).get("version", "")),
     ),
     check_fn=check_powerunits_entsoe_market_bounded_preflight_requirements,
-    requires_env=[_FEATURE_ENV],
+    requires_env=[
+        ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+        ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        _LEGACY_ENV,
+    ],
     emoji="✅",
 )

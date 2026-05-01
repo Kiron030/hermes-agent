@@ -14,11 +14,19 @@ from typing import Any
 
 import httpx
 
+from tools.powerunits_bounded_family_gates import (
+    ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
+    ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+    entsoe_market_bounded_core_step_enabled,
+    entsoe_market_bounded_gate_requirement_text,
+)
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
 logger = logging.getLogger(__name__)
 
-_FEATURE_ENV = "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED"
+_STEP = "validate"
+_LEGACY_ENV = ENTSOE_MARKET_BOUNDED_LEGACY_ENV[_STEP]
 _BASE_ENV = "POWERUNITS_INTERNAL_EXECUTE_BASE_URL"
 _SECRET_ENV = "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET"
 _TIMEOUT_ENV = "POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S"
@@ -33,12 +41,8 @@ _SECRET_URL_RE = re.compile(
 )
 
 
-def _truthy_env(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def check_powerunits_entsoe_market_bounded_validate_requirements() -> bool:
-    if not _truthy_env(_FEATURE_ENV):
+    if not entsoe_market_bounded_core_step_enabled(_STEP):
         return False
     if not (os.getenv(_BASE_ENV) or "").strip():
         return False
@@ -108,7 +112,8 @@ def validate_powerunits_entsoe_market_bounded_window(
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
                 "message": (
-                    f"{_FEATURE_ENV} must be truthy and {_BASE_ENV} / {_SECRET_ENV} must be set."
+                    f"{entsoe_market_bounded_gate_requirement_text(_STEP)}; "
+                    f"and {_BASE_ENV} / {_SECRET_ENV} must be set."
                 ),
                 "slice": None,
                 "validation_attempted": False,
@@ -269,7 +274,8 @@ VALIDATE_ENTSOE_SCHEMA = {
         "Repo B returns counts on **normalized UTC hour-bucket** tables (`market_*_hourly`); raw ENTSO-E "
         "may be sub-hourly but this path persists hourly rows. Generation is long-format by "
         "`technology_group`, so `row_count` ≫ `distinct_timestamps` is normal. "
-        f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
+        f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
+        f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",
@@ -299,6 +305,12 @@ registry.register(
         pipeline_run_id=_pipeline_run_id_from_args(args or {}),
     ),
     check_fn=check_powerunits_entsoe_market_bounded_validate_requirements,
-    requires_env=[_FEATURE_ENV, _BASE_ENV, _SECRET_ENV],
+    requires_env=[
+        ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+        ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        _LEGACY_ENV,
+        _BASE_ENV,
+        _SECRET_ENV,
+    ],
     emoji="🔎",
 )

@@ -6,7 +6,8 @@ over contiguous ≤7d windows (DE only), fail-fast.
 Orchestrates only the existing bounded Repo B HTTP endpoints; no Repo B changes.
 
 Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED`` and requires
-the same execute + summary bounded flags, base URL, and bearer as single-slice tools.
+bounded execute+summary access (``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`` **or**
+both legacy execute+summary flags), base URL, and bearer.
 """
 
 from __future__ import annotations
@@ -15,6 +16,13 @@ import json
 import logging
 import os
 from typing import Any
+
+from tools.powerunits_bounded_family_gates import (
+    ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
+    ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+    campaign_entsoe_bounded_http_primitives_enabled,
+)
 
 from tools.powerunits_entsoe_market_bounded_execute_tool import (
     check_powerunits_entsoe_market_bounded_execute_requirements,
@@ -39,9 +47,12 @@ def _truthy_env(name: str) -> bool:
 def check_powerunits_entsoe_market_bounded_campaign_requirements() -> bool:
     if not _truthy_env(_FEATURE_ENV):
         return False
-    if not check_powerunits_entsoe_market_bounded_execute_requirements():
+    if not campaign_entsoe_bounded_http_primitives_enabled():
         return False
-    if not check_powerunits_entsoe_market_bounded_summary_requirements():
+    if not (
+        (os.getenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL") or "").strip()
+        and (os.getenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET") or "").strip()
+    ):
         return False
     return True
 
@@ -73,11 +84,12 @@ def campaign_powerunits_entsoe_market_bounded_de(
                 "error_code": "feature_disabled",
                 "surface": _SURFACE,
                 "message": (
-                    f"{_FEATURE_ENV} must be truthy, and "
-                    "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED + "
-                    "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED "
-                    "must be truthy with POWERUNITS_INTERNAL_EXECUTE_BASE_URL / "
-                    "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET set."
+                    f"{_FEATURE_ENV} must be truthy; also need "
+                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` (or both legacy execute+summary "
+                    f"flags `{ENTSOE_MARKET_BOUNDED_LEGACY_ENV['execute']}` + "
+                    f"`{ENTSOE_MARKET_BOUNDED_LEGACY_ENV['summary']}`) with optional "
+                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when primary is used; "
+                    "and POWERUNITS_INTERNAL_EXECUTE_BASE_URL / POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET set."
                 ),
                 "campaign": None,
                 "windows": [],
@@ -283,7 +295,7 @@ CAMPAIGN_ENTSOE_SCHEMA = {
         "**Bounded ENTSO-E market sync campaign (v1 DE)** — sequential execute + summary "
         "for contiguous sub-windows (each ≤7d), campaign span ≤31d, ≤5 windows total. "
         "Fail-fast on first failed execute or failed summary HTTP/outcome. Requires "
-        f"{_FEATURE_ENV} plus execute and summary bounded flags, "
+        f"{_FEATURE_ENV} plus `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` (or legacy execute+summary), "
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
     ),
     "parameters": {
@@ -328,8 +340,10 @@ registry.register(
     check_fn=check_powerunits_entsoe_market_bounded_campaign_requirements,
     requires_env=[
         _FEATURE_ENV,
-        "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED",
-        "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED",
+        ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
+        ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        ENTSOE_MARKET_BOUNDED_LEGACY_ENV["execute"],
+        ENTSOE_MARKET_BOUNDED_LEGACY_ENV["summary"],
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL",
         "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET",
     ],
