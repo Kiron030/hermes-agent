@@ -310,6 +310,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_docs_tool",
             "tools.powerunits_era5_weather_bounded_campaign_tool",
             "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
+            "tools.powerunits_baseline_layer_preview_tool",
             "tools.powerunits_era5_weather_bounded_execute_tool",
             "tools.powerunits_era5_weather_bounded_preflight_tool",
             "tools.powerunits_era5_weather_bounded_summary_tool",

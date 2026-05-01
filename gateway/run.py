@@ -128,6 +128,7 @@ _POWERUNITS_ALLOWED_TELEGRAM_TOOLSETS = {
     "powerunits_era5_weather_bounded_summary",
     "powerunits_era5_weather_bounded_campaign",
     "powerunits_era5_weather_bounded_coverage_scan",
+    "powerunits_baseline_layer_preview",
 }
 
 # Bridge config.yaml values into the environment so os.getenv() picks them up.

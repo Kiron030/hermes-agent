@@ -28,6 +28,7 @@
 | **Bounded ERA5 weather sync summary** (`summarize_powerunits_era5_weather_bounded_window`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` + same base URL and bearer; **one** HTTP POST to read-only summary-window — **no** SQL from Hermes. |
 | **Bounded ERA5 weather sync campaign DE** (`campaign_powerunits_era5_weather_bounded_de`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` **and** bounded execute + summary flags + base URL/bearer; **sequential** recompute + summary per ≤7d sub-window (campaign ≤31d, ≤5 windows), **fail-fast** — **no** `market_feature_job` / `market_driver_feature_job` / `expand_market_data`; **DE only**. |
 | **Bounded ERA5 weather normalized coverage-scan DE** (`scan_powerunits_era5_weather_bounded_coverage_de`) | Allowed **only** when gated | `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED` + same base URL/bearer; **one** HTTP POST to read-only `…/era5-weather/coverage-scan` — **no** `era5_weather_job`, **no** `market_feature_job` / `market_driver_feature_job`; **`rollup.suggested_next_bounded_action`** is Repo B–only (Hermes does not add suggestions). **`hermes_statement: read_only_scan_no_writes`**. |
+| **Bounded baseline layer-coverage preview DE** (`preview_powerunits_baseline_layer_coverage_de`) | Allowed **only** when gated | `HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED` + same base URL/bearer; **one** HTTP POST to read-only `…/baseline/layer-coverage-preview` (**DE**, **≤31 d**, **v1**, single slice) — **no** ingest jobs, **no** campaigns, **no** `expand_market_data`; **`rollup.suggested_next_bounded_action`** is Repo B–only. **`hermes_statement: read_only_baseline_preview_no_jobs`** when enabled on Repo B. |
 | **General web / browser / terminal / file / code-exec / MCP / cron** | **Not** in first_safe Telegram surface | Fail-closed for Powerunits internal profile — do not “temporarily” widen without policy change. |
 | **Broad DB / free SQL / schema writes** | Forbidden | Hermes has no such tool in this profile; Repo B owns schema. |
 | **Repo B direct git writes from Hermes** | Forbidden | Product changes go through human/CI workflows, not agent. |
@@ -42,6 +43,7 @@
 | `ACCESS_MATRIX.md` | This matrix — allowed / gated / forbidden. |
 | `docs/powerunits_entsoe_market_bounded_operator_v1.md` | Bounded ENTSO-E Hermes tools + campaign v1 env gates. |
 | `docs/powerunits_era5_weather_bounded_operator_v1.md` | Bounded ERA5 Hermes tools + env gates + no auto feature job reminder. |
+| `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (read-only, DE / v1 / ≤31d). |
 | `RUNBOOK.hermes-stage1-validation.md` | Checklists, post-deploy verification, rollback basics. |
 | `SOUL.hermes-writer.md` / `RUNBOOK.hermes-writer.md` | **Stage 2 scaffolding only** — not live until explicitly enabled. |
 | `CHECKLIST.hermes-writer-activation.md` | **Gate** — all mandatory items + sign-off before Stage 2 is real on any environment. |

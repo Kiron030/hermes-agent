@@ -423,6 +423,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_baseline_layer_preview": {
+        "description": (
+            "Bounded **baseline layer-coverage preview** (read-only, v1 DE): one HTTP POST to "
+            "`/internal/hermes/bounded/v1/baseline/layer-coverage-preview` — expand-aligned layer "
+            "aggregates and baseline gate preview (**no** jobs, **no** campaigns, **no** "
+            "`expand_market_data`). Span ≤31d single window. "
+            "Requires HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED plus "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["preview_powerunits_baseline_layer_coverage_de"],
+        "includes": [],
+    },
+
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
         "tools": ["execute_code"],
