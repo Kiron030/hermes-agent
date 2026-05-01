@@ -24,6 +24,7 @@ from typing import Literal
 MarketFeaturesStep = Literal["execute", "validate", "readiness", "summary"]
 MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
 EntsoeMarketBoundedStep = Literal["preflight", "execute", "validate", "summary"]
+EntsoeForecastBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 Era5WeatherBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 
 MARKET_FEATURES_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED"
@@ -67,6 +68,20 @@ ENTSOE_MARKET_BOUNDED_LEGACY_ENV: dict[EntsoeMarketBoundedStep, str] = {
     "summary": "HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED",
 }
 _ENTSOE_LEGACY = ENTSOE_MARKET_BOUNDED_LEGACY_ENV
+
+ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED"
+_ENTSOE_FORECAST_PRIMARY = ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV
+ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV = (
+    "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES"
+)
+_ENTSOE_FORECAST_ALLOWED = ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV
+ENTSOE_FORECAST_BOUNDED_LEGACY_ENV: dict[EntsoeForecastBoundedStep, str] = {
+    "preflight": "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED",
+    "execute": "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_EXECUTE_ENABLED",
+    "validate": "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_VALIDATE_ENABLED",
+    "summary": "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED",
+}
+_ENTSOE_FORECAST_LEGACY = ENTSOE_FORECAST_BOUNDED_LEGACY_ENV
 
 ERA5_WEATHER_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED"
 _ERA5_PRIMARY = ERA5_WEATHER_BOUNDED_PRIMARY_ENV
@@ -140,6 +155,19 @@ def entsoe_market_bounded_gate_requirement_text(step: EntsoeMarketBoundedStep) -
     return (
         f"{_ENTSOE_PRIMARY} (recommended) or legacy {_ENTSOE_LEGACY[step]}; "
         f"when using primary optionally {_ENTSOE_ALLOWED} (implicit DE when unset)"
+    )
+
+
+def entsoe_forecast_bounded_core_step_enabled(step: EntsoeForecastBoundedStep) -> bool:
+    if _truthy(_ENTSOE_FORECAST_PRIMARY):
+        return _impl_country_allowed(_ENTSOE_FORECAST_ALLOWED)
+    return _truthy(_ENTSOE_FORECAST_LEGACY[step])
+
+
+def entsoe_forecast_bounded_gate_requirement_text(step: EntsoeForecastBoundedStep) -> str:
+    return (
+        f"{_ENTSOE_FORECAST_PRIMARY} (recommended) or legacy {_ENTSOE_FORECAST_LEGACY[step]}; "
+        f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (implicit DE when unset)"
     )
 
 

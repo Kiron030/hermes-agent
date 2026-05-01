@@ -11,6 +11,7 @@ These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor 
 | **Market driver bounded** | **Primary:** `MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`; **legacy:** `_DE_*` same pattern; optional `*_ALLOWED_COUNTRIES` | **Implemented.** |
 | **ENTSO‑E bounded** | **Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED`; optional `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`; **modifiers:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_{COVERAGE_SCAN,CAMPAIGN}_ENABLED` | **Implemented** (campaign / coverage-scan stay separate modifiers). |
 | **ERA5 bounded** | **Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`; same legacy + allowlist + modifier pattern as ENTSO‑E | **Implemented.** |
+| **ENTSO‑E forecast bounded** | **Primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`; **legacy:** four `*_PREFLIGHT/EXECUTE/VALIDATE/SUMMARY_*`; optional `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`; **no** separate campaign modifier in Hermes v1 | **Implemented** (forecast F3b+F4 only; orthogonal to ENTSO‑E **market** family). |
 | **Baseline preview** | `BASELINE_LAYER_PREVIEW_ENABLED` | Already **single** gate; fits target model as-is. |
 | **Timescale read / Repo B read** | One primary each | Fits model. |
 
@@ -84,6 +85,24 @@ HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED
 HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED
 HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED
 ```
+
+**ENTSO‑E forecast bounded** — deprecated per-step Hermes gates (still read when primary is falsy):
+
+```text
+HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED
+HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_EXECUTE_ENABLED
+HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_VALIDATE_ENABLED
+HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED
+```
+
+### ENTSO‑E forecast bounded
+
+Same §6 semantics as ENTSO‑E market / ERA5 for core steps (**preflight** through **summary**). **Hermes-side** distinct from **`ENTSOE_MARKET_BOUNDED_*`**: bounded routes `…/entsoe-forecast/*` invoke **`entsoe_forecast_job`** only — no **`entsoe_market_job`**, no market-features auto-run.
+
+Recommended primary:
+
+- **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1`**
+- Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2; unset ⇒ implicit DE; empty ⇒ fail-closed with primary).
 
 ---
 

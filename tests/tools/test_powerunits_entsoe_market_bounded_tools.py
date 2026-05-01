@@ -12,6 +12,7 @@ from tools import powerunits_entsoe_market_bounded_preflight_tool as pre_mod
 from tools import powerunits_entsoe_market_bounded_validate_tool as val_mod
 from tools import powerunits_entsoe_market_bounded_campaign_tool as camp_mod
 from tools.powerunits_bounded_family_gates import (
+    ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV,
     ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
     ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
 )
@@ -35,6 +36,23 @@ def _with_execute_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_execute_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_entso_bounded_core(monkeypatch)
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_market_bounded_slice(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("error_code") == "feature_disabled"
+
+
+def test_execute_feature_disabled_primary_empty_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_entso_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, "")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
     out = json.loads(
         exec_mod.execute_powerunits_entsoe_market_bounded_slice(
             country="DE",
@@ -188,6 +206,21 @@ def test_entsoe_bounded_slice_rejects_over_7d() -> None:
 
 def test_preflight_valid_de(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED", "1")
+    out = json.loads(
+        pre_mod.preflight_powerunits_entsoe_market_bounded_slice(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out["syntactically_valid"] is True
+    assert "execute_powerunits_entsoe_market_bounded_slice" in out["bounded_http_operator_hint"]
+
+
+def test_preflight_valid_de_via_primary_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_entso_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
     out = json.loads(
         pre_mod.preflight_powerunits_entsoe_market_bounded_slice(
             country="DE",
