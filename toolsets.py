@@ -525,6 +525,22 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_outage_repair_bounded_execute": {
+        "description": (
+            "Bounded **outage repair** **execute**: one POST to `/internal/hermes/bounded/v1/outage-repair/recompute` "
+            "(DE / v1 / ≤7d UTC). Repo B runs **`entsoe_generation_outage_sync`** (Step A) then "
+            "**`outage_country_hourly_compute`** (Step B); **does not auto-run** `market_feature_job` / "
+            "`market_driver_feature_job` / `expand_market_data`. "
+            "**Primary:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED` (+ optional "
+            "`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED`; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
+            "Separate gated family from **outage awareness** (read-only validate/summary)."
+        ),
+        "tools": ["execute_powerunits_outage_repair_bounded_slice"],
+        "includes": [],
+    },
+
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "

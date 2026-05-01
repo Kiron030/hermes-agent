@@ -7,6 +7,10 @@ import json
 import pytest
 
 from tools import powerunits_era5_weather_bounded_coverage_scan_tool as scan_mod
+from tools.powerunits_bounded_family_gates import (
+    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+)
 
 
 def _with_coverage_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,6 +28,26 @@ def test_era5_coverage_scan_gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     )
     assert out.get("error_code") == "feature_disabled"
+
+
+def test_era5_coverage_scan_primary_implicit_de_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
+    _with_coverage_env(monkeypatch)
+    monkeypatch.delenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+
+    def boom(*a: object, **k: object) -> None:
+        raise AssertionError("no http")
+
+    out = json.loads(
+        scan_mod.scan_powerunits_era5_weather_bounded_coverage_de(
+            scan_start_utc="2024-01-01T00:00:00Z",
+            scan_end_utc="2024-01-08T00:00:00Z",
+            country="FR",
+            _http_post=boom,
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"
+    assert out["scan_attempted"] is False
 
 
 def test_era5_coverage_scan_local_validation_no_http(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -44,6 +68,8 @@ def test_era5_coverage_scan_local_validation_no_http(monkeypatch: pytest.MonkeyP
     hs = out.get("hermes_statement", "")
     assert "Repo B only" in hs
     assert "market_driver_feature_job" in hs
+
+
 def test_era5_coverage_scan_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
     _with_coverage_env(monkeypatch)
 

@@ -20,6 +20,7 @@ from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
     era5_weather_bounded_core_step_enabled,
     era5_weather_bounded_gate_requirement_text,
+    era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
 
@@ -37,7 +38,8 @@ _MAX_SUMMARY_CHARS = 8000
 
 _OPERATOR_NOT_AUTO = (
     "ERA5 validate-window checks weather_country_hourly only; market_feature_job was NOT auto-run "
-    "and market_driver_feature_job was NOT auto-run. For refreshed features, run bounded Option D next."
+    "and market_driver_feature_job was NOT auto-run. For refreshed market features or drivers, "
+    "use the appropriate bounded family tools or Repo B jobs."
 )
 
 _SECRET_URL_RE = re.compile(
@@ -153,6 +155,32 @@ def validate_powerunits_era5_weather_bounded_window(
                 "http_status": None,
                 "outcome": None,
                 "error_class": "client_validation",
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
+    if not era5_weather_bounded_request_country_permitted(cc):
+        slim = {
+            "country": cc,
+            "version": version_s,
+            "start_utc": start_dt.isoformat().replace("+00:00", "Z"),
+            "end_utc_exclusive": end_dt.isoformat().replace("+00:00", "Z"),
+        }
+        return json.dumps(
+            {
+                "error_code": "country_not_permitted",
+                "surface": _SURFACE,
+                "slice": slim,
+                "validation_attempted": False,
+                "http_status": None,
+                "outcome": None,
+                "message": (
+                    f"Bounded ERA5 Hermes: country `{cc}` not permitted. When "
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on, set "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` to include that ISO2 "
+                    "(unset ⇒ implicit **DE** only)."
+                ),
                 "hermes_statement": base_statement,
             },
             ensure_ascii=False,
@@ -289,7 +317,10 @@ VALIDATE_ERA5_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {
+                "type": "string",
+                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
+            },
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

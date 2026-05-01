@@ -20,6 +20,11 @@ from typing import Any
 
 import httpx
 
+from tools.powerunits_bounded_family_gates import (
+    ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
+    ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+    era5_weather_bounded_request_country_permitted,
+)
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_campaign
 
 logger = logging.getLogger(__name__)
@@ -144,6 +149,25 @@ def scan_powerunits_era5_weather_bounded_coverage_de(
             ensure_ascii=False,
         )
 
+    if not era5_weather_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "error_code": "country_not_permitted",
+                "surface": _SURFACE,
+                "scan_messages": [
+                    f"Country `{cc}` not permitted under current bounded ERA5 gate (when "
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on set "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` — unset ⇒ implicit DE only). "
+                    "Legacy-era5 paths ignore allowlist narrowing."
+                ],
+                "scan_attempted": False,
+                "http_status": None,
+                "country_code": cc,
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     url = _scan_url()
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
@@ -237,8 +261,8 @@ def scan_powerunits_era5_weather_bounded_coverage_de(
 SCAN_ERA5_SCHEMA = {
     "name": "scan_powerunits_era5_weather_bounded_coverage_de",
     "description": (
-        "**Bounded ERA5 normalized weather coverage-scan (read-only, v1 DE)** — one HTTP POST. "
-        "Span ≤31d, partitioned like campaign (≤5 × ≤7d). "
+        "**Bounded ERA5 normalized weather coverage-scan (read-only, v1)** — one HTTP POST. "
+        "Span ≤31d, partitioned like campaign (≤5 × ≤7d). Country must be in Repo B bounded ERA5 slice. "
         "Does not run era5_weather_job, market_feature_job, or market_driver_feature_job. "
         "Uses Repo B `rollup.suggested_next_bounded_action` only (no local suggestions). "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
@@ -254,7 +278,11 @@ SCAN_ERA5_SCHEMA = {
                 "type": "string",
                 "description": "Exclusive UTC ISO-8601 with Z.",
             },
-            "country": {"type": "string", "description": "Must be DE (default DE).", "default": "DE"},
+            "country": {
+                "type": "string",
+                "description": "Bounded ERA5 v1 ISO2 (default DE; DE or FR slice set).",
+                "default": "DE",
+            },
             "version": {"type": "string", "description": "Must be v1.", "default": "v1"},
         },
         "required": ["scan_start_utc", "scan_end_utc"],

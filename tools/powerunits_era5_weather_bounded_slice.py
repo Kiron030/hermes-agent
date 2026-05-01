@@ -1,12 +1,16 @@
 """
-Shared local slice validation for bounded ERA5 weather sync Hermes tools (DE / v1 / ≤7d).
+Shared local slice validation for bounded ERA5 weather sync Hermes tools (allowlisted ISO2 / v1 / ≤7d).
 
-Matches Repo B `validate_bounded_era5_weather_slice`. No registry.register.
+Keep allowlist in sync with Repo B ``hermes_bounded_era5_countries.ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1``.
+No registry.register.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+
+# Mirror Repo B: backend/services/internal/hermes_bounded_era5_countries.py
+ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1: frozenset[str] = frozenset({"DE", "FR"})
 
 _MAX_SUBWINDOW_DAYS = 7
 _MAX_CAMPAIGN_SPAN_DAYS = 31
@@ -32,8 +36,9 @@ def validate_era5_bounded_slice(
     version: str,
 ) -> tuple[str, datetime, datetime]:
     cc = (country or "").strip().upper()
-    if cc != "DE":
-        raise ValueError("country must be DE for bounded era5_weather_sync v1")
+    if cc not in ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1:
+        opts = ", ".join(sorted(ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1))
+        raise ValueError(f"country must be one of [{opts}] for bounded era5_weather_sync v1")
     if (version or "").strip() != "v1":
         raise ValueError("version must be v1 for this release")
     start = _parse_utc_iso(start_s)
@@ -76,12 +81,13 @@ def validate_era5_bounded_campaign(
     version_s: str,
 ) -> tuple[str, str, list[tuple[datetime, datetime]]]:
     """
-    DE / v1 only. Campaign [start,end) exclusive; total span ≤ 31 days;
+    Allowlisted ISO2 / v1 only. Campaign [start,end) exclusive; total span ≤ 31 days;
     contiguous ≤7d slices; resulting slice count ≤ 5.
     """
     cc = (country or "").strip().upper()
-    if cc != "DE":
-        raise ValueError("country must be DE for bounded era5_weather_sync v1 campaign")
+    if cc not in ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1:
+        opts = ", ".join(sorted(ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1))
+        raise ValueError(f"country must be one of [{opts}] for bounded era5_weather_sync v1 campaign")
     ver = (version_s or "").strip()
     if ver != "v1":
         raise ValueError("version must be v1 for this release")

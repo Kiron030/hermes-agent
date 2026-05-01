@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 Hermes bounded ERA5 weather sync **campaign v1** — sequential execute + summary
-over contiguous ≤7d windows (DE only), fail-fast.
+over contiguous ≤7d windows (bounded slice ISO2 codes e.g. DE/FR), fail-fast.
 
-Orchestrates only the existing bounded Repo B HTTP endpoints; no Repo B changes.
+Orchestrates only the existing bounded Repo B HTTP endpoints; no Repo B route proliferation.
 
 Gated by ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED`` and requires
 bounded execute+summary access (``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`` **or**
 both legacy execute+summary flags), base URL, and bearer.
+
+When the primary ERA5 gate is truthy, ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES``
+narrows besides Repo B enforcement (unset ⇒ implicit DE only).
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_LEGACY_ENV,
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
     campaign_era5_bounded_http_primitives_enabled,
+    era5_weather_bounded_request_country_permitted,
 )
 
 from tools.powerunits_era5_weather_bounded_execute_tool import (
@@ -69,7 +73,8 @@ def campaign_powerunits_era5_weather_bounded_de(
     version: str = "v1",
     _http_post: Any = None,
 ) -> str:
-    """Run up to 5 contiguous ≤7d DE windows; execute then summary each; fail-fast."""
+    """Run up to 5 contiguous ≤7d windows; execute then summary each; fail-fast."""
+
 
     base_statement = (
         "Hermes performed no direct SQL. This tool only chains existing bounded HTTP POSTs to "
@@ -126,7 +131,34 @@ def campaign_powerunits_era5_weather_bounded_de(
                 "windows_attempted": 0,
                 "windows_succeeded": 0,
                 "stopped_reason": "campaign_validation_failed",
-                "next_manual_step": "Fix slice parameters (DE, v1, end > start, span ≤31d, implies ≤5 sub-windows).",
+                "next_manual_step": "Fix slice parameters (bounded ISO2 slice set, v1, end > start, span ≤31d, implies ≤5 sub-windows).",
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
+    if not era5_weather_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "error_code": "country_not_permitted",
+                "validation_messages": [
+                    f"Country `{cc}` not permitted under current bounded ERA5 gate; set "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on."
+                ],
+                "campaign": {
+                    "country": cc,
+                    "version": ver,
+                    "campaign_start_utc": start_s,
+                    "campaign_end_utc_exclusive": end_s,
+                },
+                "windows": [],
+                "windows_planned": 0,
+                "windows_attempted": 0,
+                "windows_succeeded": 0,
+                "stopped_reason": "country_not_permitted",
+                "next_manual_step": "Align Hermes ALLOWED_COUNTRIES with Repo B ERA5 bounded allowlist.",
                 "hermes_statement": base_statement,
             },
             ensure_ascii=False,
@@ -139,8 +171,7 @@ def campaign_powerunits_era5_weather_bounded_de(
     stopped_reason = "completed"
     next_manual = (
         "Campaign completed. market_feature_job / market_driver_feature_job were not run. "
-        "For DE weather-driven feature refresh use market_feature_job via worker/runbook/CLI "
-        "(bounded Hermes Option D execute is PL-only in this release)."
+        "For DE market_features_hourly after weather-driven work use Repo B worker/runbook/CLI."
     )
 
     for idx, (w_start, w_end) in enumerate(windows):
@@ -293,9 +324,10 @@ def campaign_powerunits_era5_weather_bounded_de(
 CAMPAIGN_ERA5_SCHEMA = {
     "name": "campaign_powerunits_era5_weather_bounded_de",
     "description": (
-        "**Bounded ERA5 weather sync campaign (v1 DE)** — sequential execute + summary "
+        "**Bounded ERA5 weather sync campaign (v1)** — sequential execute + summary "
         "for contiguous sub-windows (each ≤7d), campaign span ≤31d, ≤5 windows total. "
-        "Fail-fast on first failed execute or failed summary HTTP/outcome. Requires "
+        "ISO2 sliced to Repo B bounded ERA5 set (e.g. DE/FR). Fail-fast on first failed "
+        "execute or failed summary HTTP/outcome. Requires "
         f"{_FEATURE_ENV} plus `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` (or legacy execute+summary), "
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
     ),
@@ -312,7 +344,7 @@ CAMPAIGN_ERA5_SCHEMA = {
             },
             "country": {
                 "type": "string",
-                "description": "Must be DE (default DE).",
+                "description": "Bounded ERA5 v1 ISO2 (default DE; DE or FR slice set).",
                 "default": "DE",
             },
             "version": {

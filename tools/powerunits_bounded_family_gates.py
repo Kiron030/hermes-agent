@@ -26,6 +26,7 @@ MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
 EntsoeMarketBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 EntsoeForecastBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 OutageAwarenessBoundedStep = Literal["validate", "summary"]
+OutageRepairBoundedStep = Literal["execute"]
 Era5WeatherBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 
 MARKET_FEATURES_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED"
@@ -96,6 +97,17 @@ OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV: dict[OutageAwarenessBoundedStep, str] = {
 }
 _OUTAGE_AWARENESS_LEGACY = OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV
 
+OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED"
+_OUTAGE_REPAIR_PRIMARY = OUTAGE_REPAIR_BOUNDED_PRIMARY_ENV
+OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV = (
+    "HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES"
+)
+_OUTAGE_REPAIR_ALLOWED = OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV
+OUTAGE_REPAIR_BOUNDED_LEGACY_ENV: dict[OutageRepairBoundedStep, str] = {
+    "execute": "HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED",
+}
+_OUTAGE_REPAIR_LEGACY = OUTAGE_REPAIR_BOUNDED_LEGACY_ENV
+
 ERA5_WEATHER_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED"
 _ERA5_PRIMARY = ERA5_WEATHER_BOUNDED_PRIMARY_ENV
 ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV = (
@@ -110,9 +122,26 @@ ERA5_WEATHER_BOUNDED_LEGACY_ENV: dict[Era5WeatherBoundedStep, str] = {
 }
 _ERA5_LEGACY = ERA5_WEATHER_BOUNDED_LEGACY_ENV
 
-# Current Hermes tools for both families only emit **DE**; allowlist must include DE
-# when primary is used (or unset allowlist → implicit DE).
+# Mirror Repo B ``hermes_bounded_era5_countries.ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1`` for
+# bounded-era5 slice validation paths (Hermes local preflight + legacy execute request guard).
+BOUNDED_SLICE_ERA5_WEATHER_ISO2_V1: frozenset[str] = frozenset({"DE", "FR"})
+
+# Implicit single-country fallback for primary allowlists across **DE-implicit** bounded families.
 _IMPL_COUNTRY = "DE"
+
+
+def era5_weather_bounded_request_country_permitted(iso2: str) -> bool:
+    """
+    Repo B authoritative validation still applies per HTTP POST; this intersections the
+    **bounded ERA5 Hermes family's** slice vs ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES``
+    when the primary ERA5 gate is truthy (**legacy paths keep ignoring** the env allowlist).
+    """
+    cc = (iso2 or "").strip().upper()
+    if cc not in BOUNDED_SLICE_ERA5_WEATHER_ISO2_V1:
+        return False
+    if _truthy(_ERA5_PRIMARY):
+        return cc in _allowed_countries_for_primary(_ERA5_ALLOWED)
+    return True
 
 
 def _truthy(name: str) -> bool:
@@ -194,6 +223,19 @@ def outage_awareness_bounded_gate_requirement_text(step: OutageAwarenessBoundedS
     return (
         f"{_OUTAGE_AWARENESS_PRIMARY} (recommended) or legacy {_OUTAGE_AWARENESS_LEGACY[step]}; "
         f"when using primary optionally {_OUTAGE_AWARENESS_ALLOWED} (implicit DE when unset)"
+    )
+
+
+def outage_repair_bounded_core_step_enabled(step: OutageRepairBoundedStep) -> bool:
+    if _truthy(_OUTAGE_REPAIR_PRIMARY):
+        return _impl_country_allowed(_OUTAGE_REPAIR_ALLOWED)
+    return _truthy(_OUTAGE_REPAIR_LEGACY[step])
+
+
+def outage_repair_bounded_gate_requirement_text(step: OutageRepairBoundedStep) -> str:
+    return (
+        f"{_OUTAGE_REPAIR_PRIMARY} (recommended) or legacy {_OUTAGE_REPAIR_LEGACY[step]}; "
+        f"when using primary optionally {_OUTAGE_REPAIR_ALLOWED} (implicit DE when unset)"
     )
 
 

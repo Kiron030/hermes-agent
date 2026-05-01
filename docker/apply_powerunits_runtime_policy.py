@@ -51,6 +51,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_entsoe_forecast_bounded_summary",
     "powerunits_outage_awareness_bounded_validate",
     "powerunits_outage_awareness_bounded_summary",
+    "powerunits_outage_repair_bounded_execute",
     "powerunits_era5_weather_bounded_preflight",
     "powerunits_era5_weather_bounded_execute",
     "powerunits_era5_weather_bounded_validate",
