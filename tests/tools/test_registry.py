@@ -311,6 +311,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_era5_weather_bounded_campaign_tool",
             "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
             "tools.powerunits_baseline_layer_preview_tool",
+            "tools.powerunits_bounded_coverage_inventory_tool",
             "tools.powerunits_de_stack_remediation_planner_tool",
             "tools.powerunits_era5_weather_bounded_execute_tool",
             "tools.powerunits_era5_weather_bounded_preflight_tool",

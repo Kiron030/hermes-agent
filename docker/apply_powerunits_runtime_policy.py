@@ -60,6 +60,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_era5_weather_bounded_coverage_scan",
     "powerunits_baseline_layer_preview",
     "powerunits_de_stack_remediation_planner",
+    "powerunits_bounded_coverage_inventory",
 ]
 
 DISABLED_PLATFORMS = [
