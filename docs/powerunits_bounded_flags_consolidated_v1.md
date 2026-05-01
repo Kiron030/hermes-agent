@@ -13,6 +13,8 @@ These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor 
 | **ERA5 bounded** | **Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`; same legacy + allowlist + modifier pattern as ENTSO‑E | **Implemented.** |
 | **ENTSO‑E forecast bounded** | **Primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`; **legacy:** four `*_PREFLIGHT/EXECUTE/VALIDATE/SUMMARY_*`; optional `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`; **no** separate campaign modifier in Hermes v1 | **Implemented** (forecast F3b+F4 only; orthogonal to ENTSO‑E **market** family). |
 | **Baseline preview** | `BASELINE_LAYER_PREVIEW_ENABLED` | Already **single** gate; fits target model as-is. |
+| **DE stack remediation planner** | **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** | **Read-only** cross-family aggregator (**one** Repo B planner POST; starts **no** jobs). |
+| **Outage awareness bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_{VALIDATE,SUMMARY}_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES` | **Read-only** Hermes POSTs to **`…/outage-awareness/*`** — **no** outage ingest, **no** hourly outage recompute, **no** market-feature or driver jobs. |
 | **Timescale read / Repo B read** | One primary each | Fits model. |
 
 ## 2. Design target principles
@@ -103,6 +105,25 @@ Recommended primary:
 
 - **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1`**
 - Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2; unset ⇒ implicit DE; empty ⇒ fail-closed with primary).
+
+### DE bounded stack remediation planner (read-only)
+
+Single Hermes gate: **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`**. Enables **`plan_powerunits_de_stack_remediation`** (**one** HTTP POST to Repo B **`…/remediation/de-stack-plan`**). Independent of ENTSO‑E / ERA5 / forecast / market‑features execute primaries; still requires **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** + **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**. **No job execution** on this surface — JSON **`tool_hint_hermes`** values are manual operator hints only.
+
+### Outage awareness bounded (read-only)
+
+Same §6 semantics as other primary+legacy bounded families for **validate** and **summary** only (**no execute** in Hermes v1).
+
+- **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED=1`** unlocks **`validate_powerunits_outage_awareness_bounded_window`** and **`summarize_powerunits_outage_awareness_bounded_window`** together (with base URL + bearer).
+- Optional **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES`** — unset ⇒ implicit **DE**; empty ⇒ fail-closed when primary is on.
+- **Legacy** when primary is falsy: **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`** / **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`** (granular).
+
+**Deprecated (still read when primary is falsy):**
+
+```text
+HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED
+HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED
+```
 
 ---
 

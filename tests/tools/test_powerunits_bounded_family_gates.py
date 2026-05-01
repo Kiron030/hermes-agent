@@ -1,4 +1,4 @@
-"""Unit tests for consolidated bounded-family Hermes gates (features / driver / ENTSO‑E market & forecast / ERA5)."""
+"""Unit tests for consolidated bounded-family Hermes gates (features / driver / ENTSO‑E market & forecast / ERA5 / outage awareness)."""
 
 from __future__ import annotations
 
@@ -25,6 +25,9 @@ def _clear_bounded_env(monkeypatch: pytest.MonkeyPatch) -> None:
         g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV,
         g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV,
         *g.ENTSOE_FORECAST_BOUNDED_LEGACY_ENV.values(),
+        g.OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV,
+        g.OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        *g.OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV.values(),
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -141,3 +144,30 @@ def test_entsoe_forecast_legacy_granular(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_LEGACY_ENV["preflight"], "1")
     assert g.entsoe_forecast_bounded_core_step_enabled("preflight") is True
     assert g.entsoe_forecast_bounded_core_step_enabled("summary") is False
+
+
+def test_outage_awareness_primary_unlocks_validate_and_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV, "1")
+    assert g.outage_awareness_bounded_core_step_enabled("validate") is True
+    assert g.outage_awareness_bounded_core_step_enabled("summary") is True
+
+
+def test_outage_awareness_primary_with_empty_allowlist_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES_ENV, "")
+    assert g.outage_awareness_bounded_core_step_enabled("validate") is False
+
+
+def test_outage_awareness_legacy_granular(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV["validate"], "1")
+    assert g.outage_awareness_bounded_core_step_enabled("validate") is True
+    assert g.outage_awareness_bounded_core_step_enabled("summary") is False
+
+
+def test_outage_awareness_legacy_validate_only_does_not_open_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV["validate"], "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://x")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "y")
+    import tools.powerunits_outage_awareness_bounded_summary_tool as sum_mod
+
+    assert sum_mod.check_powerunits_outage_awareness_bounded_summary_requirements() is False

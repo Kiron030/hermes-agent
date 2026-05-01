@@ -14,6 +14,8 @@
 | `docs/powerunits_repo_b_read_operator_v1.md` | Repo B allowlisted read (`read_powerunits_repo_b_allowlisted`); env-gated. |
 | `docs/powerunits_bounded_flags_consolidated_v1.md` | Consolidated bounded env naming & migration table. |
 | `docs/powerunits_entsoe_forecast_bounded_operator_v1.md` | Bounded ENTSO-E **forecast** Hermes tools (`entsoe_forecast_job` only; not market sync / features). |
+| `docs/powerunits_de_stack_remediation_planner_operator_v1.md` | Read-only DE remediation planner (**one** Repo B POST; **no** job execution via this surface). |
+| `docs/powerunits_outage_awareness_bounded_operator_v1.md` | Bounded DE outage awareness validate/summary (**read-only**; **no** ingest or feature recompute). |
 | `docs/powerunits_market_features_bounded_de_operator_v1.md` | Bounded DE `market_features_hourly` Hermes tools (separate from PL Option D). |
 | `docs/powerunits_market_driver_features_bounded_de_operator_v1.md` | Bounded DE `market_driver_features_hourly` Hermes tools (separate from market-features DE + Option D). |
 | `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (Hermes POST to Repo B; read-only, DE). |
@@ -150,6 +152,20 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Feature gate:** with `HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED` falsy, `preview_powerunits_baseline_layer_coverage_de` absent or returns **`feature_disabled`** — no Repo B HTTP.
 - [ ] **Gate on:** bounded base URL + bearer set; tool **`preview_powerunits_baseline_layer_coverage_de`** with DE / v1 / ≤31d `[preview_start_utc, preview_end_utc)` → JSON **`preview_attempted: true`**, Repo B **`rollup`**, **`hermes_statement`** reflects **no jobs / no campaigns / read-only preview** (`read_only_baseline_preview_no_jobs` on Repo B). **`rollup.suggested_next_bounded_action`** is Repo B-authored only — Hermes does not append local steps.
 
+### Bounded DE outage awareness (read-only; Hermes → Repo B)
+
+- [ ] **Feature gate:** with **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`** falsy **and** both legacy **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`** / **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`** falsy, **`validate_powerunits_outage_awareness_bounded_window`** / **`summarize_powerunits_outage_awareness_bounded_window`** return **`feature_disabled`** — **no** Repo B HTTP.
+- [ ] **Primary on:** **`validate_powerunits_outage_awareness_bounded_window`** with DE / v1 / ≤7 d **`[start, end)`** → **`validation_attempted: true`**, Repo B **`hermes_statement`** indicates **read-only** / **no writes**; response includes **`checks`**, **`warnings`**, **`semantics_notes`** as applicable; **Hermes does not start** outage ingestion, **`outage_country_hourly` recompute**, **`market_feature_job`**, or **`market_driver_feature_job`**.
+- [ ] **Summary:** **`summarize_powerunits_outage_awareness_bounded_window`** same slice → **`summary_attempted: true`**, **`outcome_class`** set; still **no jobs** via this path.
+- [ ] **Primary + empty allowlist:** **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES=`** (empty) with primary truthy → **fail-closed** (**`feature_disabled`**).
+- [ ] **Legacy granular:** validate legacy only does **not** enable summary **`check_fn`** until summary legacy or primary is set.
+
+### Bounded DE stack remediation planner (read-only only)
+
+- [ ] **Feature gate:** with **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** falsy, **`plan_powerunits_de_stack_remediation`** returns **`feature_disabled`** — **no** Repo B HTTP from that path.
+- [ ] **Gate on:** **`plan_powerunits_de_stack_remediation`** with DE / v1 / ≤31 d **`[window_start_utc, window_end_utc)`** → **`plan_attempted: true`**; Repo B **`hermes_statement`** includes **`read_only_remediation_plan_no_writes`**; response includes **`recommended_sequence`** and **`family_states`**; **Hermes executes no ingest / feature jobs** — **manual** bounded tools only (`tool_hint_hermes` hints).
+- [ ] Wide windows (near 31 d) may be **slow** on Repo B (many internal sub-evaluations).
+
 ### Rollback (Repo B read only)
 
 - [ ] Set `HERMES_POWERUNITS_REPO_B_READ_ENABLED` to **falsy** or remove it; redeploy or restart if your platform caches env — tool should disappear or return disabled without touching Repo B or GitHub.
@@ -172,7 +188,8 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Repo B read:** unset or falsify `HERMES_POWERUNITS_REPO_B_READ_ENABLED` (see Repo B read subsection).
 - [ ] **Bounded ENTSO-E / ERA5:** unset or falsify **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** / **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** and legacy **`…_PREFLIGHT/_EXECUTE/_VALIDATE/_SUMMARY_ENABLED`** as needed to drop Hermes HTTP for those families without changing Repo B. **Forecast:** **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`** and its four legacy **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_*_ENABLED`** are **separate** — drop them independently of market ERA5/market-sync flags. Campaign and coverage-scan modifiers remain separate.
 - [ ] **Bounded DE market features:** unset or falsify `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*_ENABLED` (execute/validate/readiness/summary as needed) without touching PL Option D flags.
-- [ ] **Policy:** do not remove `first_safe_v1` casually; rollback to prior image/env snapshot per your Railway practice, then re-run this validation pack.
+- [ ] **Bounded DE stack planner:** falsify **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** to drop **`plan_powerunits_de_stack_remediation`** Hermes POSTs independently of other bounded flags.
+- [ ] **Bounded outage awareness (read-only):** falsify **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`** and legacy **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`** / **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`** to drop outage-awareness Hermes POSTs — **no** Repo B job impact (read-only surface only).
 
 ---
 

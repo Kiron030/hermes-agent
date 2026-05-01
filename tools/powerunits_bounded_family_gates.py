@@ -25,6 +25,7 @@ MarketFeaturesStep = Literal["execute", "validate", "readiness", "summary"]
 MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
 EntsoeMarketBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 EntsoeForecastBoundedStep = Literal["preflight", "execute", "validate", "summary"]
+OutageAwarenessBoundedStep = Literal["validate", "summary"]
 Era5WeatherBoundedStep = Literal["preflight", "execute", "validate", "summary"]
 
 MARKET_FEATURES_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED"
@@ -82,6 +83,18 @@ ENTSOE_FORECAST_BOUNDED_LEGACY_ENV: dict[EntsoeForecastBoundedStep, str] = {
     "summary": "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED",
 }
 _ENTSOE_FORECAST_LEGACY = ENTSOE_FORECAST_BOUNDED_LEGACY_ENV
+
+OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED"
+_OUTAGE_AWARENESS_PRIMARY = OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV
+OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES_ENV = (
+    "HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES"
+)
+_OUTAGE_AWARENESS_ALLOWED = OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES_ENV
+OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV: dict[OutageAwarenessBoundedStep, str] = {
+    "validate": "HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED",
+    "summary": "HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED",
+}
+_OUTAGE_AWARENESS_LEGACY = OUTAGE_AWARENESS_BOUNDED_LEGACY_ENV
 
 ERA5_WEATHER_BOUNDED_PRIMARY_ENV = "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED"
 _ERA5_PRIMARY = ERA5_WEATHER_BOUNDED_PRIMARY_ENV
@@ -168,6 +181,19 @@ def entsoe_forecast_bounded_gate_requirement_text(step: EntsoeForecastBoundedSte
     return (
         f"{_ENTSOE_FORECAST_PRIMARY} (recommended) or legacy {_ENTSOE_FORECAST_LEGACY[step]}; "
         f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (implicit DE when unset)"
+    )
+
+
+def outage_awareness_bounded_core_step_enabled(step: OutageAwarenessBoundedStep) -> bool:
+    if _truthy(_OUTAGE_AWARENESS_PRIMARY):
+        return _impl_country_allowed(_OUTAGE_AWARENESS_ALLOWED)
+    return _truthy(_OUTAGE_AWARENESS_LEGACY[step])
+
+
+def outage_awareness_bounded_gate_requirement_text(step: OutageAwarenessBoundedStep) -> str:
+    return (
+        f"{_OUTAGE_AWARENESS_PRIMARY} (recommended) or legacy {_OUTAGE_AWARENESS_LEGACY[step]}; "
+        f"when using primary optionally {_OUTAGE_AWARENESS_ALLOWED} (implicit DE when unset)"
     )
 
 
