@@ -285,6 +285,93 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_market_features_bounded_de_execute": {
+        "description": (
+            "Bounded **DE** `market_features_hourly` **execute** (distinct from PL Option D): one HTTP POST to "
+            "`/internal/hermes/bounded/v1/market-features-hourly/recompute` with **`country_code=DE`**, "
+            "**v1**, **≤24h** UTC window. **Gate:** **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** "
+            "(optional **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ALLOWED_COUNTRIES`**) or legacy per-step **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*`**; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
+            "**Does not** enable `HERMES_POWERUNITS_OPTION_D_*`."
+        ),
+        "tools": ["execute_powerunits_market_features_bounded_de_slice"],
+        "includes": [],
+    },
+
+    "powerunits_market_features_bounded_de_validate": {
+        "description": (
+            "**DE** bounded validate-window (read-only): same Repo B path as Option D but **DE-only** client; "
+            "same **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** / allowlist **or** legacy validate flag "
+            "+ base URL + bearer. "
+            "**Not** PL Option D."
+        ),
+        "tools": ["validate_powerunits_market_features_bounded_de_window"],
+        "includes": [],
+    },
+
+    "powerunits_market_features_bounded_de_readiness": {
+        "description": (
+            "**DE** bounded readiness-window (read-only inputs): **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** "
+            "/ optional allowlist **or** legacy readiness flag "
+            "+ base URL + bearer. **Not** PL Option D."
+        ),
+        "tools": ["readiness_powerunits_market_features_bounded_de_window"],
+        "includes": [],
+    },
+
+    "powerunits_market_features_bounded_de_summary": {
+        "description": (
+            "**DE** bounded summary-window (read-only): **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** "
+            "/ optional allowlist **or** legacy summary flag "
+            "+ base URL + bearer. **Not** PL Option D."
+        ),
+        "tools": ["summarize_powerunits_market_features_bounded_de_window"],
+        "includes": [],
+    },
+
+    "powerunits_market_driver_features_bounded_de_execute": {
+        "description": (
+            "Bounded **DE** **`market_driver_features_hourly`** **execute**: one Repo B POST to "
+            "`/internal/hermes/bounded/v1/market-driver-features-hourly/recompute` with **`country_code=DE`**, **v1**, **≤24h** UTC "
+            "(exclusive end). Runs **`market_driver_feature_job`** only — **does not** auto-run **`market_feature_job`** or seeds. "
+            "**Gate:** **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`** / optional **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ALLOWED_COUNTRIES`** "
+            "**or** legacy **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_EXECUTE_ENABLED`**; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
+            "**Does not** enable **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_*`** nor **`HERMES_POWERUNITS_OPTION_D_*`**."
+        ),
+        "tools": ["execute_powerunits_market_driver_features_bounded_de_slice"],
+        "includes": [],
+    },
+
+    "powerunits_market_driver_features_bounded_de_validate": {
+        "description": (
+            "**DE** bounded driver validate-window (read-only): Repo B **`…/market-driver-features-hourly/validate-window`**. "
+            "**`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`** / allowlist **or** legacy validate flag "
+            "+ base URL + bearer. Separate from **market-features** bounded tools."
+        ),
+        "tools": ["validate_powerunits_market_driver_features_bounded_de_window"],
+        "includes": [],
+    },
+
+    "powerunits_market_driver_features_bounded_de_readiness": {
+        "description": (
+            "**DE** bounded driver readiness (**`market_features_hourly`** inputs for the driver job): "
+            "**`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`** / allowlist **or** legacy readiness flag "
+            "+ base URL + bearer."
+        ),
+        "tools": ["readiness_powerunits_market_driver_features_bounded_de_window"],
+        "includes": [],
+    },
+
+    "powerunits_market_driver_features_bounded_de_summary": {
+        "description": (
+            "**DE** bounded driver summary-window (read-only rollup): **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`** "
+            "/ allowlist **or** legacy summary flag + base URL + bearer."
+        ),
+        "tools": ["summarize_powerunits_market_driver_features_bounded_de_window"],
+        "includes": [],
+    },
+
     "powerunits_entsoe_market_bounded_preflight": {
         "description": (
             "Bounded ENTSO-E market sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "

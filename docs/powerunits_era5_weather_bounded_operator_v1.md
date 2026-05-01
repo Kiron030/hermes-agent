@@ -38,7 +38,7 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 - **`market_feature_job`** was **NOT** auto-run.
 - **`market_driver_feature_job`** was **NOT** auto-run.
 
-**Next manual step** if weather-dependent **`market_features_hourly`** should be updated for **DE**: use **`market_feature_job`** via Repo B worker/runbook/CLI. Bounded Hermes **Option D execute** is **PL-only** — it is **not** the DE feature-refresh path after ERA5.
+**Next manual step** if weather-dependent **`market_features_hourly`** should be updated for **DE**: use bounded Hermes **`execute_powerunits_market_features_bounded_de_slice`** (toolsets + **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*`** — **not** PL Option D) pointing at the same Repo B **`/market-features-hourly/recompute`** with **`country_code=DE`**, or run **`market_feature_job`** via Repo B worker/runbook/CLI. Bounded **Option D execute** remains **PL-only** and does **not** cover DE.
 
 ## Slice rules (v1)
 

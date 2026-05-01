@@ -12,6 +12,9 @@
 | **This file** | Repeatable checks + post-change verification + rollback basics. |
 | `docs/powerunits_timescale_read_operator_v1.md` | Timescale tool env gates and scope. |
 | `docs/powerunits_repo_b_read_operator_v1.md` | Repo B allowlisted read (`read_powerunits_repo_b_allowlisted`); env-gated. |
+| `docs/powerunits_bounded_flags_consolidated_v1.md` | Consolidated bounded env naming & migration table. |
+| `docs/powerunits_market_features_bounded_de_operator_v1.md` | Bounded DE `market_features_hourly` Hermes tools (separate from PL Option D). |
+| `docs/powerunits_market_driver_features_bounded_de_operator_v1.md` | Bounded DE `market_driver_features_hourly` Hermes tools (separate from market-features DE + Option D). |
 | `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (Hermes POST to Repo B; read-only, DE). |
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual browser/preview smoke (read-only; no Hermes URL fetch). |
 | `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
@@ -107,6 +110,21 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Execute gate off:** with execute flag falsy, execute tool absent or returns `feature_disabled` — no Repo B HTTP from that tool path.
 - [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
 
+### Bounded DE market features hourly (Hermes → Repo B; optional)
+
+- [ ] **Separate from Option D:** `HERMES_POWERUNITS_OPTION_D_*` unchanged; DE bounded market-features use **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED`** (**recommended**) or legacy **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*`** per tool.
+- [ ] Optional Hermes-side allowlist: **`HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2); unset → implicit **DE** for current tools; empty string → fail-closed for primary-flag path.
+- [ ] **Primary off + all legacy off:** `execute_powerunits_market_features_bounded_de_slice` returns **`feature_disabled`** — no Repo B HTTP.
+- [ ] **Primary on:** all four bounded market-features tools qualify (with base URL + bearer); **`≤24h`** execute POST body includes **`country_code: "DE"`**.
+- [ ] **Legacy granular:** enabling only **`…_DE_EXECUTE_ENABLED`** still does **not** expose validate/readiness/summary until their legacy keys or **`MARKET_FEATURES_BOUNDED_ENABLED`** is set.
+
+### Bounded DE market driver features hourly (Hermes → Repo B; optional)
+
+- [ ] **Distinct family:** **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED`** (**recommended**) or legacy **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_*`** — does **not** enable **`HERMES_POWERUNITS_MARKET_FEATURES_*`** or **`HERMES_POWERUNITS_OPTION_D_*`**.
+- [ ] Optional: **`HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ALLOWED_COUNTRIES`** — same semantics as market-features (`DE` implicit when unset).
+- [ ] **Gate off:** all primary + legacy driver flags falsy → execute returns **`feature_disabled`**.
+- [ ] **Primary on:** all four driver tools qualify; POST to **`…/market-driver-features-hourly/recompute`** with **`country_code: "DE"`**; expect **`downstream_not_auto_triggered`**.
+
 ### Bounded baseline layer-coverage preview (read-only; optional)
 
 - [ ] **Feature gate:** with `HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED` falsy, `preview_powerunits_baseline_layer_coverage_de` absent or returns **`feature_disabled`** — no Repo B HTTP.
@@ -133,6 +151,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Timescale:** set `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` to falsy / unset to drop DB reads without redeploying Hermes logic.
 - [ ] **Repo B read:** unset or falsify `HERMES_POWERUNITS_REPO_B_READ_ENABLED` (see Repo B read subsection).
 - [ ] **Bounded ERA5:** unset or falsify `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_*_ENABLED` flags to drop the Hermes HTTP surface without changing Repo B.
+- [ ] **Bounded DE market features:** unset or falsify `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*_ENABLED` (execute/validate/readiness/summary as needed) without touching PL Option D flags.
 - [ ] **Policy:** do not remove `first_safe_v1` casually; rollback to prior image/env snapshot per your Railway practice, then re-run this validation pack.
 
 ---
