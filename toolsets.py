@@ -500,6 +500,31 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_outage_awareness_bounded_validate": {
+        "description": (
+            "Bounded **outage awareness** **validate-window** (read-only, v1 DE, ≤7d): one POST to "
+            "`/internal/hermes/bounded/v1/outage-awareness/validate-window` — `outage_country_hourly` + "
+            "overlapping `market_generation_outage_events`; **no** outage ingestion job, **no** "
+            "`outage_country_hourly_job`, **no** `market_feature_job` / driver job. "
+            "**Primary:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED` (+ optional "
+            "`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`; "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`."
+        ),
+        "tools": ["validate_powerunits_outage_awareness_bounded_window"],
+        "includes": [],
+    },
+
+    "powerunits_outage_awareness_bounded_summary": {
+        "description": (
+            "Bounded **outage awareness** **summary-window** (read-only, v1 DE, ≤7d): one POST to "
+            "`/internal/hermes/bounded/v1/outage-awareness/summary-window`; same semantics as validate + "
+            "operator rollup. **Primary** or legacy **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`**."
+        ),
+        "tools": ["summarize_powerunits_outage_awareness_bounded_window"],
+        "includes": [],
+    },
+
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
             "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
@@ -585,6 +610,20 @@ TOOLSETS = {
             "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
         ),
         "tools": ["preview_powerunits_baseline_layer_coverage_de"],
+        "includes": [],
+    },
+
+    "powerunits_de_stack_remediation_planner": {
+        "description": (
+            "Bounded DE stack **remediation planner** (read-only, v1): one HTTP POST to "
+            "`/internal/hermes/bounded/v1/remediation/de-stack-plan` — aggregates Repo B bounded scans "
+            "(ENTSO‑E market, ERA5, baseline preview, rolled-up market‑features/driver summaries, forecast "
+            "validation). **Starts no jobs.** `recommended_sequence[].tool_hint_hermes` are operator "
+            "**suggestions**, not autonomous execution. "
+            "Requires HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED plus POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+        ),
+        "tools": ["plan_powerunits_de_stack_remediation"],
         "includes": [],
     },
 

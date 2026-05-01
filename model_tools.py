@@ -66,6 +66,8 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_entsoe_forecast_bounded_execute",
     "powerunits_entsoe_forecast_bounded_validate",
     "powerunits_entsoe_forecast_bounded_summary",
+    "powerunits_outage_awareness_bounded_validate",
+    "powerunits_outage_awareness_bounded_summary",
     "powerunits_era5_weather_bounded_preflight",
     "powerunits_era5_weather_bounded_execute",
     "powerunits_era5_weather_bounded_validate",
@@ -73,6 +75,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_era5_weather_bounded_campaign",
     "powerunits_era5_weather_bounded_coverage_scan",
     "powerunits_baseline_layer_preview",
+    "powerunits_de_stack_remediation_planner",
 )
 
 
