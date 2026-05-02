@@ -1,7 +1,7 @@
 """
 Shared local slice validation for bounded ERA5 weather sync Hermes tools (allowlisted ISO2 / v1 / ≤7d).
 
-Keep allowlist in sync with Repo B ``hermes_bounded_era5_countries.ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1``.
+Keep allowlist in sync with Repo B Tier‑1 (see ``powerunits_era5_tier1_countries``).
 No registry.register.
 """
 
@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-# Mirror Repo B: backend/services/internal/hermes_bounded_era5_countries.py
-ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1: frozenset[str] = frozenset({"DE", "FR"})
+from tools.powerunits_era5_tier1_countries import (
+    ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1,
+)
 
 _MAX_SUBWINDOW_DAYS = 7
 _MAX_CAMPAIGN_SPAN_DAYS = 31

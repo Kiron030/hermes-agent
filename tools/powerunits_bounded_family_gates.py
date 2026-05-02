@@ -21,6 +21,9 @@ from __future__ import annotations
 import os
 from typing import Literal
 
+from tools.powerunits_era5_tier1_countries import (
+    ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1 as BOUNDED_SLICE_ERA5_WEATHER_ISO2_V1,
+)
 MarketFeaturesStep = Literal["execute", "validate", "readiness", "summary"]
 MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
 EntsoeMarketBoundedStep = Literal["preflight", "execute", "validate", "summary"]
@@ -121,10 +124,6 @@ ERA5_WEATHER_BOUNDED_LEGACY_ENV: dict[Era5WeatherBoundedStep, str] = {
     "summary": "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED",
 }
 _ERA5_LEGACY = ERA5_WEATHER_BOUNDED_LEGACY_ENV
-
-# Mirror Repo B ``hermes_bounded_era5_countries.ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1`` for
-# bounded-era5 slice validation paths (Hermes local preflight + legacy execute request guard).
-BOUNDED_SLICE_ERA5_WEATHER_ISO2_V1: frozenset[str] = frozenset({"DE", "FR"})
 
 # Implicit single-country fallback for primary allowlists across **DE-implicit** bounded families.
 _IMPL_COUNTRY = "DE"
@@ -241,14 +240,22 @@ def outage_repair_bounded_gate_requirement_text(step: OutageRepairBoundedStep) -
 
 def era5_weather_bounded_core_step_enabled(step: Era5WeatherBoundedStep) -> bool:
     if _truthy(_ERA5_PRIMARY):
-        return _impl_country_allowed(_ERA5_ALLOWED)
+        # Primary path: fail-closed only when **`ALLOWED`** is explicitly set to blank.
+        # If the env var is **absent**, `era5_weather_bounded_request_country_permitted()` still
+        # defaults outbound ISO2 narrowing to `{DE}`. Any **non‑empty** list opens the ERA5 bounded
+        # tool surface (narrowing enforced per-request against Tier‑1 ∩ allowlist).
+        if _ERA5_ALLOWED in os.environ and not (os.getenv(_ERA5_ALLOWED) or "").strip():
+            return False
+        return True
     return _truthy(_ERA5_LEGACY[step])
 
 
 def era5_weather_bounded_gate_requirement_text(step: Era5WeatherBoundedStep) -> str:
     return (
         f"{_ERA5_PRIMARY} (recommended) or legacy {_ERA5_LEGACY[step]}; "
-        f"when using primary optionally {_ERA5_ALLOWED} (implicit DE when unset)"
+        f"when using primary optionally {_ERA5_ALLOWED} (**unset ⇒ implicit DE-only narrowing per HTTP "
+        "request**; explicitly empty disallowlist ⇒ fail‑closed;"
+        " any **non‑empty comma list ⇒ tool surface open**, intersection against Tier‑1 at request)"
     )
 
 

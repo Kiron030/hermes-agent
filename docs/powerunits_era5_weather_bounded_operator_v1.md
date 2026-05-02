@@ -2,7 +2,15 @@
 
 ## Country / version
 
-**DE** and **`version=v1`** only — matches Repo B bounded `era5_weather_job` contract (ADR 043).
+**Tier‑1** bounded `country_code` values equal Repo B **`ERA5_COUNTRY_BBOXES`** keys (**19** ISO2; **`UK` is not a key — use `GB`**).
+
+Sorted set: AT, BE, CZ, DE, DK, ES, FI, FR, GB, HU, IE, IT, NL, NO, PL, PT, RO, SE, SK.
+
+Repo‑B allowlist **`ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1`** is derived from that dict; ISO2 codes without an existing bbox remain **disallowed** until `ERA5_COUNTRY_BBOXES` gains an entry.
+
+**Hermes narrowing:** when **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** is truthy (primary path), **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** restricts which Tier‑1 codes may reach Repo B **(intersection of Tier‑1 and allowlist, per HTTP request)**. **Unset** env var ⇒ **implicit `{DE}`** only; setting the var to **`""`** (explicit empty string) ⇒ **fail‑closed** for ERA5 bounded tools altogether. **Any non-empty comma list ⇒ tools unlocked** (countries outside Tier‑1 or outside the intersection are blocked at slice/preflight/execute guards). Legacy-only configs ignore this allowlist.
+
+**Version:** **`version=v1`** — bounded `era5_weather_job` contract (ADR 043).
 
 ## Live path (Hermes)
 
@@ -17,7 +25,7 @@ Same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** and **`POWERUNITS_HERMES_INTERNA
 
 Tool: **`scan_powerunits_era5_weather_bounded_coverage_de`** (toolset **`powerunits_era5_weather_bounded_coverage_scan`**) → **`POST …/era5-weather/coverage-scan`**.
 
-- **DE** / **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded ERA5 campaign partitioning.
+- One **Tier‑1** **`country_code`** / **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded ERA5 campaign partitioning.
 - **Read-only:** **no** `era5_weather_job` / bounded recompute, **no** `market_feature_job`, **no** `market_driver_feature_job`. Response includes **`hermes_statement`: `read_only_scan_no_writes`** and per-sub-window checks on **`weather_country_hourly`** (same semantics as validate-window).
 - **`rollup.suggested_next_bounded_action`** is produced by **Repo B only**; Hermes forwards the JSON and does **not** add local remediation suggestions (see tool `hermes_statement` in outputs on parse errors as well).
 - Gated separately: **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED`** (plus same base URL and bearer as other bounded ERA5 POSTs).
@@ -42,7 +50,7 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 
 ## Slice rules (v1)
 
-- `country_code` = **DE**, `version` = **v1**
+- **`country_code`** any **Tier‑1** ISO2 (see **Country / version** section); **`version`** = **v1**
 - `window_start_utc` inclusive, `window_end_utc` exclusive, duration **> 0** and **≤ 7 days** UTC
 
 ## Railway / Hermes env

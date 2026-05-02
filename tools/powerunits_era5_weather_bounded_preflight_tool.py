@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ERA5 weather sync (DE/FR slices / v1 / ≤7d).
+Hermes local **preflight** for bounded ERA5 Tier‑1 slices (ISO2 from Repo B `ERA5_COUNTRY_BBOXES` mirror) / v1 / ≤7d.
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED``.

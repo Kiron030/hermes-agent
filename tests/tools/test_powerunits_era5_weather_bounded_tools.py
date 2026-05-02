@@ -209,6 +209,64 @@ def test_legacy_execute_allows_fr_without_primary_allowlist(monkeypatch: pytest.
     assert out["success"] is True
 
 
+def test_preflight_primary_allows_pt_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "PT")
+    out = json.loads(
+        pre_mod.preflight_powerunits_era5_weather_bounded_slice(
+            country="PT",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("syntactically_valid") is True
+    assert out.get("slice", {}).get("country") == "PT"
+
+
+def test_execute_primary_allows_hu_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "HU")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "rid",
+                "correlation_id": "cid",
+                "rows_written": 24,
+                "downstream_not_auto_triggered": ["market_feature_job", "market_driver_feature_job"],
+            }
+        )
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    def fake_post(
+        url: str, headers: dict[str, Any], json_body: dict[str, Any], timeout_s: float
+    ) -> Any:
+        assert json_body["country_code"] == "HU"
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_era5_weather_bounded_slice(
+            country="HU",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
 def test_preflight_primary_implicit_de_blocks_fr(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_era5_bounded_core(monkeypatch)
     monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
@@ -345,7 +403,7 @@ def test_validate_wrong_country(monkeypatch: pytest.MonkeyPatch) -> None:
 
     out = json.loads(
         val_mod.validate_powerunits_era5_weather_bounded_window(
-            country="PL",
+            country="XX",
             start="2024-01-01T00:00:00Z",
             end="2024-01-01T12:00:00Z",
             version="v1",

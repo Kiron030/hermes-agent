@@ -118,7 +118,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 
 ### Bounded ERA5 weather (Hermes → Repo B)
 
-- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with DE / v1 / ≤7d slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool.
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1` → `preflight_powerunits_era5_weather_bounded_slice` with **`country_code` in Repo B Tier‑1 bbox allowlist** (19 ISO2 incl. **`GB`**, not **`UK`**; see operator doc / `ERA5_COUNTRY_BBOXES`) **/ v1 / ≤7d** slice → JSON `syntactically_valid: true`, `bounded_http_operator_hint` names the execute tool. Optional **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** narrows outbound ISO2 when primary path is used (**unset ⇒ implicit DE only**).
 - [ ] **Preflight — legacy:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED=1` with primary off → same preflight behavior.
 - [ ] **Execute gate off:** primary falsy and all four legacy core flags falsy → execute returns **`feature_disabled`** — no Repo B HTTP from that tool path.
 - [ ] **Operator wording:** successful execute JSON includes explicit **no auto** `market_feature_job` / `market_driver_feature_job` reminder (`operator_statement` / Repo B `downstream_not_auto_triggered`).
@@ -153,9 +153,14 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Feature gate:** with `HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED` falsy, `preview_powerunits_baseline_layer_coverage_de` absent or returns **`feature_disabled`** — no Repo B HTTP.
 - [ ] **Gate on:** bounded base URL + bearer set; tool **`preview_powerunits_baseline_layer_coverage_de`** with DE / v1 / ≤31d `[preview_start_utc, preview_end_utc)` → JSON **`preview_attempted: true`**, Repo B **`rollup`**, **`hermes_statement`** reflects **no jobs / no campaigns / read-only preview** (`read_only_baseline_preview_no_jobs` on Repo B). **`rollup.suggested_next_bounded_action`** is Repo B-authored only — Hermes does not append local steps.
 
+### Bounded coverage inventory (multi-country read-only; optional)
+
+- [ ] **Feature gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`** falsy → **`inventory_powerunits_bounded_coverage_v1`** **`feature_disabled`** — no Repo B HTTP.
+- [ ] **Gate on:** **`inventory_powerunits_bounded_coverage_v1`** with **`[window_start_utc, window_end_utc)`**, ≤31 d UTC span, **`country_codes`** (one or several **Tier‑1 bounded ERA5** ISO2, e.g. `DE`, `NL`, `IT` — Repo B denies unknown ERA5 bbox keys with explicit skipped rows); omit **`families`** → Repo B returns **four** default inventory families (**ERA5**, ENTSO‑E **market**, **outage awareness**, ENTSO‑E **forecast**). Expect **`skipped`** rows from Repo B for non‑DE where v1 scanners are DE-only (**market / outage awareness / forecast**); **`repo_b_inventory`** JSON stays canonical (**no Hermes matrix**).
+- [ ] **`export_format=csv`:** response contains **`csv_export`** derived **only** from embedded **`repo_b_inventory.rows`** in the **same turn** (incl. **`warnings_json`**); still **no** workspace persistence requirement.
+
 ### Bounded DE outage awareness (read-only; Hermes → Repo B)
 
-- [ ] **Feature gate:** with **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`** falsy **and** both legacy **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`** / **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`** falsy, **`validate_powerunits_outage_awareness_bounded_window`** / **`summarize_powerunits_outage_awareness_bounded_window`** return **`feature_disabled`** — **no** Repo B HTTP.
 - [ ] **Primary on:** **`validate_powerunits_outage_awareness_bounded_window`** with DE / v1 / ≤7 d **`[start, end)`** → **`validation_attempted: true`**, Repo B **`hermes_statement`** indicates **read-only** / **no writes**; response includes **`checks`**, **`warnings`**, **`semantics_notes`** as applicable; **Hermes does not start** outage ingestion, **`outage_country_hourly` recompute**, **`market_feature_job`**, or **`market_driver_feature_job`**.
 - [ ] **Summary:** **`summarize_powerunits_outage_awareness_bounded_window`** same slice → **`summary_attempted: true`**, **`outcome_class`** set; still **no jobs** via this path.
 - [ ] **Primary + empty allowlist:** **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES=`** (empty) with primary truthy → **fail-closed** (**`feature_disabled`**).
@@ -196,6 +201,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Bounded ENTSO-E / ERA5:** unset or falsify **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`** / **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`** and legacy **`…_PREFLIGHT/_EXECUTE/_VALIDATE/_SUMMARY_ENABLED`** as needed to drop Hermes HTTP for those families without changing Repo B. **Forecast:** **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`** and its four legacy **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_*_ENABLED`** are **separate** — drop them independently of market ERA5/market-sync flags. Campaign and coverage-scan modifiers remain separate.
 - [ ] **Bounded DE market features:** unset or falsify `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_*_ENABLED` (execute/validate/readiness/summary as needed) without touching PL Option D flags.
 - [ ] **Bounded DE stack planner:** falsify **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** to drop **`plan_powerunits_de_stack_remediation`** Hermes POSTs independently of other bounded flags.
+- [ ] **Bounded coverage inventory:** falsify **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`** to drop **`inventory_powerunits_bounded_coverage_v1`** (read-only aggregator) without changing other bounded flags.
 - [ ] **Bounded outage awareness (read-only):** falsify **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`** and legacy **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_VALIDATE_ENABLED`** / **`HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED`** to drop outage-awareness Hermes POSTs — **no** Repo B job impact (read-only surface only).
 - [ ] **Bounded outage repair:** falsify **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED`** and legacy **`HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED`** to drop outage-repair executes — does **not** stop Repo B ingestion when invoked elsewhere.
 
