@@ -155,9 +155,11 @@ def execute_powerunits_entsoe_market_bounded_slice(
                 "surface": _SURFACE,
                 "slice": None,
                 "validation_messages": [
-                    f"Country `{cc}` not permitted under current bounded ENTSO-E market gates: extend "
-                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "execution_attempted": False,
                 "success": False,
@@ -274,9 +276,9 @@ EXECUTE_ENTSOE_SCHEMA = {
     "name": "execute_powerunits_entsoe_market_bounded_slice",
     "description": (
         "**Bounded ENTSO-E market sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (Repo B **`DE`** or **`NL`** Tier v1, ≤7 d UTC). "
+        f"`{_EXECUTE_PATH}` (Repo B mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`**, **`v1`** / ≤7 d UTC). "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or legacy `{_LEGACY_ENV}`; "
-        f"optional `{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**unset ⇒ implicit DE-only**); "
+        f"optional `{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); "
         f"{_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {

@@ -164,8 +164,9 @@ def execute_powerunits_entsoe_forecast_bounded_slice(
                 "error_code": "country_not_permitted",
                 "validation_messages": [
                     (
-                        "country not permitted under current Hermes "
-                        f"{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}"
+                        f"Country `{cc}` rejected by **`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
                     ),
                 ],
                 "execution_attempted": False,
@@ -287,10 +288,10 @@ EXECUTE_ENTSOE_FORECAST_SCHEMA = {
     "name": "execute_powerunits_entsoe_forecast_bounded_slice",
     "description": (
         "**Bounded ENTSO-E forecast execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d UTC). "
+        f"`{_EXECUTE_PATH}` (Repo B mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d UTC). "
         "F3b+F4 hourly forecast ingestion only. "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or legacy `{_LEGACY_ENV}`; "
-        f"optional `{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
+        f"optional `{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",

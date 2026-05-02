@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Hermes bounded ENTSO-E forecast **validate-window** — one HTTP POST to Repo B.
 """
@@ -188,8 +188,9 @@ def validate_powerunits_entsoe_forecast_bounded_window(
                 "error_code": "country_not_permitted",
                 "validation_messages": [
                     (
-                        "country not permitted under current Hermes "
-                        f"{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}"
+                        f"Country `{cc}` rejected by **`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
                     ),
                 ],
                 "validation_attempted": False,
@@ -332,12 +333,12 @@ VALIDATE_ENTSOE_FORECAST_SCHEMA = {
     "description": (
         "**Bounded ENTSO‑E forecast validate-window** — one HTTP **`POST …/entsoe-forecast/validate-window`** "
         "(**not** `…/entsoe-market-sync/validate-window`; not `validate_powerunits_entsoe_market_bounded_window`). "
-        "Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d. Counts **`market_entsoe_load_forecast_hourly`** (F3b) "
+        "Repo B mirrored Tier‑v1 ISO2 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d. Counts **`market_entsoe_load_forecast_hourly`** (F3b) "
         "and **`market_entsoe_wind_solar_forecast_hourly`** (F4) — **not** **`market_demand_hourly`** / "
         "**`market_prices_day_ahead`** / **`market_generation_by_type_hourly`**. "
         "Delivery hour **`delivery_start_utc`**; Wind/Solar long-format per `technology`. "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
-        f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
+        f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",

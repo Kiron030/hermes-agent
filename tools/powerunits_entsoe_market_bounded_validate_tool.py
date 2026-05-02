@@ -164,9 +164,11 @@ def validate_powerunits_entsoe_market_bounded_window(
                 "surface": _SURFACE,
                 "slice": None,
                 "validation_messages": [
-                    f"Country `{cc}` not permitted (Repo B Tier v1 ∩ Hermes narrowing): set "
-                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "validation_attempted": False,
                 "http_status": None,
@@ -294,12 +296,12 @@ def validate_powerunits_entsoe_market_bounded_window(
 VALIDATE_ENTSOE_SCHEMA = {
     "name": "validate_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync validate-window** — Repo B **`DE`** or **`NL`** / v1 / ≤7 d; one HTTP POST. "
+        "**Bounded ENTSO-E market sync validate-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** ≤7 d; one HTTP POST. "
         "Repo B returns counts on **normalized UTC hour-bucket** tables (`market_*_hourly`); raw ENTSO-E "
         "may be sub-hourly but this path persists hourly rows. Generation is long-format by "
         "`technology_group`, so `row_count` ≫ `distinct_timestamps` is normal. "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
-        f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
+        f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",

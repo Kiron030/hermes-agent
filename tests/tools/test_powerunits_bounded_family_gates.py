@@ -138,10 +138,13 @@ def test_entsoe_requested_nl_permitted_when_allowlist_contains_nl(monkeypatch: p
     assert g.entsoe_market_bounded_request_country_permitted("NL") is True
 
 
-def test_entsoe_requested_nl_implicit_permit_when_allowlist_env_unset(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Legacy‑style: primary without explicit allowlist ⇒ per‑request narrowing defaults to Repo B∩implicit DE."""
+def test_entsoe_requested_tier1_permitted_when_primary_allowlist_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Primary with **no** ALLOWED env ⇒ Hermes uses full Repo B Tier‑1 mirror for ENTSO‑E (mirrored frozenset; widens only when Repo B does), alongside unrelated DE‑only legacy bounded families."""
     monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
-    assert g.entsoe_market_bounded_request_country_permitted("NL") is False
+    monkeypatch.delenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    for cc in ("NL", "BE", "FR"):
+        assert g.entsoe_market_bounded_request_country_permitted(cc) is True
+    assert g.entsoe_market_bounded_request_country_permitted("ES") is False
 
 
 def test_era5_primary_nonempty_allowlist_without_de_still_unlocks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -198,11 +201,26 @@ def test_entsoe_forecast_nl_permitted_when_primary_allowlists_de_nl(
     assert g.entsoe_forecast_bounded_request_country_permitted("NL") is True
 
 
-def test_entsoe_forecast_nl_implicit_nonmember_when_allowlist_unset(
+def test_entsoe_forecast_tier1_permitted_when_allowlist_env_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
-    assert g.entsoe_forecast_bounded_request_country_permitted("NL") is False
+    monkeypatch.delenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    for cc in ("NL", "BE", "FR"):
+        assert g.entsoe_forecast_bounded_request_country_permitted(cc) is True
+    assert g.entsoe_forecast_bounded_request_country_permitted("IT") is False
+
+
+def test_entsoe_market_and_forecast_tier1_mirrors_stay_identical() -> None:
+    """Guard: Hermes mirrors must track Repo B (market and forecast share the same expanding Tier v1 set)."""
+    from tools.powerunits_entsoe_forecast_bounded_countries import (
+        ALLOWED_BOUNDED_ENTSOE_FORECAST_COUNTRY_CODES_V1 as fc,
+    )
+    from tools.powerunits_entsoe_market_bounded_countries import (
+        ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1 as mc,
+    )
+
+    assert mc == fc
 
 
 def test_outage_awareness_primary_unlocks_validate_and_summary(monkeypatch: pytest.MonkeyPatch) -> None:

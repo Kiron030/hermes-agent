@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ENTSO-E market sync (Repo B DE/NL v1, ≤7d).
+Hermes local **preflight** for bounded ENTSO-E market sync (Repo B Tier‑v1 ISO2 bundle, ≤7d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED``.
@@ -62,7 +62,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
         "bounded_http_operator_hint": (
             "Live path: preflight (this tool) → execute_powerunits_entsoe_market_bounded_slice → "
             "validate_powerunits_entsoe_market_bounded_window → summarize_powerunits_entsoe_market_bounded_window. "
-            "Repo B runs entsoe_market_job.run for the requested bounded ISO2 (DE / NL v1 Tier); "
+            "Repo B runs entsoe_market_job.run for the requested Repo B Tier‑v1 ISO2; "
             "v1 readiness-window is planned as a follow-up."
         ),
     }
@@ -92,9 +92,11 @@ def preflight_powerunits_entsoe_market_bounded_slice(
                 "error_code": "country_not_permitted",
                 "syntactically_valid": False,
                 "validation_messages": [
-                    f"Country `{cc}` not permitted under current bounded ENTSO-E gates: extend "
-                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "slice": None,
             },
@@ -121,7 +123,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
 PREFLIGHT_ENTSOE_SCHEMA = {
     "name": "preflight_powerunits_entsoe_market_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E market sync preflight** — local Tier v1 (**`DE`** / **`NL`**) slice / v1 / ≤7 d check only; "
+        "**Bounded ENTSO-E market sync preflight** — local Tier v1 mirrored bundle (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d check only; "
         "no HTTP. "
         f"Gate: `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`."

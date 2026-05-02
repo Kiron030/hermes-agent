@@ -163,9 +163,11 @@ def summarize_powerunits_entsoe_market_bounded_window(
                 "surface": _SURFACE,
                 "slice": None,
                 "summary_messages": [
-                    f"Country `{cc}` not permitted (Repo B Tier v1 ∩ Hermes narrowing): set "
-                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "summary_attempted": False,
                 "http_status": None,
@@ -291,7 +293,7 @@ def summarize_powerunits_entsoe_market_bounded_window(
 SUMMARY_ENTSOE_SCHEMA = {
     "name": "summarize_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync summary-window** — Repo B **`DE`** or **`NL`** / v1 / ≤7 d; one HTTP POST. "
+        "**Bounded ENTSO-E market sync summary-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** ≤7 d; one HTTP POST. "
         "Includes the same **normalized hourly UTC** semantics as validate (see Repo B "
         "`checks.normalized_time_grain` / `semantics_notes`). "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "

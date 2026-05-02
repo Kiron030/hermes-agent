@@ -2,10 +2,11 @@
 
 Design:
 - One **primary** ``HERMES_*_ENABLED`` flag per family (no country suffix).
-- Optional ``HERMES_*_ALLOWED_COUNTRIES`` comma list (uppercase ISO2). **Bounded ENTSO‑E market**, **bounded ENTSO‑E forecast**,
-  and **bounded ERA5** primaries mirror each other (**unset ⇒ implicit DE per request intersection**;
-  **explicit empty** ⇒ fail-closed); other families still use implicit **DE** for **opening** tools
-  when unset (see implementations below).
+- Optional ``HERMES_*_ALLOWED_COUNTRIES`` comma list (uppercase ISO2).
+  **Bounded ENTSO‑E market** / **forecast** primaries (**unset ⇒ full Repo B Tier‑1 mirror**
+  per request; **explicit empty** ⇒ fail-closed when primary is truthy).
+  **Bounded ERA5** primary still narrows (**unset ⇒ implicit DE**); see ``era5_*`` helpers below.
+  Other bounded families retain their implicit **DE** opening behaviour when unset.
 - **Legacy** per-step flags remain supported so existing Railway configs keep working
   until operators migrate (including ENTSO‑E / ERA5 names without `_DE_` suffix).
   Legacy path does **not** consult the allowlist (preserves prior behavior).
@@ -194,19 +195,34 @@ def market_driver_features_bounded_gate_requirement_text(step: MarketDriverStep)
 
 
 def entsoe_market_bounded_request_country_permitted(iso2: str) -> bool:
-    """Repo B Tier v1 ∩ optional Hermes allowlist when ENTSO‑E primary is truthy; legacy ⇒ no narrowing."""
+    """
+    Repo B Tier v1 (Hermes mirror) ∩ optional Hermes allowlist when ENTSO‑E primary is truthy.
+
+    Primary + **unset** ``HERMES_*_ALLOWED_COUNTRIES``: Hermes **does not** narrow beyond Repo B's
+    Tier‑1 frozen set (aligns outbound tools with Repo B code without widening past it).
+
+    Primary + **non‑empty explicit** allowlist: intersection with Repo B Tier‑1 (Hermes narrowing).
+
+    Legacy mode ⇒ ignore allowlist entirely.
+    """
     cc = (iso2 or "").strip().upper()
     if cc not in BOUNDED_ENTSOE_MARKET_ISO2_V1:
         return False
-    if _truthy(_ENTSOE_PRIMARY):
-        return cc in _allowed_countries_for_primary(_ENTSOE_ALLOWED)
-    return True
+    if not _truthy(_ENTSOE_PRIMARY):
+        return True
+    raw = os.getenv(_ENTSOE_ALLOWED)
+    if raw is None:
+        return True
+    if not raw.strip():
+        return False
+    explicit = frozenset(p.strip().upper() for p in raw.split(",") if p.strip())
+    return cc in (explicit & BOUNDED_ENTSOE_MARKET_ISO2_V1)
 
 
 def entsoe_market_bounded_core_step_enabled(step: EntsoeMarketBoundedStep) -> bool:
     if _truthy(_ENTSOE_PRIMARY):
         # Explicit empty ALLOWED ⇒ fail‑closed; **unset** ⇒ tools open — per‑request narrowing via
-        # `entsoe_market_bounded_request_country_permitted` (implicit DE-only when env absent).
+        # `entsoe_market_bounded_request_country_permitted` (**unset allowlist ⇒ full Repo B Tier‑1**).
         if _ENTSOE_ALLOWED in os.environ and not (os.getenv(_ENTSOE_ALLOWED) or "").strip():
             return False
         return True
@@ -216,19 +232,25 @@ def entsoe_market_bounded_core_step_enabled(step: EntsoeMarketBoundedStep) -> bo
 def entsoe_market_bounded_gate_requirement_text(step: EntsoeMarketBoundedStep) -> str:
     return (
         f"{_ENTSOE_PRIMARY} (recommended) or legacy {_ENTSOE_LEGACY[step]}; "
-        f"when using primary optionally {_ENTSOE_ALLOWED} (**unset ⇒ implicit DE-only per slice**; "
-        "explicitly empty disallowlist ⇒ fail‑closed)"
+        f"when using primary optionally {_ENTSOE_ALLOWED} (**omit ⇒ Hermes aligns with Repo B Tier‑1**; "
+        "non‑empty ⇒ intersect for narrowing; explicitly empty disallowlist ⇒ fail‑closed)"
     )
 
 
 def entsoe_forecast_bounded_request_country_permitted(iso2: str) -> bool:
-    """Repo B Tier v1 ∩ optional Hermes allowlist when forecast primary truthy; legacy ⇒ no narrowing."""
+    """Same permit model as bounded ENTSO‑E market: Tier‑1 mirror; optional explicit allowlist narrowing."""
     cc = (iso2 or "").strip().upper()
     if cc not in BOUNDED_ENTSOE_FORECAST_ISO2_V1:
         return False
-    if _truthy(_ENTSOE_FORECAST_PRIMARY):
-        return cc in _allowed_countries_for_primary(_ENTSOE_FORECAST_ALLOWED)
-    return True
+    if not _truthy(_ENTSOE_FORECAST_PRIMARY):
+        return True
+    raw = os.getenv(_ENTSOE_FORECAST_ALLOWED)
+    if raw is None:
+        return True
+    if not raw.strip():
+        return False
+    explicit = frozenset(p.strip().upper() for p in raw.split(",") if p.strip())
+    return cc in (explicit & BOUNDED_ENTSOE_FORECAST_ISO2_V1)
 
 
 def entsoe_forecast_bounded_core_step_enabled(step: EntsoeForecastBoundedStep) -> bool:
@@ -242,8 +264,8 @@ def entsoe_forecast_bounded_core_step_enabled(step: EntsoeForecastBoundedStep) -
 def entsoe_forecast_bounded_gate_requirement_text(step: EntsoeForecastBoundedStep) -> str:
     return (
         f"{_ENTSOE_FORECAST_PRIMARY} (recommended) or legacy {_ENTSOE_FORECAST_LEGACY[step]}; "
-        f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (**unset ⇒ implicit DE-only per slice**; "
-        "explicitly empty disallowlist ⇒ fail‑closed)"
+        f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (**omit ⇒ Hermes aligns with Repo B Tier‑1**; "
+        "non‑empty ⇒ intersect for narrowing; explicitly empty disallowlist ⇒ fail‑closed)"
     )
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Hermes bounded ENTSO-E market sync **campaign v1** — sequential execute + summary
-over contiguous ≤7d windows (Repo B bounded **DE/NL v1 Tier** ISO2 slice), fail-fast.
+over contiguous ≤7d windows (Repo B Tier‑v1 ENTSO‑E ISO2 bundle), fail-fast.
 
 Orchestrates only the existing bounded Repo B HTTP endpoints (no route proliferation).
 
@@ -131,7 +131,7 @@ def campaign_powerunits_entsoe_market_bounded_de(
                 "windows_attempted": 0,
                 "windows_succeeded": 0,
                 "stopped_reason": "campaign_validation_failed",
-                "next_manual_step": "Fix slice parameters (bounded DE or NL ISO2, v1, end > start, span ≤31d, implies ≤5 sub-windows).",
+                "next_manual_step": "Fix slice parameters (mirrored Tier‑v1 ISO2 from Repo B, **`v1`**, end > start, span ≤31d, implies ≤5 sub-windows).",
                 "hermes_statement": base_statement,
             },
             ensure_ascii=False,
@@ -142,9 +142,11 @@ def campaign_powerunits_entsoe_market_bounded_de(
             {
                 "surface": _SURFACE,
                 "validation_messages": [
-                    f"Country `{cc}` not permitted under current bounded ENTSO-E gates: extend "
-                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "campaign": {
                     "country": cc,
@@ -157,7 +159,7 @@ def campaign_powerunits_entsoe_market_bounded_de(
                 "windows_attempted": 0,
                 "windows_succeeded": 0,
                 "stopped_reason": "country_not_permitted",
-                "next_manual_step": "Adjust Railway allowlist so this Tier-v1 ENTSO ISO2 is explicitly permitted.",
+                "next_manual_step": "Broaden **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** (or omit env for full Tier‑1 mirror) while keeping ISO2 on Repo B Tier‑v1 bundle.",
                 "hermes_statement": base_statement,
             },
             ensure_ascii=False,
@@ -324,7 +326,7 @@ CAMPAIGN_ENTSOE_SCHEMA = {
     "name": "campaign_powerunits_entsoe_market_bounded_de",
     "description": (
         "**Bounded ENTSO-E market sync campaign v1** — sequential execute + summary "
-        "for contiguous sub-windows (Repo B Tier v1 ISO2 **DE** or **NL**, each ≤7 d); "
+        "for contiguous sub-windows (Repo B mirrored Tier‑v1 ISO2 bundle; each ≤7 d); "
         "campaign span ≤31 d, ≤5 windows. "
         "Fail-fast on first failed execute or failed summary HTTP/outcome. Requires "
         f"{_FEATURE_ENV} plus `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` (or legacy execute+summary), "
