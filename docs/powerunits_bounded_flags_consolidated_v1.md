@@ -13,6 +13,7 @@ These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor 
 | **ERA5 bounded** | **Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`; same legacy + allowlist + modifier pattern as ENTSO‑E | **Implemented.** |
 | **ENTSO‑E forecast bounded** | **Primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED`; **legacy:** four `*_PREFLIGHT/EXECUTE/VALIDATE/SUMMARY_*`; optional `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`; **no** separate campaign modifier in Hermes v1 | **Implemented** (forecast F3b+F4 only; orthogonal to ENTSO‑E **market** family). |
 | **Baseline preview** | `BASELINE_LAYER_PREVIEW_ENABLED` | Already **single** gate; fits target model as-is. |
+| **Bounded coverage inventory** | **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`** | **Read-only** aggregator — Repo B **`…/coverage-inventory`**; default inventory v1 aggregates **four** Repo B evaluator families (**ERA5**, ENTSO‑E **market**, **outage awareness**, ENTSO‑E **forecast**). Hermes persists **no** inventory matrix (`csv_export` is turn-local only). Requires same bounded execute **base URL** + bearer as other **`internal/hermes/bounded`** tools. |
 | **DE stack remediation planner** | **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** | **Read-only** cross-family aggregator (**one** Repo B planner POST; starts **no** jobs). |
 | **Outage awareness bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_{VALIDATE,SUMMARY}_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES` | **Read-only** Hermes POSTs to **`…/outage-awareness/*`** — **no** outage ingest, **no** hourly outage recompute, **no** market-feature or driver jobs. |
 | **Outage repair bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES`; **legacy:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED` | **Write** bounded path (**Step A + Step B**) via **`…/outage-repair/recompute`**; **no auto** **`market_feature_job`** / **`market_driver_feature_job`**. Separate family from awareness. |
@@ -68,12 +69,14 @@ HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_SUMMARY_ENABLED
 
 Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist ignored on legacy-only**, **unset allowlist ⇒ implicit DE**, **empty allowlist ⇒ fail-closed**) for steps **preflight**, **execute**, **validate**, **summary**.
 
+**Exception — bounded ERA5 weather Tier‑1:** bounded ERA5 tools stay unlocked on primary whenever **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** is **non-empty**, even if **`DE`** is omitted; **explicit empty** still fail-closes. Per-request narrowing still intersects Repo B **`ERA5_COUNTRY_BBOXES`** Tier‑1 with that allowlist (**env var omitted ⇒ `{DE}`** at permit time).
+
 **Modifiers unchanged:** **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED`** / **`…_COVERAGE_SCAN_ENABLED`** and **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED`** / **`…_COVERAGE_SCAN_ENABLED`** remain **separate** — they imply multi-window orchestration or read-only scan semantics beyond a single bounded slice.
 
 ### Migration — ENTSO‑E / ERA5
 
 1. Set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1`** and/or **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**.
-2. Optionally set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES=DE`** (same for ERA5) for explicitness; unset still defaults to **DE** for current Hermes tools.
+2. Optionally set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES=DE`** (still **implicit DE-only** ENTSO narrowing when omitted). **ERA5 Tier‑1:** set **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** to a **non-empty comma list** subset of Repo B **`ERA5_COUNTRY_BBOXES`** keys (**omit unset ⇒ implicit `{DE}`** at request narrowing; **`""` ⇒ Hermes ERA5 bounded tools disable**).
 3. After staging validation, remove redundant legacy **`…_PREFLIGHT_ENABLED`**, **`…_EXECUTE_ENABLED`**, **`…_VALIDATE_ENABLED`**, **`…_SUMMARY_ENABLED`** keys if you want fewer Railway variables — **do not** remove **`…_CAMPAIGN_ENABLED`** / **`…_COVERAGE_SCAN_ENABLED`** where those tools are used.
 
 **Deprecated (still read when primary is falsy):**
@@ -106,6 +109,10 @@ Recommended primary:
 
 - **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1`**
 - Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2; unset ⇒ implicit DE; empty ⇒ fail-closed with primary).
+
+### DE bounded coverage inventory v1 (read-only)
+
+Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`** (same credentials as **`POWERUNITS_INTERNAL_EXECUTE_*`**). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Turning it **off** disables only this tool — it does **not** disable outage awareness reads, outage repair, ENTSO‑E forecast executes, etc. Turning it **on** still performs **zero** writes and stores **no** canonical matrix in Hermes (JSON **`repo_b_inventory`** in the reply is ephemeral; **`csv_export`** is derived **only** from that embedded payload).
 
 ### DE bounded stack remediation planner (read-only)
 

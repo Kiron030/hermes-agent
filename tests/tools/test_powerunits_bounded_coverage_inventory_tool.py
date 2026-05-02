@@ -44,6 +44,7 @@ def test_inventory_http_200_with_csv(monkeypatch: pytest.MonkeyPatch) -> None:
                 "subwindow_index": 0,
                 "status": "ok",
                 "summary_code": "validation_passed",
+                "warnings": [],
                 "coverage_metrics": {"checks": {}},
                 "suggested_next_action": "fine",
                 "tool_hint_hermes": None,
@@ -74,4 +75,6 @@ def test_inventory_http_200_with_csv(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["success"] is True
     assert "DE" in out["chat_summary"]
     assert isinstance(out["csv_export"], str)
-    assert out["csv_export"].splitlines()[0].startswith("country_code,")
+    hdr = out["csv_export"].splitlines()[0]
+    assert hdr.startswith("country_code,")
+    assert "warnings_json" in hdr

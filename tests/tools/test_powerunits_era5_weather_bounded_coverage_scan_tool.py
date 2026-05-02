@@ -50,6 +50,44 @@ def test_era5_coverage_scan_primary_implicit_de_blocks_fr(monkeypatch: pytest.Mo
     assert out["scan_attempted"] is False
 
 
+def test_era5_coverage_scan_primary_allows_es_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _with_coverage_env(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "ES")
+
+    payload = {
+        "correlation_id": "srv-cid",
+        "hermes_statement": "read_only_scan_no_writes",
+        "rollup": {"scan_outcome": "ok", "suggested_next_bounded_action": []},
+        "scanner": "era5_weather_normalized_es_v1",
+        "slice": {},
+        "subwindows": [],
+        "partition": {},
+    }
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(payload)
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert json_body["country_code"] == "ES"
+        return R()
+
+    out = json.loads(
+        scan_mod.scan_powerunits_era5_weather_bounded_coverage_de(
+            scan_start_utc="2024-01-01T00:00:00Z",
+            scan_end_utc="2024-01-08T00:00:00Z",
+            country="ES",
+            _http_post=fake_post,
+        )
+    )
+    assert out["scan_attempted"] is True
+
+
 def test_era5_coverage_scan_local_validation_no_http(monkeypatch: pytest.MonkeyPatch) -> None:
     _with_coverage_env(monkeypatch)
 

@@ -127,7 +127,11 @@ def _chat_summary(rows: list[dict[str, Any]], *, correlation_id: str | None) -> 
         buck = counts[(cc, fam)]
         dominant = max(buck.keys(), key=lambda s: order.get(s, -1))
         parts = ",".join(f"{s}:{buck[s]}" for s in sorted(buck.keys()))
-        short_fam = fam.replace("bounded_", "").replace("_normalized_v1", "")
+        short_fam = (
+            fam.replace("bounded_", "")
+            .replace("_normalized_v1", "")
+            .replace("_v1", "")
+        )
         lines_out.append(f"• **{cc} / {short_fam}** — worst **{dominant}** ({parts})")
     cid = correlation_id or "n/a"
     lines_out.append("")
@@ -151,6 +155,7 @@ def _rows_to_csv(rows: list[dict[str, Any]]) -> str:
         "subwindow_index",
         "status",
         "summary_code",
+        "warnings_json",
         "rollup_scan_outcome",
         "tool_hint_hermes",
         "suggested_next_action",
@@ -160,6 +165,7 @@ def _rows_to_csv(rows: list[dict[str, Any]]) -> str:
     w.writerow(cols)
     for row in rows:
         metrics = json.dumps(row.get("coverage_metrics") or {}, ensure_ascii=False)
+        warnings = json.dumps(row.get("warnings") or [], ensure_ascii=False)
         w.writerow(
             [
                 row.get("country_code"),
@@ -172,6 +178,7 @@ def _rows_to_csv(rows: list[dict[str, Any]]) -> str:
                 row.get("subwindow_index"),
                 row.get("status"),
                 row.get("summary_code"),
+                warnings,
                 row.get("rollup_scan_outcome"),
                 row.get("tool_hint_hermes"),
                 row.get("suggested_next_action"),
@@ -195,7 +202,10 @@ def inventory_powerunits_bounded_coverage_v1(
     stmt = (
         "Hermes performed no direct SQL. One read-only POST to Repo B "
         "`/internal/hermes/bounded/v1/coverage-inventory` — aggregates bounded coverage-scan "
-        "evaluators server-side (**no writes**, **no campaigns**)."
+        "evaluators for **ERA5 weather**, ENTSO‑E **market**, **outage awareness** "
+        "(read-only), and ENTSO‑E **forecast** (delivery-hour semantics, long-format Wind/Solar in "
+        "Repo `checks`; **same `families` default as Repo B**) server-side (**no writes**, "
+        "**no campaigns**)."
     )
 
     if not check_powerunits_bounded_coverage_inventory_requirements():
@@ -365,8 +375,8 @@ def inventory_powerunits_bounded_coverage_v1(
         "request_echo": {"path": _INVENTORY_PATH, "body": body_doc, "gate_env": BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV},
         "csv_export": export_csv_body,
         "hint_export": (
-            "`csv_export` is derived-only from `repo_b_inventory.rows` in **this response** "
-            "(no persisted matrix)."
+            "`csv_export` is derived-only from `repo_b_inventory.rows` in **this response**, including "
+            "column **`warnings_json`** (same turn as Repo B payload; **no persisted matrix**)."
         ),
     }
 
@@ -388,13 +398,13 @@ def inventory_powerunits_bounded_coverage_v1(
 INVENTORY_BOUNDED_SCHEMA = {
     "name": "inventory_powerunits_bounded_coverage_v1",
     "description": (
-        "**Bounded multi-country coverage inventory (Repo B read-only)** — aggregates "
-        "`bounded_era5_weather_normalized_v1` and "
-        "`bounded_entsoe_market_normalized_v1` via Repo B bounded evaluators "
-        "(`coverage-inventory`). No writes/jobs — **Hermes caches no authoritative matrix**; rerun "
-        f"after repairs. Requires `{BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV}`, "
-        f"{_BASE_ENV}, {_SECRET_ENV}. Optional `export_format=csv` returns `csv_export` derived from "
-        "the same embedded `repo_b_inventory.rows` only."
+        "**Bounded multi-country coverage inventory (Repo B read-only)** — Repo B **`bounded_coverage_inventory_v1`** "
+        "default families: `bounded_era5_weather_normalized_v1`, `bounded_entsoe_market_normalized_v1`, "
+        "`bounded_outage_awareness_v1`, `bounded_entsoe_forecast_v1`. Outage semantics (missing vs empty vs stale) "
+        "and ENTSO‑E forecast delivery-hour semantics (incl. long-format Wind/Solar notes in `checks`) are **Repo B**-grounded "
+        "(Hermes forwards JSON only). No writes/jobs — **Hermes caches no authoritative matrix**; rerun after repairs. Requires "
+        f"`{BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV}`, {_BASE_ENV}, {_SECRET_ENV}. "
+        '`export_format="csv"` → `csv_export` with column **`warnings_json`** from the **same** `repo_b_inventory.rows`; no side store.'
     ),
     "parameters": {
         "type": "object",
@@ -408,7 +418,13 @@ INVENTORY_BOUNDED_SCHEMA = {
                 "description": "Exclusive UTC ISO-8601 with Z (max 31d span vs start, Repo B-validated).",
             },
             "country_codes": {
-                "description": "ISO country codes (`[\"DE\",\"FR\"]`) OR comma-separated `DE,FR`.",
+                "description": (
+                    "One or many ISO2 codes. **ERA5 family** evaluates each Tier‑1 code Repo B permits "
+                    "(see Repo B ``ERA5_COUNTRY_BBOXES`` / bounded allowlist); unknown ISO2 → Repo B "
+                    "**skipped** row for ERA5 with allowlist rationale. ENTSO‑E market / outage / forecast "
+                    "inventory rows remain **DE-only skipped** off DE. CSV or comma string (e.g. "
+                    '`["DE","IT","ES"]` or `DE,IT`).'
+                ),
                 "oneOf": [
                     {"type": "array", "items": {"type": "string"}},
                     {"type": "string"},
@@ -417,15 +433,20 @@ INVENTORY_BOUNDED_SCHEMA = {
             "families": {
                 "type": "array",
                 "description": (
-                    "Optional subset; allowed v1 ids: `bounded_era5_weather_normalized_v1`, "
-                    "`bounded_entsoe_market_normalized_v1`. Omit or empty → Repo B defaults."
+                    "Optional subset; Repo B inventory v1 family ids — **all four defaults** when omitted: "
+                    "`bounded_era5_weather_normalized_v1`, `bounded_entsoe_market_normalized_v1`, "
+                    "`bounded_outage_awareness_v1`, `bounded_entsoe_forecast_v1`. "
+                    "Non-DE countries yield explicit **`skipped`** rows where Repo B inventory v1 is DE-only: ENTSO‑E market, outage awareness, ENTSO‑E forecast (`summary_code` explains each skip)."
                 ),
                 "items": {"type": "string"},
             },
             "version": {"type": "string", "description": "v1.", "default": "v1"},
             "export_format": {
                 "type": "string",
-                "description": 'Optional. Set to "csv" to fill `csv_export` from Repo B rows in this response.',
+                "description": (
+                    'Optional. Set export_format to the string csv to populate csv_export from Repo B rows '
+                    "in **this single response**, including JSON column warnings_json (no Hermes persistence)."
+                ),
             },
         },
         "required": ["window_start_utc", "window_end_utc", "country_codes"],

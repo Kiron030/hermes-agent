@@ -125,10 +125,17 @@ def test_entsoe_primary_exclude_de_closes(monkeypatch: pytest.MonkeyPatch) -> No
     assert g.entsoe_market_bounded_core_step_enabled("execute") is False
 
 
-def test_era5_primary_exclude_de_closes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_era5_primary_nonempty_allowlist_without_de_still_unlocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ERA5 Tier-1 rollout: allowlist needs not contain DE — only fail-closed on explicit empty."""
     monkeypatch.setenv(g.ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.setenv(g.ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "AT,NL")
-    assert g.era5_weather_bounded_core_step_enabled("summary") is False
+    assert g.era5_weather_bounded_core_step_enabled("summary") is True
+
+
+def test_era5_requested_nl_permitted_when_primary_allowlists_nl(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL")
+    assert g.era5_weather_bounded_request_country_permitted("NL") is True
 
 
 def test_entsoe_forecast_primary_unlocks_preflight_through_summary(monkeypatch: pytest.MonkeyPatch) -> None:

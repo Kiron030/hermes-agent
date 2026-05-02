@@ -646,9 +646,10 @@ TOOLSETS = {
     "powerunits_bounded_coverage_inventory": {
         "description": (
             "**Bounded coverage inventory (multi-country read-only)** — one HTTP POST to "
-            "`/internal/hermes/bounded/v1/coverage-inventory` (Repo B). Aggregates ERA5 normalized + "
-            "ENTSO‑E **market** evaluators where inventory v1 applies; skips FR for ENTSO‑E market DE-only "
-            "semantics inside Repo B responses. Requires `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`, "
+            "`/internal/hermes/bounded/v1/coverage-inventory` (Repo B). Default v1 families: ERA5 normalized, "
+            "ENTSO‑E **market** (DE scanners for inventory), DE‑only **outage awareness** inventory rows, "
+            "ENTSO‑E **forecast** (delivery‑hour semantics; DE‑scanner inventory rows). Non‑DE ⇒ explicit "
+            "`skipped` rows for DE‑only families. Requires `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`, "
             "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. "
             "**No Hermes-side matrix**, no writes — rerun after bounded repairs."
         ),
