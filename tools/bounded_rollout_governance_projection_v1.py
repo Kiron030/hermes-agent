@@ -220,10 +220,27 @@ def compute_hermes_allowed_now_v1(*, family: str, country_code: str) -> dict[str
     raise ValueError(f"unknown governance family for Hermes overlay: {family!r}")
 
 
+def _entso_bounded_allowlist_narrowing_hint(family: str) -> str | None:
+    """When Repo B is open but Hermes execute/validate gates close, Railway allowlists are a common cause."""
+    if family == ENTSOE_MARKET_FAMILY:
+        return (
+            "narrowing_hint:omit_HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_for_full_Tier1_mirror_intersection"
+            " (non-empty_list_intentionally_narrow; explicit_empty_fail_closed)"
+        )
+    if family == ENTSOE_FORECAST_FAMILY:
+        return (
+            "narrowing_hint:omit_HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_for_full_Tier1_mirror_intersection"
+            " (non-empty_list_intentionally_narrow; explicit_empty_fail_closed)"
+        )
+    return None
+
+
 def _cross_layer_effective(row: dict[str, Any], hnow: dict[str, Any]) -> tuple[str, str | None]:
     """Hermes-informed status; does not redefine Repo truth keys."""
     if not row.get("repo_b_allowed"):
         return str(row.get("effective_status") or ""), row.get("blocking_reason")
+
+    family_s = str(row.get("family") or "")
 
     ex_r = bool(row.get("execute_ready"))
     ex_h = hnow.get("execute_tool_open") is True
@@ -232,9 +249,17 @@ def _cross_layer_effective(row: dict[str, Any], hnow: dict[str, Any]) -> tuple[s
     va_h = hnow.get("validate_tool_open") is True
 
     if ex_r and not ex_h:
-        return "repo_execute_ready_hermes_gated", "hermes_gate_or_allowlist_blocks_execute_tool_surface"
+        msg = "hermes_gate_or_allowlist_blocks_execute_tool_surface"
+        hint = _entso_bounded_allowlist_narrowing_hint(family_s)
+        if hint:
+            msg = f"{msg}; {hint}"
+        return "repo_execute_ready_hermes_gated", msg
     if va_r and not va_h:
-        return "repo_validate_ready_hermes_gated", "hermes_gate_blocks_validate_tool_surface"
+        msg = "hermes_gate_blocks_validate_tool_surface"
+        hint = _entso_bounded_allowlist_narrowing_hint(family_s)
+        if hint:
+            msg = f"{msg}; {hint}"
+        return "repo_validate_ready_hermes_gated", msg
 
     if ex_r and ex_h:
         return "bounded_execute_open_repo_b_and_hermes", None

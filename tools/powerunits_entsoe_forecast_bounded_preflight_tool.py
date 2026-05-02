@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ENTSO-E **forecast** sync (Tier v1 **`DE`** / **`NL`**, `v1`, ≤7 d).
+Hermes local **preflight** for bounded ENTSO-E **forecast** sync (mirrored Tier‑v1 ISO2 bundle vs Repo B, ≤7 d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED``.
@@ -93,9 +93,11 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
                 "error_code": "country_not_permitted",
                 "syntactically_valid": False,
                 "validation_messages": [
-                    f"Country `{cc}` not permitted under bounded ENTSO-E forecast gates "
-                    f"({ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}; "
-                    "**unset allowlist ⇒ implicit DE-only narrowing**)."
+                    (
+                        f"Country `{cc}` rejected by **`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With **`{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}`**: "
+                        "**omit allowlist** ⇒ Tier‑1 matches Repo B bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "slice": None,
             },
@@ -122,7 +124,7 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
 PREFLIGHT_ENTSOE_FORECAST_SCHEMA = {
     "name": "preflight_powerunits_entsoe_forecast_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E forecast preflight** — local Tier v1 (**`DE`** / **`NL`**) / **`v1`** / ≤7 d slice check only; no HTTP. "
+        "**Bounded ENTSO-E forecast preflight** — local Tier v1 mirror (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d slice check only; no HTTP. "
         f"Gate: `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
     ),

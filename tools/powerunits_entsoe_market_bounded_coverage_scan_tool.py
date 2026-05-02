@@ -148,9 +148,10 @@ def scan_powerunits_entsoe_market_bounded_coverage_de(
                 "surface": _SURFACE,
                 "error_code": "country_not_permitted",
                 "scan_messages": [
-                    f"Country `{cc}` not permitted (Repo B Tier v1 ∩ Hermes narrowing): extend "
-                    f"`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` when primary "
-                    "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` is used (**omit env ⇒ implicit DE-only**)."
+                    (
+                        f"Country `{cc}` rejected by **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** vs Repo B Tier‑1 "
+                        f"(or `{cc}` is outside mirrored Tier‑1). With primary: **omit env** ⇒ Tier‑1 bundle; non‑empty ⇒ intersection; explicit **empty** ⇒ fail‑closed."
+                    ),
                 ],
                 "scan_attempted": False,
                 "http_status": None,
@@ -252,7 +253,7 @@ def scan_powerunits_entsoe_market_bounded_coverage_de(
 SCAN_ENTSOE_SCHEMA = {
     "name": "scan_powerunits_entsoe_market_bounded_coverage_de",
     "description": (
-        "**Bounded ENTSO-E normalized market coverage-scan (read-only, v1 Tier: **DE** / **NL**)** — one HTTP POST. "
+        "**Bounded ENTSO-E normalized market coverage-scan** (read-only; mirrored Repo B Tier‑v1 ISO2 bundle via `country`) — one HTTP POST. "
         "Span ≤31d, partitioned like campaign (≤5 × ≤7d). "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
     ),

@@ -374,7 +374,7 @@ TOOLSETS = {
 
     "powerunits_entsoe_market_bounded_preflight": {
         "description": (
-            "Bounded ENTSO-E market sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
+            "Bounded ENTSO-E market sync **preflight** (Repo B Tier-1 ISO2 **DE/NL/BE/FR** / v1 / ≤7d UTC): local slice check only; "
             "bounded HTTP operator hint. **No** Powerunits HTTP. "
             "**Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (optional "
             "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
@@ -387,9 +387,11 @@ TOOLSETS = {
     "powerunits_entsoe_market_bounded_execute": {
         "description": (
             "Bounded ENTSO-E market sync **execute**: one HTTP POST to "
-            "`/internal/hermes/bounded/v1/entsoe-market-sync/recompute` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/recompute` "
+            "(Repo B Tier‑v1 mirrored ISO2 bundle (**`DE`/`NL`/`BE`/`FR`** — Hermes ≡ Repo B frozenset) / v1 / ≤7 d). "
             "**Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (+ optional "
-            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` — **omit ⇒ full mirrored Tier‑1**; "
+            "non‑empty ⇒ intersection) **or** legacy "
             "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_EXECUTE_ENABLED`; "
             "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`."
         ),
@@ -400,7 +402,8 @@ TOOLSETS = {
     "powerunits_entsoe_market_bounded_validate": {
         "description": (
             "Bounded ENTSO-E market sync **validate-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/entsoe-market-sync/validate-window` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/validate-window` "
+            "(Repo B Tier‑v1 mirrored ISO2 **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d). "
             "Counts are on **normalized UTC hour-bucket** tables; generation is long-format by "
             "technology_group (see Repo B `semantics_notes`). "
             "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_VALIDATE_ENABLED` + "
@@ -413,7 +416,8 @@ TOOLSETS = {
     "powerunits_entsoe_market_bounded_summary": {
         "description": (
             "Bounded ENTSO-E market sync **summary-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/entsoe-market-sync/summary-window` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/entsoe-market-sync/summary-window` "
+            "(Repo B Tier‑v1 mirrored ISO2 **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d). "
             "Same hourly-normalized semantics as validate (compact validation subset). "
             "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_SUMMARY_ENABLED` + "
             "same base URL and bearer."
@@ -424,7 +428,8 @@ TOOLSETS = {
 
     "powerunits_entsoe_market_bounded_campaign": {
         "description": (
-            "Bounded ENTSO-E market sync **campaign (v1 DE)**: sequential execute + summary over "
+            "Bounded ENTSO-E market sync **campaign v1** (mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`** bundle; `_de` suffix is historical): "
+            "sequential execute + summary over "
             "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
             "Requires `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED` plus **primary** "
             "(or legacy execute+summary) for ENTSO-E bounded HTTP primitives, "
@@ -438,7 +443,7 @@ TOOLSETS = {
 
     "powerunits_entsoe_market_bounded_coverage_scan": {
         "description": (
-            "Bounded ENTSO-E market sync **coverage-scan** (read-only, v1 DE): one HTTP POST to "
+            "Bounded ENTSO-E market sync **coverage-scan** (read-only, **`v1`**, mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`**): one HTTP POST to "
             "`/internal/hermes/bounded/v1/entsoe-market-sync/coverage-scan` — multi-subwindow rollup "
             "on normalized hourly ENTSO-E tables (**no** recompute / **no** job triggers). "
             "Span ≤31d partitioned like campaign (≤5 × ≤7d). "
@@ -451,7 +456,7 @@ TOOLSETS = {
 
     "powerunits_entsoe_forecast_bounded_preflight": {
         "description": (
-            "Bounded ENTSO-E **forecast** sync **preflight** (DE / v1 / ≤7d UTC): local slice check; "
+            "Bounded ENTSO-E **forecast** sync **preflight** (Repo B Tier‑v1 mirrored **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d UTC): local slice check; "
             "**no** Powerunits HTTP. F3b+F4 **day-ahead forecasts** only — not realized market. "
             "**Primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED` (optional "
             "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
@@ -464,10 +469,12 @@ TOOLSETS = {
     "powerunits_entsoe_forecast_bounded_execute": {
         "description": (
             "Bounded ENTSO-E forecast **execute**: one HTTP POST to "
-            "`/internal/hermes/bounded/v1/entsoe-forecast/recompute` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/recompute` "
+            "(Repo B Tier‑v1 mirrored ISO2 **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d). "
             "Runs **entsoe_forecast_job** only. **Primary:** "
             "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED` (+ optional "
-            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
+            "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES` — **omit ⇒ full mirrored Tier‑1**; "
+            "non‑empty ⇒ intersection) **or** legacy "
             "`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_EXECUTE_ENABLED`; "
             "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
             "Does **not** run market_feature_job, market_driver_feature_job, expand_market_data, or "
@@ -480,7 +487,7 @@ TOOLSETS = {
     "powerunits_entsoe_forecast_bounded_validate": {
         "description": (
             "Bounded ENTSO‑E **forecast validate-window** (**not** ENTSO‑E market-sync): read-only **`POST`** "
-            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (DE / NL / v1 / ≤7 d). "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (Repo B Tier-1 ISO2 **DE/NL/BE/FR** / v1 / ≤7 d). "
             "Forecast-native tables **`market_entsoe_load_forecast_hourly`**, **`market_entsoe_wind_solar_forecast_hourly`** "
             "— **never** **`market_demand_hourly`** / **`market_prices_day_ahead`** / **`market_generation_by_type_hourly`** "
             "(those belong to **`…/entsoe-market-sync/validate-window`**). "
@@ -493,7 +500,7 @@ TOOLSETS = {
     "powerunits_entsoe_forecast_bounded_summary": {
         "description": (
             "Bounded ENTSO-E forecast **summary-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/entsoe-forecast/summary-window` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/summary-window` (Repo B Tier-1 ISO2 / v1 / ≤7d). "
             "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED` + "
             "same base URL and bearer."
         ),
@@ -668,7 +675,8 @@ TOOLSETS = {
         "description": (
             "**Bounded rollout governance matrix (read-only)** — Repo B authoritative allowlists/routes surfaced as "
             "per-country × family rows; Hermes overlays Railway gate projection into `hermes_allowed_now` locally. "
-            "POST `/internal/hermes/bounded/v1/rollout-governance`. Requires "
+            "POST `/internal/hermes/bounded/v1/rollout-governance`. **`export_format=csv`** returns inline Hermes-derived "
+            "**`csv_export`** (JSON from Repo B stays canonical). Requires "
             "**`HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED`**, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
             "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. **No persisted matrix**, no auto-open actions."
         ),

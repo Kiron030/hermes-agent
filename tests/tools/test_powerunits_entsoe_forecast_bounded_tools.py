@@ -101,6 +101,70 @@ def test_execute_http_200_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["operator_statement"] == "forecast only"
 
 
+@pytest.mark.parametrize("country", ["BE", "FR"])
+def test_execute_http_be_fr_via_primary_allowlist_unset(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.delenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "fcst-be-fr",
+                "correlation_id": "cid",
+                "rows_written": 7,
+                "downstream_not_auto_triggered": ["market_feature_job"],
+                "operator_statement": "forecast only",
+            }
+        )
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-forecast/recompute" in url
+        assert json_body["country_code"] == country
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
+@pytest.mark.parametrize("country", ["BE", "FR"])
+def test_preflight_be_fr_via_primary_allowlist_unset(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.delenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    out = json.loads(
+        pre_mod.preflight_powerunits_entsoe_forecast_bounded_slice(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out["syntactically_valid"] is True
+    assert out.get("error_code") != "country_not_permitted"
+
+
 def test_execute_http_nl_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_fcst_bounded_core(monkeypatch)
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
@@ -296,6 +360,129 @@ def test_preflight_valid_de_via_primary_only(monkeypatch: pytest.MonkeyPatch) ->
     )
     assert out["syntactically_valid"] is True
     assert "execute_powerunits_entsoe_forecast_bounded_slice" in out["bounded_http_operator_hint"]
+
+
+@pytest.mark.parametrize("country", ["BE", "FR"])
+def test_execute_blocked_when_allowlist_de_nl_only_forecast(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    called: list[bool] = []
+
+    def _no_http(*_a: object, **_k: object) -> None:
+        called.append(True)
+        raise AssertionError("unexpected HTTP POST")
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=_no_http,
+        )
+    )
+    assert not called
+    assert out.get("error_code") == "country_not_permitted"
+
+
+@pytest.mark.parametrize("country", ["BE", "FR"])
+def test_validate_via_primary_be_fr_allowlist_unset_forecast(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.delenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    ok_body = json.dumps(
+        {
+            "outcome": "passed",
+            "summary_code": "validation_passed",
+            "warnings": [],
+            "read_target": "primary",
+            "checks": {
+                "market_entsoe_load_forecast_hourly": {"row_count": 1},
+                "market_entsoe_wind_solar_forecast_hourly": {"row_count": 0},
+            },
+        }
+    )
+
+    class R:
+        status_code = 200
+        text = ok_body
+        content = ok_body.encode("utf-8")
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-forecast/validate-window" in url
+        assert json_body["country_code"] == country
+        return R()
+
+    out = json.loads(
+        val_mod.validate_powerunits_entsoe_forecast_bounded_window(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["validation_attempted"] is True
+
+
+@pytest.mark.parametrize("country", ["BE", "FR"])
+def test_summary_via_primary_be_fr_allowlist_unset_forecast(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    from tools import powerunits_entsoe_forecast_bounded_summary_tool as sum_mod
+
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.delenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    ok_body = json.dumps(
+        {
+            "success": True,
+            "outcome_class": "ok",
+            "correlation_id": "cid",
+            "operator_next": "ok",
+        }
+    )
+
+    class R:
+        status_code = 200
+        text = ok_body
+        content = ok_body.encode("utf-8")
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-forecast/summary-window" in url
+        assert json_body["country_code"] == country
+        return R()
+
+    out = json.loads(
+        sum_mod.summarize_powerunits_entsoe_forecast_bounded_window(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["summary_attempted"] is True
 
 
 def test_forecast_slice_accepts_7d() -> None:

@@ -55,7 +55,7 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 
 ## Railway / Hermes env
 
-**Recommended:** **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** (comma-separated Tier‑1 subset; intersects Repo B **`ERA5_COUNTRY_BBOXES`** keys **per HTTP request**; **unset** ⇒ implicit **`DE`**-only narrowing; explicit **`""`** ⇒ ERA5 bounded Hermes surfaces **fail‑closed**). Primary unset ⇒ **legacy** per-step `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` unchanged — **ERA5 rollout note:** Tier‑1 non‑**DE** operates may run without **`DE`** in the allowlist whenever the list is **non‑empty**, unlike bounded ENTSO‑E market (**DE**‑only Repo B slices today).
+**Recommended:** **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** (comma-separated Tier‑1 subset; intersects Repo B **`ERA5_COUNTRY_BBOXES`** keys **per HTTP request**; **unset** ⇒ implicit **`DE`**-only narrowing; explicit **`""`** ⇒ ERA5 bounded Hermes surfaces **fail‑closed**). Primary unset ⇒ **legacy** per-step `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` unchanged — **ERA5 rollout note:** Tier‑1 non‑**DE** operates may run without **`DE`** in the allowlist whenever the list is **non‑empty**, unlike bounded **ENTSO‑E market/forecast** on the primary path (**omit `HERMES_*_ALLOWED_COUNTRIES` ⇒ full mirrored Tier‑v1 bundle**, not implicit **DE**-only).
 
 | Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
 |----------|---------|----------|---------|---------------|-----------|
