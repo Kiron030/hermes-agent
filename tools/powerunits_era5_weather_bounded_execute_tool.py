@@ -25,6 +25,9 @@ from tools.powerunits_bounded_family_gates import (
     era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as _BOUNDED_ISO2_DOC,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,11 +169,11 @@ def execute_powerunits_era5_weather_bounded_slice(
                 "http_status": None,
                 "hermes_statement": base_statement,
                 "message": (
-                    f"Bounded ERA5 Hermes: country `{cc}` not permitted. When "
-                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on, set "
-                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` to include that ISO2 "
-                    "(unset ⇒ implicit **DE** only). Repo B allowlist is authoritative; "
-                    "legacy per-step ERA5 flags ignore this env narrowing."
+                    f"Bounded ERA5 Hermes: country `{cc}` not permitted (Repo B Tier‑1 ∩ Hermes narrowing). "
+                    f"When `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on extend "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` "
+                    "(**env var omitted ⇒ implicit DE-only** narrowing). "
+                    "Legacy per-step ERA5 flags ignore Hermes env narrowing."
                 ),
             },
             ensure_ascii=False,
@@ -294,7 +297,7 @@ EXECUTE_ERA5_SCHEMA = {
     "name": "execute_powerunits_era5_weather_bounded_slice",
     "description": (
         "**Bounded ERA5 weather sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). "
+        f"`{_EXECUTE_PATH}` (Tier‑1 ISO2 / v1 / ≤7d UTC). "
         f"Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}. "
         "On success, Repo B ran era5_weather_job only; market_feature_job and market_driver_feature_job "
@@ -305,7 +308,7 @@ EXECUTE_ERA5_SCHEMA = {
         "properties": {
             "country": {
                 "type": "string",
-                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
+                "description": _BOUNDED_ISO2_DOC,
             },
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},

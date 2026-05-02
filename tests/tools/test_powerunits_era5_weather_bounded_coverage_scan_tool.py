@@ -11,6 +11,9 @@ from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
 )
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as TIER1_ERA5_ISO2_DOC,
+)
 
 
 def _with_coverage_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -50,10 +53,13 @@ def test_era5_coverage_scan_primary_implicit_de_blocks_fr(monkeypatch: pytest.Mo
     assert out["scan_attempted"] is False
 
 
-def test_era5_coverage_scan_primary_allows_es_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("country", ("ES", "IE", "NO", "PL"))
+def test_era5_coverage_scan_primary_allows_country_when_allowlisted(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
     _with_coverage_env(monkeypatch)
     monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
-    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "ES")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, country)
 
     payload = {
         "correlation_id": "srv-cid",
@@ -74,14 +80,14 @@ def test_era5_coverage_scan_primary_allows_es_when_allowlisted(monkeypatch: pyte
             return json.loads(self.text)
 
     def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
-        assert json_body["country_code"] == "ES"
+        assert json_body["country_code"] == country
         return R()
 
     out = json.loads(
         scan_mod.scan_powerunits_era5_weather_bounded_coverage_de(
             scan_start_utc="2024-01-01T00:00:00Z",
             scan_end_utc="2024-01-08T00:00:00Z",
-            country="ES",
+            country=country,
             _http_post=fake_post,
         )
     )
@@ -159,4 +165,5 @@ def test_era5_coverage_scan_schema_read_only_and_no_jobs() -> None:
     assert "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED" in desc
     assert "era5_weather_job" in desc.lower()
     assert "Repo B" in desc
-
+    country_desc = scan_mod.SCAN_ERA5_SCHEMA["parameters"]["properties"]["country"]["description"]
+    assert country_desc == TIER1_ERA5_ISO2_DOC

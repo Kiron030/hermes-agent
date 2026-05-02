@@ -20,6 +20,10 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
     entsoe_market_bounded_core_step_enabled,
     entsoe_market_bounded_gate_requirement_text,
+    entsoe_market_bounded_request_country_permitted,
+)
+from tools.powerunits_entsoe_market_bounded_countries import (
+    BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSOE_MARKET,
 )
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
@@ -152,6 +156,26 @@ def summarize_powerunits_entsoe_market_bounded_window(
             ensure_ascii=False,
         )
 
+    if not entsoe_market_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "error_code": "country_not_permitted",
+                "surface": _SURFACE,
+                "slice": None,
+                "summary_messages": [
+                    f"Country `{cc}` not permitted (Repo B Tier v1 ∩ Hermes narrowing): set "
+                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                ],
+                "summary_attempted": False,
+                "http_status": None,
+                "outcome_class": None,
+                "error_class": "client_gate",
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     slice_obj = {
         "country": cc,
         "version": version_s,
@@ -267,7 +291,7 @@ def summarize_powerunits_entsoe_market_bounded_window(
 SUMMARY_ENTSOE_SCHEMA = {
     "name": "summarize_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync summary-window** — DE / v1 / ≤7d; one HTTP POST. "
+        "**Bounded ENTSO-E market sync summary-window** — Repo B **`DE`** or **`NL`** / v1 / ≤7 d; one HTTP POST. "
         "Includes the same **normalized hourly UTC** semantics as validate (see Repo B "
         "`checks.normalized_time_grain` / `semantics_notes`). "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
@@ -276,7 +300,7 @@ SUMMARY_ENTSOE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSOE_MARKET},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

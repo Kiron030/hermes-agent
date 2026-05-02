@@ -10,11 +10,15 @@ import pytest
 from tools import powerunits_era5_weather_bounded_campaign_tool as camp_mod
 from tools import powerunits_era5_weather_bounded_execute_tool as exec_mod
 from tools import powerunits_era5_weather_bounded_preflight_tool as pre_mod
+from tools import powerunits_era5_weather_bounded_summary_tool as sum_mod
 from tools import powerunits_era5_weather_bounded_validate_tool as val_mod
 from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
     ERA5_WEATHER_BOUNDED_LEGACY_ENV,
     ERA5_WEATHER_BOUNDED_PRIMARY_ENV,
+)
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as TIER1_ERA5_ISO2_DOC,
 )
 from tools.powerunits_era5_weather_bounded_slice import (
     validate_era5_bounded_campaign,
@@ -125,10 +129,13 @@ def test_execute_primary_implicit_de_blocks_fr(monkeypatch: pytest.MonkeyPatch) 
     assert out.get("execution_attempted") is False
 
 
-def test_execute_primary_allows_fr_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("country", ("FR", "IE", "NO", "PL"))
+def test_execute_primary_allows_country_when_in_allowlist(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
     _clear_era5_bounded_core(monkeypatch)
     monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
-    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,FR")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, country)
     monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
     monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
 
@@ -152,12 +159,12 @@ def test_execute_primary_allows_fr_when_allowlisted(monkeypatch: pytest.MonkeyPa
     def fake_post(
         url: str, headers: dict[str, Any], json_body: dict[str, Any], timeout_s: float
     ) -> Any:
-        assert json_body["country_code"] == "FR"
+        assert json_body["country_code"] == country
         return R()
 
     out = json.loads(
         exec_mod.execute_powerunits_era5_weather_bounded_slice(
-            country="FR",
+            country=country,
             start="2024-01-01T00:00:00Z",
             end="2024-01-01T12:00:00Z",
             version="v1",
@@ -207,6 +214,24 @@ def test_legacy_execute_allows_fr_without_primary_allowlist(monkeypatch: pytest.
         )
     )
     assert out["success"] is True
+
+@pytest.mark.parametrize("country", ("IE", "NO", "PL"))
+def test_preflight_primary_allows_tier1_rollout_country_when_allowlisted(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, country)
+    out = json.loads(
+        pre_mod.preflight_powerunits_era5_weather_bounded_slice(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("syntactically_valid") is True
+    assert out.get("slice", {}).get("country") == country
 
 
 def test_preflight_primary_allows_pt_when_allowlisted(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -391,6 +416,52 @@ def test_execute_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "operator_statement" in out
     assert "market_feature_job was NOT auto-run" in out["operator_statement"]
     assert "market_driver_feature_job was NOT auto-run" in out["operator_statement"]
+
+
+@pytest.mark.parametrize("country", ("IE", "NO", "PL"))
+def test_validate_primary_allowlisted_country_http_passed(
+    monkeypatch: pytest.MonkeyPatch, country: str
+) -> None:
+    """Tier-1 ISO2 echoed to Repo B when primary + singleton allowlist match."""
+    _clear_era5_bounded_core(monkeypatch)
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV, country)
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://x")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "y")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "outcome": "passed",
+                "summary_code": "validation_passed",
+                "correlation_id": "c",
+                "warnings": [],
+                "checks": {"expected_hour_slots": 12},
+            }
+        )
+
+        def json(self) -> dict[str, Any]:
+            return json.loads(self.text)
+
+    def fake_post(
+        url: str, headers: dict[str, Any], json_body: dict[str, Any], timeout_s: float
+    ) -> Any:
+        assert json_body["country_code"] == country
+        assert "era5-weather/validate-window" in url
+        return R()
+
+    out = json.loads(
+        val_mod.validate_powerunits_era5_weather_bounded_window(
+            country=country,
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["validation_passed"] is True
 
 
 def test_validate_wrong_country(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -685,3 +756,18 @@ def test_era5_campaign_fail_fast_on_second_execute_when_three_windows_planned(
     assert out["windows"][0]["execute_success"] is True
     assert out["windows"][0]["summary_success"] is True
     assert out["windows"][1]["execute_success"] is False
+
+
+def test_bounded_era5_json_schemas_share_tier1_country_documentation_sentence() -> None:
+    for sch in (
+        pre_mod.PREFLIGHT_ERA5_SCHEMA,
+        exec_mod.EXECUTE_ERA5_SCHEMA,
+        val_mod.VALIDATE_ERA5_SCHEMA,
+        sum_mod.SUMMARY_ERA5_SCHEMA,
+        camp_mod.CAMPAIGN_ERA5_SCHEMA,
+    ):
+        assert (
+            sch["parameters"]["properties"]["country"]["description"]
+            == TIER1_ERA5_ISO2_DOC
+        )
+

@@ -36,3 +36,11 @@ TIER_1_BOUNDED_ISO2_SORTED_V1: tuple[str, ...] = (
 ALLOWED_BOUNDED_ERA5_WEATHER_COUNTRY_CODES_V1: frozenset[str] = frozenset(
     TIER_1_BOUNDED_ISO2_SORTED_V1
 )
+
+# Tool JSON schemas, Access Matrix hints, scan/error messages (keep aligned with Repo B wording).
+BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 = (
+    "Repo B Tier-1 ISO2: keys of ERA5_COUNTRY_BBOXES (19 codes incl. DE, IE, NO, PL, FR, NL, … "
+    "`GB` not `UK`). With primary `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED`, outbound "
+    "requests also intersect `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`; **unset** ⇒ "
+    "implicit **DE**-only permits (**explicit empty** allowlist ⇒ fail‑closed)."
+)

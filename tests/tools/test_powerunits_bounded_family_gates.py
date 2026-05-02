@@ -119,10 +119,29 @@ def test_era5_legacy_ignores_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     assert g.era5_weather_bounded_core_step_enabled("preflight") is True
 
 
-def test_entsoe_primary_exclude_de_closes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_entsoe_primary_nonempty_allowlist_without_de_still_unlocks_execute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ENTSO‑E market: nonempty allowlist only fails closed when explicitly empty — not ERA5‑style implicit DE."""
     monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, "FR,IT")
-    assert g.entsoe_market_bounded_core_step_enabled("execute") is False
+    assert g.entsoe_market_bounded_core_step_enabled("execute") is True
+
+
+def test_entsoe_requested_nl_denied_when_primary_allowlists_only_de(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE")
+    assert g.entsoe_market_bounded_request_country_permitted("NL") is False
+
+
+def test_entsoe_requested_nl_permitted_when_allowlist_contains_nl(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL")
+    assert g.entsoe_market_bounded_request_country_permitted("NL") is True
+
+
+def test_entsoe_requested_nl_implicit_permit_when_allowlist_env_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Legacy‑style: primary without explicit allowlist ⇒ per‑request narrowing defaults to Repo B∩implicit DE."""
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    assert g.entsoe_market_bounded_request_country_permitted("NL") is False
 
 
 def test_era5_primary_nonempty_allowlist_without_de_still_unlocks(monkeypatch: pytest.MonkeyPatch) -> None:

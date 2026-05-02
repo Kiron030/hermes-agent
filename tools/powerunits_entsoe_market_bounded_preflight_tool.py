@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ENTSO-E market sync (DE / v1 / ≤7d).
+Hermes local **preflight** for bounded ENTSO-E market sync (Repo B DE/NL v1, ≤7d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_PREFLIGHT_ENABLED``.
@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import json
 
+from tools.powerunits_entsoe_market_bounded_countries import (
+    BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSOE_MARKET,
+)
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
 from tools.powerunits_bounded_family_gates import (
@@ -18,6 +21,7 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
     entsoe_market_bounded_core_step_enabled,
     entsoe_market_bounded_gate_requirement_text,
+    entsoe_market_bounded_request_country_permitted,
 )
 
 _STEP = "preflight"
@@ -58,7 +62,8 @@ def preflight_powerunits_entsoe_market_bounded_slice(
         "bounded_http_operator_hint": (
             "Live path: preflight (this tool) → execute_powerunits_entsoe_market_bounded_slice → "
             "validate_powerunits_entsoe_market_bounded_window → summarize_powerunits_entsoe_market_bounded_window. "
-            "Repo B runs entsoe_market_job.run for DE only; v1 readiness-window is planned as a follow-up."
+            "Repo B runs entsoe_market_job.run for the requested bounded ISO2 (DE / NL v1 Tier); "
+            "v1 readiness-window is planned as a follow-up."
         ),
     }
 
@@ -75,6 +80,22 @@ def preflight_powerunits_entsoe_market_bounded_slice(
                 **base,
                 "syntactically_valid": False,
                 "validation_messages": [str(e)],
+                "slice": None,
+            },
+            ensure_ascii=False,
+        )
+
+    if not entsoe_market_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                **base,
+                "error_code": "country_not_permitted",
+                "syntactically_valid": False,
+                "validation_messages": [
+                    f"Country `{cc}` not permitted under current bounded ENTSO-E gates: extend "
+                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                ],
                 "slice": None,
             },
             ensure_ascii=False,
@@ -100,7 +121,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
 PREFLIGHT_ENTSOE_SCHEMA = {
     "name": "preflight_powerunits_entsoe_market_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E market sync preflight** — local DE / v1 / ≤7d slice check only; "
+        "**Bounded ENTSO-E market sync preflight** — local Tier v1 (**`DE`** / **`NL`**) slice / v1 / ≤7 d check only; "
         "no HTTP. "
         f"Gate: `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
@@ -108,7 +129,7 @@ PREFLIGHT_ENTSOE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSOE_MARKET},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

@@ -23,6 +23,9 @@ from tools.powerunits_bounded_family_gates import (
     era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as _BOUNDED_ISO2_DOC,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -175,9 +178,10 @@ def summarize_powerunits_era5_weather_bounded_window(
                 "http_status": None,
                 "outcome_class": None,
                 "summary_messages": [
-                    f"Country `{cc}` not permitted under current bounded ERA5 gate: set "
+                    f"Country `{cc}` not permitted (Repo B Tier‑1 ∩ Hermes narrowing): extend "
                     f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
-                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on (unset ⇒ DE only)."
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is truthy "
+                    "(**env var omitted ⇒ implicit DE-only**)."
                 ],
                 "hermes_statement": base_statement,
             },
@@ -304,7 +308,7 @@ def summarize_powerunits_era5_weather_bounded_window(
 SUMMARY_ERA5_SCHEMA = {
     "name": "summarize_powerunits_era5_weather_bounded_window",
     "description": (
-        "**Bounded ERA5 weather summary-window** — DE / v1 / ≤7d; one HTTP POST. "
+        "**Bounded ERA5 weather summary-window** — Tier‑1 ISO2 / v1 / ≤7d; one HTTP POST. "
         "Composed validate + optional pipeline echo; does not run market_feature_job or "
         "market_driver_feature_job. "
         f"Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
@@ -315,7 +319,7 @@ SUMMARY_ERA5_SCHEMA = {
         "properties": {
             "country": {
                 "type": "string",
-                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
+                "description": _BOUNDED_ISO2_DOC,
             },
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},

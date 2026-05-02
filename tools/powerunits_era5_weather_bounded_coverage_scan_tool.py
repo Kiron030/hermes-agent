@@ -26,6 +26,9 @@ from tools.powerunits_bounded_family_gates import (
     era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_campaign
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as _BOUNDED_ISO2_DOC,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,10 +158,11 @@ def scan_powerunits_era5_weather_bounded_coverage_de(
                 "error_code": "country_not_permitted",
                 "surface": _SURFACE,
                 "scan_messages": [
-                    f"Country `{cc}` not permitted under current bounded ERA5 gate (when "
-                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is on set "
-                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` — unset ⇒ implicit DE only). "
-                    "Legacy-era5 paths ignore allowlist narrowing."
+                    f"Country `{cc}` not permitted (Repo B Tier‑1 ∩ Hermes narrowing): set "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is truthy "
+                    "(**env var omitted ⇒ implicit DE-only**)."
+                    " Legacy-only bounded ERA5 endpoints ignore Hermes env narrowing."
                 ],
                 "scan_attempted": False,
                 "http_status": None,
@@ -262,7 +266,8 @@ SCAN_ERA5_SCHEMA = {
     "name": "scan_powerunits_era5_weather_bounded_coverage_de",
     "description": (
         "**Bounded ERA5 normalized weather coverage-scan (read-only, v1)** — one HTTP POST. "
-        "Span ≤31d, partitioned like campaign (≤5 × ≤7d). Country must be in Repo B bounded ERA5 slice. "
+        "Span ≤31d, partitioned like campaign (≤5 × ≤7d). Country must be Repo B bounded **Tier‑1** ISO2 "
+        "(`ERA5_COUNTRY_BBOXES` keys). "
         "Does not run era5_weather_job, market_feature_job, or market_driver_feature_job. "
         "Uses Repo B `rollup.suggested_next_bounded_action` only (no local suggestions). "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
@@ -280,7 +285,7 @@ SCAN_ERA5_SCHEMA = {
             },
             "country": {
                 "type": "string",
-                "description": "Bounded ERA5 v1 ISO2 (default DE; DE or FR slice set).",
+                "description": _BOUNDED_ISO2_DOC,
                 "default": "DE",
             },
             "version": {"type": "string", "description": "Must be v1.", "default": "v1"},

@@ -543,9 +543,11 @@ TOOLSETS = {
 
     "powerunits_era5_weather_bounded_preflight": {
         "description": (
-            "Bounded ERA5 weather sync **preflight** (DE / v1 / ≤7d UTC): local slice check only; "
-            "bounded HTTP operator hint. **No** Powerunits HTTP. "
-            "**Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` (optional "
+            "Bounded ERA5 weather sync **preflight** (Repo B **Tier‑1** bounded ISO2, **v1**, ≤7 d UTC): "
+            "local slice check only; bounded HTTP operator hint. **No** Powerunits HTTP. Default "
+            "payload **`DE`**; with primary gate, omitting **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** "
+            "⇒ Hermes narrowing to **implicit DE‑only**. "
+            "**Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` (+ optional "
             "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
             "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_PREFLIGHT_ENABLED`."
         ),
@@ -556,10 +558,10 @@ TOOLSETS = {
     "powerunits_era5_weather_bounded_execute": {
         "description": (
             "Bounded ERA5 weather sync **execute**: one HTTP POST to "
-            "`/internal/hermes/bounded/v1/era5-weather/recompute` (DE / v1 / ≤7d). "
+            "`/internal/hermes/bounded/v1/era5-weather/recompute` (Repo B **Tier‑1** **`country_code`**, **v1**, ≤7 d). "
             "**Primary:** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED` (+ optional "
-            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`) **or** legacy "
-            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED`; "
+            "`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` — omit ⇒ implicit **DE‑only** Hermes narrowing) "
+            "**or** legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_EXECUTE_ENABLED`; "
             "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`. "
             "Does not auto-run market_feature_job or market_driver_feature_job."
         ),
@@ -570,9 +572,9 @@ TOOLSETS = {
     "powerunits_era5_weather_bounded_validate": {
         "description": (
             "Bounded ERA5 weather sync **validate-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/era5-weather/validate-window` (DE / v1 / ≤7d). "
-            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` + "
-            "same base URL and bearer."
+            "`/internal/hermes/bounded/v1/era5-weather/validate-window` (**Tier‑1** ISO2 echo, **v1**, ≤7 d). "
+            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_VALIDATE_ENABLED` + optional "
+            "allowlist narrowing + same base URL and bearer."
         ),
         "tools": ["validate_powerunits_era5_weather_bounded_window"],
         "includes": [],
@@ -581,9 +583,9 @@ TOOLSETS = {
     "powerunits_era5_weather_bounded_summary": {
         "description": (
             "Bounded ERA5 weather sync **summary-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/era5-weather/summary-window` (DE / v1 / ≤7d). "
-            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` + "
-            "same base URL and bearer."
+            "`/internal/hermes/bounded/v1/era5-weather/summary-window` (**Tier‑1** ISO2 echo, **v1**, ≤7 d). "
+            "**Primary** or legacy `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_SUMMARY_ENABLED` + optional "
+            "allowlist narrowing + same base URL and bearer."
         ),
         "tools": ["summarize_powerunits_era5_weather_bounded_window"],
         "includes": [],
@@ -591,8 +593,10 @@ TOOLSETS = {
 
     "powerunits_era5_weather_bounded_campaign": {
         "description": (
-            "Bounded ERA5 weather sync **campaign (v1 DE)**: sequential execute + summary over "
-            "contiguous ≤7d sub-windows (campaign span ≤31d, ≤5 windows), fail-fast. "
+            "Bounded ERA5 weather sync **campaign v1**: sequential execute + summary over "
+            "contiguous ≤7 d sub-windows (campaign span ≤31 d, ≤5 windows), fail-fast — same **Tier‑1** slice "
+            "semantics as single-window tools (**default slice `DE`**; Hermes omit allowlist ⇒ implicit **DE‑only** "
+            "under primary gate). "
             "Requires `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_CAMPAIGN_ENABLED` plus **primary** "
             "(or legacy execute+summary) for ERA5 bounded HTTP primitives, "
             "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, "
@@ -605,12 +609,13 @@ TOOLSETS = {
 
     "powerunits_era5_weather_bounded_coverage_scan": {
         "description": (
-            "Bounded ERA5 weather sync **coverage-scan** (read-only, v1 DE): one HTTP POST to "
-            "`/internal/hermes/bounded/v1/era5-weather/coverage-scan` — multi-subwindow rollup on "
+            "Bounded ERA5 weather sync **coverage-scan** (read-only, **v1**, **Tier‑1** **`country_code`**, default **`DE`**): "
+            "one HTTP POST to `/internal/hermes/bounded/v1/era5-weather/coverage-scan` — multi-subwindow rollup on "
             "`weather_country_hourly` (**no** execute, **no** era5_weather_job, **no** feature jobs). "
-            "Span ≤31d partitioned like campaign (≤5 × ≤7d). "
-            "Requires HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED plus "
-            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
+            "Span ≤31 d partitioned like campaign (≤5 × ≤7 d). "
+            "Requires `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_COVERAGE_SCAN_ENABLED`, "
+            "`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`, `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`; "
+            "Tier‑1 **`country_code`** follows the same bounded ERA5 permit narrowing as execute/validate when the primary ERA5 gate is used."
         ),
         "tools": ["scan_powerunits_era5_weather_bounded_coverage_de"],
         "includes": [],

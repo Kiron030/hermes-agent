@@ -35,7 +35,7 @@ Tool: **`scan_powerunits_era5_weather_bounded_coverage_de`** (toolset **`powerun
 Tool: **`campaign_powerunits_era5_weather_bounded_de`** (toolset **`powerunits_era5_weather_bounded_campaign`**).
 
 - Chains **only** bounded `recompute` + `summary-window` per sub-window (same contract as single-slice tools).
-- **DE** / **v1**. Range `[campaign_start_utc, campaign_end_utc)` **exclusive end**; span **≤ 31 days**; **≤ 5** contiguous sub-windows each **≤ 7 days**.
+- **Tier‑1** **`country_code`** / **v1** (defaults like single-slice tools; Hermes narrowing when primary is used). Range `[campaign_start_utc, campaign_end_utc)` **exclusive end**; span **≤ 31 days**; **≤ 5** contiguous sub-windows each **≤ 7 days**.
 - **Fail-fast** on first failed execute (HTTP ≠ 200 or `success: false`) or first unsuccessful summary (`ok` / `ok_with_warnings` rule matches the single-slice summary tool).
 - **Does not** invoke `market_feature_job`, `market_driver_feature_job`, or `expand_market_data`.
 
@@ -55,7 +55,7 @@ After a **successful** bounded ERA5 execute, Repo B runs **`era5_weather_job` on
 
 ## Railway / Hermes env
 
-**Recommended:** **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** (same semantics as ENTSO‑E primary allowlist above). Primary unset ⇒ **legacy** per-step `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` unchanged.
+**Recommended:** **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** (comma-separated Tier‑1 subset; intersects Repo B **`ERA5_COUNTRY_BBOXES`** keys **per HTTP request**; **unset** ⇒ implicit **`DE`**-only narrowing; explicit **`""`** ⇒ ERA5 bounded Hermes surfaces **fail‑closed**). Primary unset ⇒ **legacy** per-step `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` unchanged — **ERA5 rollout note:** Tier‑1 non‑**DE** operates may run without **`DE`** in the allowlist whenever the list is **non‑empty**, unlike bounded ENTSO‑E market (**DE**‑only Repo B slices today).
 
 | Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
 |----------|---------|----------|---------|---------------|-----------|

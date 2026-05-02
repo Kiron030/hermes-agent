@@ -1,5 +1,5 @@
 """
-Shared local slice validation for bounded ENTSO-E market sync Hermes tools (DE / v1 / ≤7d).
+Shared local slice validation for bounded ENTSO-E market sync Hermes tools (Repo B v1 ISO2).
 
 No registry.register — imported by entsoe bounded tool modules only.
 """
@@ -7,6 +7,10 @@ No registry.register — imported by entsoe bounded tool modules only.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+
+from tools.powerunits_entsoe_market_bounded_countries import (
+    ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1,
+)
 
 _MAX_SUBWINDOW_DAYS = 7
 _MAX_CAMPAIGN_SPAN_DAYS = 31
@@ -32,8 +36,9 @@ def validate_entsoe_bounded_slice(
     version: str,
 ) -> tuple[str, datetime, datetime]:
     cc = (country or "").strip().upper()
-    if cc != "DE":
-        raise ValueError("country must be DE for bounded entsoe_market_sync v1")
+    if cc not in ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1:
+        opts = ", ".join(sorted(ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1))
+        raise ValueError(f"country must be one of ({opts}) for bounded entsoe_market_sync v1")
     if (version or "").strip() != "v1":
         raise ValueError("version must be v1 for this release")
     start = _parse_utc_iso(start_s)
@@ -76,12 +81,13 @@ def validate_entsoe_bounded_campaign(
     version_s: str,
 ) -> tuple[str, str, list[tuple[datetime, datetime]]]:
     """
-    DE / v1 only. Campaign [start,end) exclusive; total span ≤ 31 days;
+    Repo B v1 ISO2 allowlist / v1 only. Campaign [start,end) exclusive; total span ≤ 31 days;
     contiguous ≤7d slices; resulting slice count ≤ 5.
     """
     cc = (country or "").strip().upper()
-    if cc != "DE":
-        raise ValueError("country must be DE for bounded entsoe_market_sync v1 campaign")
+    if cc not in ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1:
+        opts = ", ".join(sorted(ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1))
+        raise ValueError(f"country must be one of ({opts}) for bounded entsoe_market_sync v1 campaign")
     ver = (version_s or "").strip()
     if ver != "v1":
         raise ValueError("version must be v1 for this release")
