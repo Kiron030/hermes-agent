@@ -17,6 +17,10 @@ from typing import Any
 
 import httpx
 
+from tools.powerunits_bounded_family_gates import entsoe_market_bounded_request_country_permitted
+from tools.powerunits_entsoe_market_bounded_countries import (
+    BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSOE_MARKET,
+)
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_campaign
 
 logger = logging.getLogger(__name__)
@@ -138,6 +142,23 @@ def scan_powerunits_entsoe_market_bounded_coverage_de(
             ensure_ascii=False,
         )
 
+    if not entsoe_market_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "error_code": "country_not_permitted",
+                "scan_messages": [
+                    f"Country `{cc}` not permitted (Repo B Tier v1 ∩ Hermes narrowing): extend "
+                    f"`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` when primary "
+                    "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` is used (**omit env ⇒ implicit DE-only**)."
+                ],
+                "scan_attempted": False,
+                "http_status": None,
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     url = _scan_url()
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
@@ -231,7 +252,7 @@ def scan_powerunits_entsoe_market_bounded_coverage_de(
 SCAN_ENTSOE_SCHEMA = {
     "name": "scan_powerunits_entsoe_market_bounded_coverage_de",
     "description": (
-        "**Bounded ENTSO-E normalized market coverage-scan (read-only, v1 DE)** — one HTTP POST. "
+        "**Bounded ENTSO-E normalized market coverage-scan (read-only, v1 Tier: **DE** / **NL**)** — one HTTP POST. "
         "Span ≤31d, partitioned like campaign (≤5 × ≤7d). "
         f"Requires {_FEATURE_ENV}, {_BASE_ENV}, {_SECRET_ENV}."
     ),
@@ -246,7 +267,7 @@ SCAN_ENTSOE_SCHEMA = {
                 "type": "string",
                 "description": "Exclusive UTC ISO-8601 with Z.",
             },
-            "country": {"type": "string", "description": "Must be DE (default DE).", "default": "DE"},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSOE_MARKET, "default": "DE"},
             "version": {"type": "string", "description": "Must be v1.", "default": "v1"},
         },
         "required": ["scan_start_utc", "scan_end_utc"],

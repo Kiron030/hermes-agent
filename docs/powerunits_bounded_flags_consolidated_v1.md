@@ -1,5 +1,9 @@
 # Bounded Hermes env flags — consolidated model & migration v1
 
+## 0. Operating model (cross-repo)
+
+Hermes gates and allowlists attach to **Repo B bounded HTTP** contracts — see **`docs/powerunits_bounded_operating_model_v1.md`**. Canonical **product-side** semantics (thin Hermes vs SoT, read/write split, inventory + **`skipped`**, readiness snapshot): **EU-PP-Database** repo, **`docs/architecture/internal_hermes_bounded_operating_model_v1.md`**.
+
 ## 1. Current inventory (Hermes codebase)
 
 These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor prep.
@@ -67,7 +71,7 @@ HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_SUMMARY_ENABLED
 
 ## 6. Implemented behavior — ENTSO‑E & ERA5 bounded (symmetric)
 
-Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist ignored on legacy-only**, **unset allowlist ⇒ implicit DE**, **empty allowlist ⇒ fail-closed**) for steps **preflight**, **execute**, **validate**, **summary**.
+Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist ignored on legacy-only**) for steps **preflight**, **execute**, **validate**, **summary**. Per-request narrowing: **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` unset ⇒ implicit `{DE}`**; **explicit `""` ⇒ fail-closed when primary is on.** Intersection always includes Repo B **`{DE,NL}`** Tier v1 (**FR** etc. rejected regardless of Railway).
 
 **Exception — bounded ERA5 weather Tier‑1:** bounded ERA5 tools stay unlocked on primary whenever **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** is **non-empty**, even if **`DE`** is omitted; **explicit empty** still fail-closes. Per-request narrowing still intersects Repo B **`ERA5_COUNTRY_BBOXES`** Tier‑1 with that allowlist (**env var omitted ⇒ `{DE}`** at permit time).
 
@@ -76,7 +80,7 @@ Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist 
 ### Migration — ENTSO‑E / ERA5
 
 1. Set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1`** and/or **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED=1`**.
-2. Optionally set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES=DE`** (still **implicit DE-only** ENTSO narrowing when omitted). **ERA5 Tier‑1:** set **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** to a **non-empty comma list** subset of Repo B **`ERA5_COUNTRY_BBOXES`** keys (**omit unset ⇒ implicit `{DE}`** at request narrowing; **`""` ⇒ Hermes ERA5 bounded tools disable**).
+2. Optionally set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`**, comma ISO2 subset of Repo B **`DE`**/**`NL`** (**omit ⇒ Hermes narrowing still implicit `DE` only**). **ERA5 Tier‑1:** set **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** to a **non-empty comma list** subset of Repo B **`ERA5_COUNTRY_BBOXES`** keys (**omit unset ⇒ implicit `{DE}`** at request narrowing; **`""` ⇒ Hermes ERA5 bounded tools disable**).
 3. After staging validation, remove redundant legacy **`…_PREFLIGHT_ENABLED`**, **`…_EXECUTE_ENABLED`**, **`…_VALIDATE_ENABLED`**, **`…_SUMMARY_ENABLED`** keys if you want fewer Railway variables — **do not** remove **`…_CAMPAIGN_ENABLED`** / **`…_COVERAGE_SCAN_ENABLED`** where those tools are used.
 
 **Deprecated (still read when primary is falsy):**

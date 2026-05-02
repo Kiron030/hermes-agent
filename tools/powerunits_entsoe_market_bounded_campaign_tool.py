@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Hermes bounded ENTSO-E market sync **campaign v1** — sequential execute + summary
-over contiguous ≤7d windows (DE only), fail-fast.
+over contiguous ≤7d windows (Repo B bounded **DE/NL v1 Tier** ISO2 slice), fail-fast.
 
-Orchestrates only the existing bounded Repo B HTTP endpoints; no Repo B changes.
+Orchestrates only the existing bounded Repo B HTTP endpoints (no route proliferation).
 
 Gated by ``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_CAMPAIGN_ENABLED`` and requires
 bounded execute+summary access (``HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`` **or**
@@ -22,6 +22,7 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_MARKET_BOUNDED_LEGACY_ENV,
     ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
     campaign_entsoe_bounded_http_primitives_enabled,
+    entsoe_market_bounded_request_country_permitted,
 )
 
 from tools.powerunits_entsoe_market_bounded_execute_tool import (
@@ -29,6 +30,10 @@ from tools.powerunits_entsoe_market_bounded_execute_tool import (
     execute_powerunits_entsoe_market_bounded_slice,
 )
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_campaign
+from tools.powerunits_entsoe_market_bounded_countries import (
+    BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSOE_MARKET,
+)
+
 from tools.powerunits_entsoe_market_bounded_summary_tool import (
     check_powerunits_entsoe_market_bounded_summary_requirements,
     summarize_powerunits_entsoe_market_bounded_window,
@@ -69,7 +74,7 @@ def campaign_powerunits_entsoe_market_bounded_de(
     version: str = "v1",
     _http_post: Any = None,
 ) -> str:
-    """Run up to 5 contiguous ≤7d DE windows; execute then summary each; fail-fast."""
+    """Run up to 5 contiguous ≤7d windows; execute then summary each; fail-fast."""
 
     base_statement = (
         "Hermes performed no direct SQL. This tool only chains existing bounded HTTP POSTs to "
@@ -126,7 +131,33 @@ def campaign_powerunits_entsoe_market_bounded_de(
                 "windows_attempted": 0,
                 "windows_succeeded": 0,
                 "stopped_reason": "campaign_validation_failed",
-                "next_manual_step": "Fix slice parameters (DE, v1, end > start, span ≤31d, implies ≤5 sub-windows).",
+                "next_manual_step": "Fix slice parameters (bounded DE or NL ISO2, v1, end > start, span ≤31d, implies ≤5 sub-windows).",
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
+    if not entsoe_market_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "validation_messages": [
+                    f"Country `{cc}` not permitted under current bounded ENTSO-E gates: extend "
+                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                ],
+                "campaign": {
+                    "country": cc,
+                    "version": ver,
+                    "campaign_start_utc": start_s,
+                    "campaign_end_utc_exclusive": end_s,
+                },
+                "windows": [],
+                "windows_planned": 0,
+                "windows_attempted": 0,
+                "windows_succeeded": 0,
+                "stopped_reason": "country_not_permitted",
+                "next_manual_step": "Adjust Railway allowlist so this Tier-v1 ENTSO ISO2 is explicitly permitted.",
                 "hermes_statement": base_statement,
             },
             ensure_ascii=False,
@@ -292,8 +323,9 @@ def campaign_powerunits_entsoe_market_bounded_de(
 CAMPAIGN_ENTSOE_SCHEMA = {
     "name": "campaign_powerunits_entsoe_market_bounded_de",
     "description": (
-        "**Bounded ENTSO-E market sync campaign (v1 DE)** — sequential execute + summary "
-        "for contiguous sub-windows (each ≤7d), campaign span ≤31d, ≤5 windows total. "
+        "**Bounded ENTSO-E market sync campaign v1** — sequential execute + summary "
+        "for contiguous sub-windows (Repo B Tier v1 ISO2 **DE** or **NL**, each ≤7 d); "
+        "campaign span ≤31 d, ≤5 windows. "
         "Fail-fast on first failed execute or failed summary HTTP/outcome. Requires "
         f"{_FEATURE_ENV} plus `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` (or legacy execute+summary), "
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET."
@@ -311,7 +343,7 @@ CAMPAIGN_ENTSOE_SCHEMA = {
             },
             "country": {
                 "type": "string",
-                "description": "Must be DE (default DE).",
+                "description": _ISO_DOC_ENTSOE_MARKET,
                 "default": "DE",
             },
             "version": {

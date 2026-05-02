@@ -111,6 +111,41 @@ def test_legacy_execute_only_does_not_open_validate(monkeypatch: pytest.MonkeyPa
     assert val_mod.check_powerunits_entsoe_market_bounded_validate_requirements() is False
 
 
+def test_execute_http_nl_body_country(monkeypatch: pytest.MonkeyPatch) -> None:
+    _with_execute_env(monkeypatch)
+
+    class R:
+        status_code = 200
+        content = b"{}\n"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "nl-rid",
+                "correlation_id": "cid",
+                "rows_written": 9,
+            }
+        )
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert json_body["country_code"] == "NL"
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_market_bounded_slice(
+            country="NL",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
 def test_execute_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
     _with_execute_env(monkeypatch)
 
@@ -192,6 +227,16 @@ def test_entsoe_bounded_slice_accepts_7d() -> None:
     )
     assert cc == "DE"
     assert (end - start).total_seconds() == 7 * 24 * 3600
+
+
+def test_entsoe_bounded_slice_accepts_nl() -> None:
+    cc, start, end = validate_entsoe_bounded_slice(
+        "NL",
+        "2024-01-01T00:00:00Z",
+        "2024-01-03T12:00:00Z",
+        "v1",
+    )
+    assert cc == "NL"
 
 
 def test_entsoe_bounded_slice_rejects_over_7d() -> None:

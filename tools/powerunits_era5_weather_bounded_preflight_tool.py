@@ -19,6 +19,9 @@ from tools.powerunits_bounded_family_gates import (
     era5_weather_bounded_request_country_permitted,
 )
 from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_slice
+from tools.powerunits_era5_tier1_countries import (
+    BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as _BOUNDED_ISO2_DOC,
+)
 
 _STEP = "preflight"
 _LEGACY_ENV = ERA5_WEATHER_BOUNDED_LEGACY_ENV[_STEP]
@@ -100,8 +103,11 @@ def preflight_powerunits_era5_weather_bounded_slice(
                 "error_code": "country_not_permitted",
                 "syntactically_valid": False,
                 "validation_messages": [
-                    f"`{cc}` is not permitted: set `{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` "
-                    f"when `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is enabled (unset ⇒ DE only)."
+                    f"`{cc}` is not permitted after Tier‑1 Repo B ∩ Hermes narrowing: extend "
+                    f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` is truthy "
+                    "(**env var omitted ⇒ implicit DE-only** Hermes narrowing). "
+                    "Legacy-only ERA5 flags ignore Hermes env narrowing."
                 ],
                 "slice": slim,
             },
@@ -128,7 +134,7 @@ def preflight_powerunits_era5_weather_bounded_slice(
 PREFLIGHT_ERA5_SCHEMA = {
     "name": "preflight_powerunits_era5_weather_bounded_slice",
     "description": (
-        "**Bounded ERA5 weather sync preflight** — local DE / v1 / ≤7d slice check only; "
+        "**Bounded ERA5 weather sync preflight** — local Tier-1 ISO2 / v1 / ≤7d slice check only; "
         f"no HTTP. Gate `{ERA5_WEATHER_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV}`. "
         "Execute path does not auto-run market_feature_job or market_driver_feature_job."
@@ -138,7 +144,7 @@ PREFLIGHT_ERA5_SCHEMA = {
         "properties": {
             "country": {
                 "type": "string",
-                "description": "Bounded ERA5 v1 ISO2 (DE or FR; same set as Repo B bounded ERA5 allowlist).",
+                "description": _BOUNDED_ISO2_DOC,
             },
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},

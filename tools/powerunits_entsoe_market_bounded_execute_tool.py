@@ -23,6 +23,10 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_MARKET_BOUNDED_PRIMARY_ENV,
     entsoe_market_bounded_core_step_enabled,
     entsoe_market_bounded_gate_requirement_text,
+    entsoe_market_bounded_request_country_permitted,
+)
+from tools.powerunits_entsoe_market_bounded_countries import (
+    BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSOE_MARKET,
 )
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 
@@ -144,6 +148,25 @@ def execute_powerunits_entsoe_market_bounded_slice(
             ensure_ascii=False,
         )
 
+    if not entsoe_market_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "error_code": "country_not_permitted",
+                "surface": _SURFACE,
+                "slice": None,
+                "validation_messages": [
+                    f"Country `{cc}` not permitted under current bounded ENTSO-E market gates: extend "
+                    f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` when "
+                    f"`{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` is truthy (**env var omitted ⇒ implicit DE-only**)."
+                ],
+                "execution_attempted": False,
+                "success": False,
+                "http_status": None,
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     slice_obj = {
         "country": cc,
         "version": version_s,
@@ -251,14 +274,15 @@ EXECUTE_ENTSOE_SCHEMA = {
     "name": "execute_powerunits_entsoe_market_bounded_slice",
     "description": (
         "**Bounded ENTSO-E market sync execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). "
+        f"`{_EXECUTE_PATH}` (Repo B **`DE`** or **`NL`** Tier v1, ≤7 d UTC). "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or legacy `{_LEGACY_ENV}`; "
-        f"optional `{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
+        f"optional `{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**unset ⇒ implicit DE-only**); "
+        f"{_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSOE_MARKET},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

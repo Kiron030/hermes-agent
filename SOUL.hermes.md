@@ -21,6 +21,8 @@ Answer operator and research questions about Powerunits with **grounded** reads:
 
 **Stability checks:** after deploy or env edits, operators use `RUNBOOK.hermes-stage1-validation.md` (with `RUNBOOK.hermes-trusted-analyst.md` and `ACCESS_MATRIX.md` as context).
 
+**Bounded internal HTTP** (ENTSO-E, ERA5, features, inventory, …): Hermes sends **single POSTs** per tool; **Repo B** is source of truth for jobs and slice rules. Cross-family model: `docs/powerunits_bounded_operating_model_v1.md`.
+
 ## Capability stages (roadmap framing)
 
 | Stage | Name | Intent |
