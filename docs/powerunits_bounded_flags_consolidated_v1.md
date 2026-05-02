@@ -71,7 +71,7 @@ HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_DE_SUMMARY_ENABLED
 
 ## 6. Implemented behavior — ENTSO‑E & ERA5 bounded (symmetric)
 
-Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist ignored on legacy-only**) for steps **preflight**, **execute**, **validate**, **summary**. Per-request narrowing: **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` unset ⇒ implicit `{DE}`**; **explicit `""` ⇒ fail-closed when primary is on.** Intersection always includes Repo B **`{DE,NL}`** Tier v1 (**FR** etc. rejected regardless of Railway).
+Same rules as §4 (**primary wins**, **legacy when primary falsy**, **allowlist ignored on legacy-only**) for steps **preflight**, **execute**, **validate**, **summary**. Per-request narrowing: **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` unset ⇒ implicit `{DE}`**; **explicit `""` ⇒ fail-closed when primary is on.** Intersection always includes Repo B **`{DE,NL}`** Tier v1 (**FR** etc. rejected regardless of Railway). **ENTSO‑E forecast bounded** mirrors **ENTSO‑E market** primaries: **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** **unset ⇒ `{DE}`** at permit time; **explicit `""` ⇒ fail-closed**; Tier v1 Repo B codes **`{DE,NL}`**.
 
 **Exception — bounded ERA5 weather Tier‑1:** bounded ERA5 tools stay unlocked on primary whenever **`HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES`** is **non-empty**, even if **`DE`** is omitted; **explicit empty** still fail-closes. Per-request narrowing still intersects Repo B **`ERA5_COUNTRY_BBOXES`** Tier‑1 with that allowlist (**env var omitted ⇒ `{DE}`** at permit time).
 
@@ -107,16 +107,16 @@ HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_SUMMARY_ENABLED
 
 ### ENTSO‑E forecast bounded
 
-Same §6 semantics as ENTSO‑E market / ERA5 for core steps (**preflight** through **summary**). **Hermes-side** distinct from **`ENTSOE_MARKET_BOUNDED_*`**: bounded routes `…/entsoe-forecast/*` invoke **`entsoe_forecast_job`** only — no **`entsoe_market_job`**, no market-features auto-run.
+Core steps align with **bounded ENTSO‑E market** (**primary** + optional allowlist; **unset ⇒ implicit `DE` narrowing**; **explicit empty ⇒ fail-closed**); per-request permit intersects Repo B Tier v1 **`DE`/`NL`**. **Orthogonal** to **`ENTSOE_MARKET_BOUNDED_*`** — routes `…/entsoe-forecast/*` invoke **`entsoe_forecast_job`** only (no **`entsoe_market_job`**, no market-features auto-run).
 
 Recommended primary:
 
 - **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1`**
-- Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2; unset ⇒ implicit DE; empty ⇒ fail-closed with primary).
+- Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2 subset of Repo B **`DE`/`NL`**; omit ⇒ implicit **`DE`** at Hermes narrowing; empty ⇒ fail-closed with primary).
 
 ### DE bounded coverage inventory v1 (read-only)
 
-Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`** (same credentials as **`POWERUNITS_INTERNAL_EXECUTE_*`**). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Turning it **off** disables only this tool — it does **not** disable outage awareness reads, outage repair, ENTSO‑E forecast executes, etc. Turning it **on** still performs **zero** writes and stores **no** canonical matrix in Hermes (JSON **`repo_b_inventory`** in the reply is ephemeral; **`csv_export`** is derived **only** from that embedded payload).
+Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`** (same credentials as **`POWERUNITS_INTERNAL_EXECUTE_*`**). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Turning it **off** disables only this tool — it does **not** disable outage awareness reads, outage repair, ENTSO‑E forecast executes, etc. Turning it **on** still performs **zero** writes and stores **no** canonical matrix in Hermes (JSON **`repo_b_inventory`** in the reply is ephemeral). **`export_format=csv`** derives UTF-8 **`csv_export`** inline from embedded **`rows`**; optional **`exports_csv_workspace_filename`** writes the same CSV to **`exports/*.csv`** on the bounded workspace volume, or use **`save_hermes_workspace_note`** with a **`.csv`** name — **no** Repo B CSV endpoint.
 
 ### DE bounded stack remediation planner (read-only)
 

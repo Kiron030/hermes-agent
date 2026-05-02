@@ -22,6 +22,10 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV,
     entsoe_forecast_bounded_core_step_enabled,
     entsoe_forecast_bounded_gate_requirement_text,
+    entsoe_forecast_bounded_request_country_permitted,
+)
+from tools.powerunits_entsoe_forecast_bounded_countries import (
+    BOUNDED_ENTSOE_FORECAST_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSO_FORECAST,
 )
 from tools.powerunits_entsoe_forecast_bounded_slice import validate_entsoe_forecast_bounded_slice
 
@@ -146,6 +150,32 @@ def execute_powerunits_entsoe_forecast_bounded_slice(
             ensure_ascii=False,
         )
 
+    if not entsoe_forecast_bounded_request_country_permitted(cc):
+        slice_obj_denied = {
+            "country": cc,
+            "version": version_s,
+            "start_utc": start_dt.isoformat().replace("+00:00", "Z"),
+            "end_utc_exclusive": end_dt.isoformat().replace("+00:00", "Z"),
+        }
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "slice": slice_obj_denied,
+                "error_code": "country_not_permitted",
+                "validation_messages": [
+                    (
+                        "country not permitted under current Hermes "
+                        f"{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}"
+                    ),
+                ],
+                "execution_attempted": False,
+                "success": False,
+                "http_status": None,
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     slice_obj = {
         "country": cc,
         "version": version_s,
@@ -257,14 +287,15 @@ EXECUTE_ENTSOE_FORECAST_SCHEMA = {
     "name": "execute_powerunits_entsoe_forecast_bounded_slice",
     "description": (
         "**Bounded ENTSO-E forecast execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (DE / v1 / ≤7d UTC). F3b+F4 hourly forecast ingestion only. "
+        f"`{_EXECUTE_PATH}` (Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d UTC). "
+        "F3b+F4 hourly forecast ingestion only. "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or legacy `{_LEGACY_ENV}`; "
         f"optional `{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSO_FORECAST},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

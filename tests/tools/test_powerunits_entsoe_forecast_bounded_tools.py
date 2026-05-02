@@ -101,6 +101,77 @@ def test_execute_http_200_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["operator_statement"] == "forecast only"
 
 
+def test_execute_http_nl_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    class R:
+        status_code = 200
+        content = b"{}"
+        text = json.dumps(
+            {
+                "success": True,
+                "status": "success",
+                "pipeline_run_id": "nl-rid",
+                "correlation_id": "cid",
+                "rows_written": 24,
+                "downstream_not_auto_triggered": ["market_feature_job"],
+                "operator_statement": "forecast only",
+            }
+        )
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-forecast/recompute" in url
+        assert json_body["country_code"] == "NL"
+        return R()
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
+            country="NL",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["success"] is True
+
+
+def test_execute_country_not_permitted_when_allowlist_de_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+    called: list[bool] = []
+
+    def _should_not_call(*_args, **_kw) -> None:
+        called.append(True)
+        raise AssertionError("unexpected HTTP POST")
+
+    out = json.loads(
+        exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
+            country="NL",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=_should_not_call,
+        )
+    )
+    assert not called
+    assert out.get("error_code") == "country_not_permitted"
+    assert out.get("execution_attempted") is False
+
+
 def test_legacy_execute_only_does_not_open_validate(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_fcst_bounded_core(monkeypatch)
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_LEGACY_ENV["execute"], "1")
@@ -133,3 +204,28 @@ def test_forecast_slice_accepts_7d() -> None:
     )
     assert cc == "DE"
     assert (end - start).total_seconds() == 7 * 24 * 3600
+
+
+def test_forecast_slice_accepts_nl() -> None:
+    cc, *_ = validate_entsoe_forecast_bounded_slice(
+        "NL",
+        "2024-01-01T00:00:00Z",
+        "2024-01-01T12:00:00Z",
+        "v1",
+    )
+    assert cc == "NL"
+
+
+def test_preflight_nl_blocked_when_allowlist_de_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE")
+    out = json.loads(
+        pre_mod.preflight_powerunits_entsoe_forecast_bounded_slice(
+            country="NL",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+        )
+    )
+    assert out.get("error_code") == "country_not_permitted"

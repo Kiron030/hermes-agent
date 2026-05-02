@@ -28,7 +28,7 @@ Repeat: **Hermes must not persist bounded outcomes as canonical state.** To “r
 
 ## 3. Coverage inventory and `skipped`
 
-- **Coverage-inventory** is a **Repo B aggregator**: each invocation recomputes the matrix Hermes asks for (`POST …/coverage-inventory`). Hermes may attach a **turn-local CSV** export only — **no** durable inventory DB in Repo A.
+- **Coverage-inventory** is a **Repo B aggregator**: each invocation recomputes the matrix Hermes asks for (`POST …/coverage-inventory`). Hermes may attach **`csv_export`** in the **same tool response** (**UTF-8**, derived from Repo `rows` only) and/or write **`exports/*.csv`** via **`exports_csv_workspace_filename`** — **no** durable inventory DB / **no** canonical matrix in Repo A; **no** Repo B CSV route.
 - Rows marked **`skipped`** mean “this evaluator was **not** run for `(country, family)` in this release” (e.g. family still **execute-limited** to **DE** on Repo B). That is **expected** during phased rollout — operators use skips to see **coverage of readiness**, not silent success.
 
 Details: EU-PP-Database `docs/architecture/internal_hermes_bounded_operating_model_v1.md`.

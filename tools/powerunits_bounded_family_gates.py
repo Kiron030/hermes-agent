@@ -2,7 +2,7 @@
 
 Design:
 - One **primary** ``HERMES_*_ENABLED`` flag per family (no country suffix).
-- Optional ``HERMES_*_ALLOWED_COUNTRIES`` comma list (uppercase ISO2). **Bounded ENTSO‑E market**
+- Optional ``HERMES_*_ALLOWED_COUNTRIES`` comma list (uppercase ISO2). **Bounded ENTSO‑E market**, **bounded ENTSO‑E forecast**,
   and **bounded ERA5** primaries mirror each other (**unset ⇒ implicit DE per request intersection**;
   **explicit empty** ⇒ fail-closed); other families still use implicit **DE** for **opening** tools
   when unset (see implementations below).
@@ -27,6 +27,9 @@ from tools.powerunits_era5_tier1_countries import (
 )
 from tools.powerunits_entsoe_market_bounded_countries import (
     ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1 as BOUNDED_ENTSOE_MARKET_ISO2_V1,
+)
+from tools.powerunits_entsoe_forecast_bounded_countries import (
+    ALLOWED_BOUNDED_ENTSOE_FORECAST_COUNTRY_CODES_V1 as BOUNDED_ENTSOE_FORECAST_ISO2_V1,
 )
 MarketFeaturesStep = Literal["execute", "validate", "readiness", "summary"]
 MarketDriverStep = Literal["execute", "validate", "readiness", "summary"]
@@ -218,16 +221,29 @@ def entsoe_market_bounded_gate_requirement_text(step: EntsoeMarketBoundedStep) -
     )
 
 
+def entsoe_forecast_bounded_request_country_permitted(iso2: str) -> bool:
+    """Repo B Tier v1 ∩ optional Hermes allowlist when forecast primary truthy; legacy ⇒ no narrowing."""
+    cc = (iso2 or "").strip().upper()
+    if cc not in BOUNDED_ENTSOE_FORECAST_ISO2_V1:
+        return False
+    if _truthy(_ENTSOE_FORECAST_PRIMARY):
+        return cc in _allowed_countries_for_primary(_ENTSOE_FORECAST_ALLOWED)
+    return True
+
+
 def entsoe_forecast_bounded_core_step_enabled(step: EntsoeForecastBoundedStep) -> bool:
     if _truthy(_ENTSOE_FORECAST_PRIMARY):
-        return _impl_country_allowed(_ENTSOE_FORECAST_ALLOWED)
+        if _ENTSOE_FORECAST_ALLOWED in os.environ and not (os.getenv(_ENTSOE_FORECAST_ALLOWED) or "").strip():
+            return False
+        return True
     return _truthy(_ENTSOE_FORECAST_LEGACY[step])
 
 
 def entsoe_forecast_bounded_gate_requirement_text(step: EntsoeForecastBoundedStep) -> str:
     return (
         f"{_ENTSOE_FORECAST_PRIMARY} (recommended) or legacy {_ENTSOE_FORECAST_LEGACY[step]}; "
-        f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (implicit DE when unset)"
+        f"when using primary optionally {_ENTSOE_FORECAST_ALLOWED} (**unset ⇒ implicit DE-only per slice**; "
+        "explicitly empty disallowlist ⇒ fail‑closed)"
     )
 
 

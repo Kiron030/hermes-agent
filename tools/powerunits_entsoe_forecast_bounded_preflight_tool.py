@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes local **preflight** for bounded ENTSO-E **forecast** sync (DE / v1 / ≤7d).
+Hermes local **preflight** for bounded ENTSO-E **forecast** sync (Tier v1 **`DE`** / **`NL`**, `v1`, ≤7 d).
 
 No Powerunits HTTP, no job execution. Gated by ``HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED``
 (optional allowlist) or legacy ``HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED``.
@@ -16,6 +16,10 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV,
     entsoe_forecast_bounded_core_step_enabled,
     entsoe_forecast_bounded_gate_requirement_text,
+    entsoe_forecast_bounded_request_country_permitted,
+)
+from tools.powerunits_entsoe_forecast_bounded_countries import (
+    BOUNDED_ENTSOE_FORECAST_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSO_FORECAST,
 )
 from tools.powerunits_entsoe_forecast_bounded_slice import validate_entsoe_forecast_bounded_slice
 
@@ -59,8 +63,8 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
             "Live path: preflight (this tool) → execute_powerunits_entsoe_forecast_bounded_slice → "
             "validate_powerunits_entsoe_forecast_bounded_window → "
             "summarize_powerunits_entsoe_forecast_bounded_window. "
-            "Repo B runs entsoe_forecast_job for DE; market_feature_job / market_driver_feature_job "
-            "were NOT run."
+            "Repo B **`entsoe_forecast_job`** only for requested **ISO2**; **`market_feature_job`** / "
+            "**`market_driver_feature_job`** were NOT started."
         ),
     }
 
@@ -77,6 +81,22 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
                 **base,
                 "syntactically_valid": False,
                 "validation_messages": [str(e)],
+                "slice": None,
+            },
+            ensure_ascii=False,
+        )
+
+    if not entsoe_forecast_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                **base,
+                "error_code": "country_not_permitted",
+                "syntactically_valid": False,
+                "validation_messages": [
+                    f"Country `{cc}` not permitted under bounded ENTSO-E forecast gates "
+                    f"({ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}; "
+                    "**unset allowlist ⇒ implicit DE-only narrowing**)."
+                ],
                 "slice": None,
             },
             ensure_ascii=False,
@@ -102,14 +122,14 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
 PREFLIGHT_ENTSOE_FORECAST_SCHEMA = {
     "name": "preflight_powerunits_entsoe_forecast_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E forecast preflight** — local DE / v1 / ≤7d slice check only; no HTTP. "
+        "**Bounded ENTSO-E forecast preflight** — local Tier v1 (**`DE`** / **`NL`**) / **`v1`** / ≤7 d slice check only; no HTTP. "
         f"Gate: `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSO_FORECAST},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},

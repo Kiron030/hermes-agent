@@ -175,6 +175,36 @@ def test_entsoe_forecast_legacy_granular(monkeypatch: pytest.MonkeyPatch) -> Non
     assert g.entsoe_forecast_bounded_core_step_enabled("summary") is False
 
 
+def test_entsoe_forecast_nonempty_allowlist_without_de_unlocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tier rollout: gates open whenever primary is on and allowlist non-empty."""
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "NL")
+    assert g.entsoe_forecast_bounded_core_step_enabled("execute") is True
+
+
+def test_entsoe_forecast_nl_denied_when_primary_allowlists_only_de(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE")
+    assert g.entsoe_forecast_bounded_request_country_permitted("NL") is False
+
+
+def test_entsoe_forecast_nl_permitted_when_primary_allowlists_de_nl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL")
+    assert g.entsoe_forecast_bounded_request_country_permitted("NL") is True
+
+
+def test_entsoe_forecast_nl_implicit_nonmember_when_allowlist_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    assert g.entsoe_forecast_bounded_request_country_permitted("NL") is False
+
+
 def test_outage_awareness_primary_unlocks_validate_and_summary(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(g.OUTAGE_AWARENESS_BOUNDED_PRIMARY_ENV, "1")
     assert g.outage_awareness_bounded_core_step_enabled("validate") is True

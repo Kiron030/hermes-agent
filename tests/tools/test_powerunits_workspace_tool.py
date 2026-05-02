@@ -44,11 +44,24 @@ def test_subdir_and_path_escape_blocked(ws) -> None:
     assert o3.get("error_code") == "invalid_path"
 
 
-def test_only_text_ext_and_no_overwrite_default(ws) -> None:
+def test_only_allowed_ext_and_no_overwrite_default(ws) -> None:
     o1 = json.loads(
         ws.save_hermes_workspace_note(kind="drafts", name="x.json", content="{}", overwrite_mode="forbid")
     )
     assert o1.get("error_code") == "invalid_write_args"
+
+    csv_save = json.loads(
+        ws.save_hermes_workspace_note(
+            kind="exports",
+            name="coverage-inv.csv",
+            content="country_code,family\nDE,x\n",
+            overwrite_mode="forbid",
+        )
+    )
+    assert csv_save.get("saved") is True
+
+    csv_read = json.loads(ws.read_hermes_workspace_file("exports/coverage-inv.csv"))
+    assert "country_code,family" in csv_read["content"]
 
     first = json.loads(
         ws.save_hermes_workspace_note(kind="drafts", name="x.md", content="a", overwrite_mode="forbid")
