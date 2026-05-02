@@ -132,6 +132,8 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Primary + empty allowlist:** `…_ALLOWED_COUNTRIES=` (empty) with primary truthy → **fail-closed** (`feature_disabled` or equivalent).
 - [ ] **Execute gate off:** primary falsy **and** all four legacy falsy → execute **`feature_disabled`** — no Repo B HTTP.
 - [ ] **Execute on:** bounded POST **`…/entsoe-forecast/recompute`**; response states **no downstream** features/market/auto-expand if Repo B echoes that field.
+- [ ] **Validate — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → **`validate_powerunits_entsoe_forecast_bounded_window`** (**not** **`validate_powerunits_entsoe_market_bounded_window`**) → **`POST`** **`…/entsoe-forecast/validate-window`**. Successful JSON echoes **`checks.market_entsoe_load_forecast_hourly`** / **`checks.market_entsoe_wind_solar_forecast_hourly`** — if **`checks.market_demand_hourly`** appears, the upstream call routed to **`…/entsoe-market-sync/validate-window`** or the wrong Hermes tool was chosen.
+- [ ] **Summary — primary:** **`summarize_powerunits_entsoe_forecast_bounded_window`** → **`POST`** **`…/entsoe-forecast/summary-window`** (**not** **`…/entsoe-market-sync/summary-window`**).
 
 ### Bounded DE market features hourly (Hermes → Repo B; optional)
 

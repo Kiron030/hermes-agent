@@ -61,6 +61,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_baseline_layer_preview",
     "powerunits_de_stack_remediation_planner",
     "powerunits_bounded_coverage_inventory",
+    "powerunits_bounded_rollout_governance",
 ]
 
 DISABLED_PLATFORMS = [

@@ -180,6 +180,109 @@ def test_legacy_execute_only_does_not_open_validate(monkeypatch: pytest.MonkeyPa
     assert val_mod.check_powerunits_entsoe_forecast_bounded_validate_requirements() is False
 
 
+def _with_forecast_validate_primary_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+
+
+def test_validate_posts_only_entsoe_forecast_bounded_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    _with_forecast_validate_primary_env(monkeypatch)
+
+    captured: dict[str, str] = {}
+
+    ok_body = json.dumps(
+        {
+            "outcome": "passed",
+            "summary_code": "validation_passed",
+            "warnings": [],
+            "read_target": "primary",
+            "checks": {
+                "market_entsoe_load_forecast_hourly": {"row_count": 1},
+                "market_entsoe_wind_solar_forecast_hourly": {"row_count": 0},
+            },
+        }
+    )
+
+    class R:
+        status_code = 200
+        text = ok_body
+        content = ok_body.encode("utf-8")
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        captured["url"] = url
+        assert "entsoe-forecast/validate-window" in url
+        assert "entsoe-market-sync" not in url
+        return R()
+
+    out = json.loads(
+        val_mod.validate_powerunits_entsoe_forecast_bounded_window(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out["validation_attempted"] is True
+    assert out["bounded_internal_post_path"].endswith("/entsoe-forecast/validate-window")
+    assert (
+        out["bounded_internal_validator_family"] == val_mod._BOUNDED_REPO_B_VALIDATE_FAMILY_V1
+    )
+    assert "unexpected_contract_warnings" not in out
+    assert "entsoe-forecast/validate-window" in captured["url"]
+
+
+def test_validate_emits_warning_if_body_shape_is_market_sync_validator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Guards against misrouted HTTP or wrong tool invocation echoing market-sync validate checks."""
+    _with_forecast_validate_primary_env(monkeypatch)
+
+    bad_body = json.dumps(
+        {
+            "outcome": "passed",
+            "summary_code": "validation_passed",
+            "warnings": [],
+            "read_target": "primary",
+            "checks": {
+                "market_demand_hourly": {"row_count": 1},
+            },
+        }
+    )
+
+    class R:
+        status_code = 200
+        text = bad_body
+        content = bad_body.encode("utf-8")
+
+        def json(self) -> dict:
+            return json.loads(self.text)
+
+    def fake_post(url: str, headers: dict, json_body: dict, timeout_s: float) -> R:
+        assert "entsoe-forecast/validate-window" in url
+        return R()
+
+    out = json.loads(
+        val_mod.validate_powerunits_entsoe_forecast_bounded_window(
+            country="DE",
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T12:00:00Z",
+            version="v1",
+            _http_post=fake_post,
+        )
+    )
+    assert out.get("unexpected_contract_warnings")
+    assert any(
+        "validate_powerunits_entsoe_market_bounded_window" in w
+        for w in out["unexpected_contract_warnings"]
+    )
+
+
 def test_preflight_valid_de_via_primary_only(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_fcst_bounded_core(monkeypatch)
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
