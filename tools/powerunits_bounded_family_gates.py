@@ -320,3 +320,18 @@ def bounded_coverage_inventory_requirement_text() -> str:
         f"{BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV} must be truthy (read-only Repo B aggregation; "
         "Hermes carries no authoritative inventory matrix)"
     )
+
+
+# Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
+BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
+
+
+def bounded_rollout_governance_enabled() -> bool:
+    return _truthy(BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV)
+
+
+def bounded_rollout_governance_requirement_text() -> str:
+    return (
+        f"{BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV} must be truthy; plus "
+        "POWERUNITS_INTERNAL_EXECUTE_BASE_URL and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET (same bounded internal bearer stack)."
+    )

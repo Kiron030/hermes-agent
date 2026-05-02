@@ -76,6 +76,8 @@ Read-only counts are against normalized tables on Repo B **primary** app DB:
 - **`market_entsoe_load_forecast_hourly`**
 - **`market_entsoe_wind_solar_forecast_hourly`**
 
+Hermes **`validate_powerunits_entsoe_forecast_bounded_window`** (**not** **`validate_powerunits_entsoe_market_bounded_window`**) issues **`POST …/entsoe-forecast/validate-window`** only — not **`market_demand_hourly`**, **`market_prices_day_ahead`**, or **`market_generation_by_type_hourly`** (those belong to **`…/entsoe-market-sync/validate-window`**).
+
 Responses include **`row_count`**, **`distinct_timestamps`** (delivery hour starts), **`min_timestamp`**, **`max_timestamp`**, duplicate-key style checks where applicable (`load`: `row_count == distinct` on PK implied keys; wind/solar: duplicates per **`(country_code, delivery_start_utc, technology, version)`** buckets), plus **`checks.normalized_time_grain`** and **`checks.semantics_notes`** (forecast vs realized metered, long-format generation, `forecast_issue_utc` caveats).
 
 ## Caveats

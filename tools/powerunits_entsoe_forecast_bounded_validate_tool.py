@@ -35,7 +35,10 @@ _BASE_ENV = "POWERUNITS_INTERNAL_EXECUTE_BASE_URL"
 _SECRET_ENV = "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET"
 _TIMEOUT_ENV = "POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S"
 _SURFACE = "powerunits_entsoe_forecast_bounded_validate"
-_VALIDATE_PATH = "/internal/hermes/bounded/v1/entsoe-forecast/validate-window"
+_VALIDATE_PATH = (
+    "/internal/hermes/bounded/v1/entsoe-forecast/validate-window"  # not …/entsoe-market-sync/…
+)
+_BOUNDED_REPO_B_VALIDATE_FAMILY_V1 = "bounded_entsoe_forecast_normalized_f3b_f4_v1"
 _DEFAULT_TIMEOUT_S = 120
 _MAX_SUMMARY_CHARS = 8000
 
@@ -43,6 +46,18 @@ _SECRET_URL_RE = re.compile(
     r"(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?)://[^\s'\"<>]+",
     re.IGNORECASE,
 )
+
+
+def _looks_like_entsoe_market_sync_bounded_validate_payload(parsed: dict[str, Any]) -> bool:
+    """Detect ENTSO‑E **market-sync** bounded validate shapes (wrong endpoint or misrouted POST)."""
+    ch = parsed.get("checks")
+    if not isinstance(ch, dict):
+        return False
+    return (
+        "market_demand_hourly" in ch
+        or "market_prices_day_ahead" in ch
+        or "market_generation_by_type_hourly" in ch
+    )
 
 
 def check_powerunits_entsoe_forecast_bounded_validate_requirements() -> bool:
@@ -128,10 +143,13 @@ def validate_powerunits_entsoe_forecast_bounded_window(
         )
 
     base_statement = (
-        "Hermes performed no direct SQL. Validation used exactly one HTTP POST to the "
-        "Powerunits bounded internal entsoe-forecast validate-window API. Repo B returns counts on "
-        "market_entsoe_load_forecast_hourly (F3b) and market_entsoe_wind_solar_forecast_hourly (F4), "
-        "keyed by delivery_start_utc, plus semantics_notes on forecast_issue_utc caveats."
+        "Hermes performed no direct SQL. Validation uses exactly **`POST "
+        "/internal/hermes/bounded/v1/entsoe-forecast/validate-window`** (bounded ENTSO‑E **forecast**, "
+        "not **`…/entsoe-market-sync/validate-window`**). Repo B reads **forecast-native** hourly tables "
+        "**`market_entsoe_load_forecast_hourly`** (F3b) and **`market_entsoe_wind_solar_forecast_hourly`** "
+        "(F4) only — not realized-metered **market-sync** hourly tables (**`market_demand_hourly`**, "
+        "**`market_prices_day_ahead`**, **`market_generation_by_type_hourly`**). Grain: **`delivery_start_utc`**; "
+        "see **`checks.semantics_notes`** for long-format Wind/Solar and `forecast_issue_utc` caveats."
     )
 
     country_s = (country or "").strip()
@@ -268,6 +286,15 @@ def validate_powerunits_entsoe_forecast_bounded_window(
     server_outcome = parsed.get("outcome") if isinstance(parsed.get("outcome"), str) else None
     summary_code = parsed.get("summary_code")
 
+    unexpected_contract_warnings: list[str] = []
+    if status == 200 and _looks_like_entsoe_market_sync_bounded_validate_payload(parsed):
+        unexpected_contract_warnings.append(
+            "Response `checks` match **ENTSO‑E market-sync** bounded validate (demand/prices/generation tables), "
+            "not bounded **forecast** F3b/F4 — verify `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` and that the model "
+            "invoked **`validate_powerunits_entsoe_forecast_bounded_window`**, not "
+            "`validate_powerunits_entsoe_market_bounded_window`."
+        )
+
     out: dict[str, Any] = {
         "surface": _SURFACE,
         "slice": slice_obj,
@@ -285,7 +312,11 @@ def validate_powerunits_entsoe_forecast_bounded_window(
         "success": server_outcome == "passed",
         "response_body_summary": summary,
         "hermes_statement": base_statement,
+        "bounded_internal_post_path": _VALIDATE_PATH,
+        "bounded_internal_validator_family": _BOUNDED_REPO_B_VALIDATE_FAMILY_V1,
     }
+    if unexpected_contract_warnings:
+        out["unexpected_contract_warnings"] = unexpected_contract_warnings
 
     if status == 400:
         out["error_class"] = "server_validation"
@@ -299,10 +330,12 @@ def validate_powerunits_entsoe_forecast_bounded_window(
 VALIDATE_ENTSOE_FORECAST_SCHEMA = {
     "name": "validate_powerunits_entsoe_forecast_bounded_window",
     "description": (
-        "**Bounded ENTSO-E forecast validate-window** — Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d; one HTTP POST. "
-        "Repo B counts **`market_entsoe_load_forecast_hourly`** (F3b) and "
-        "**`market_entsoe_wind_solar_forecast_hourly`** (F4); delivery hour is **`delivery_start_utc`**. "
-        "Wind/solar is long-format per `technology`; `forecast_issue_utc` may be NULL. "
+        "**Bounded ENTSO‑E forecast validate-window** — one HTTP **`POST …/entsoe-forecast/validate-window`** "
+        "(**not** `…/entsoe-market-sync/validate-window`; not `validate_powerunits_entsoe_market_bounded_window`). "
+        "Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d. Counts **`market_entsoe_load_forecast_hourly`** (F3b) "
+        "and **`market_entsoe_wind_solar_forecast_hourly`** (F4) — **not** **`market_demand_hourly`** / "
+        "**`market_prices_day_ahead`** / **`market_generation_by_type_hourly`**. "
+        "Delivery hour **`delivery_start_utc`**; Wind/Solar long-format per `technology`. "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
     ),

@@ -76,6 +76,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_era5_weather_bounded_campaign",
     "powerunits_era5_weather_bounded_coverage_scan",
     "powerunits_bounded_coverage_inventory",
+    "powerunits_bounded_rollout_governance",
     "powerunits_baseline_layer_preview",
     "powerunits_de_stack_remediation_planner",
 )

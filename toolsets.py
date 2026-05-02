@@ -479,11 +479,12 @@ TOOLSETS = {
 
     "powerunits_entsoe_forecast_bounded_validate": {
         "description": (
-            "Bounded ENTSO-E forecast **validate-window**: one HTTP POST to read-only "
-            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (DE / v1 / ≤7d). "
-            "Counts on `market_entsoe_load_forecast_hourly` + `market_entsoe_wind_solar_forecast_hourly`. "
-            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_VALIDATE_ENABLED` + "
-            "same base URL and bearer."
+            "Bounded ENTSO‑E **forecast validate-window** (**not** ENTSO‑E market-sync): read-only **`POST`** "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (DE / NL / v1 / ≤7 d). "
+            "Forecast-native tables **`market_entsoe_load_forecast_hourly`**, **`market_entsoe_wind_solar_forecast_hourly`** "
+            "— **never** **`market_demand_hourly`** / **`market_prices_day_ahead`** / **`market_generation_by_type_hourly`** "
+            "(those belong to **`…/entsoe-market-sync/validate-window`**). "
+            "**Primary** or legacy `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_VALIDATE_ENABLED` + same base URL and bearer."
         ),
         "tools": ["validate_powerunits_entsoe_forecast_bounded_window"],
         "includes": [],
@@ -660,6 +661,18 @@ TOOLSETS = {
             "**No Hermes-side canonical matrix**, no Repo B CSV route — rerun after bounded repairs."
         ),
         "tools": ["inventory_powerunits_bounded_coverage_v1"],
+        "includes": [],
+    },
+
+    "powerunits_bounded_rollout_governance": {
+        "description": (
+            "**Bounded rollout governance matrix (read-only)** — Repo B authoritative allowlists/routes surfaced as "
+            "per-country × family rows; Hermes overlays Railway gate projection into `hermes_allowed_now` locally. "
+            "POST `/internal/hermes/bounded/v1/rollout-governance`. Requires "
+            "**`HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED`**, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. **No persisted matrix**, no auto-open actions."
+        ),
+        "tools": ["governance_powerunits_bounded_rollout_read_v1"],
         "includes": [],
     },
 
