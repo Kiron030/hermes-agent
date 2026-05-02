@@ -127,7 +127,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 ### Bounded ENTSO-E forecast (Hermes → Repo B; forecast family only)
 
 - [ ] **Orthogonal:** This path is **`…/entsoe-forecast/*`** → **`entsoe_forecast_job`** only — **not** **`…/entsoe-market-sync/*`**, **not** `market_feature_job`, **not** `market_driver_feature_job`.
-- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (DE / v1 / ≤7d) → `syntactically_valid: true`, bounded hint names execute tool.
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (Tier **`DE`/`NL`** / **`v1`** / ≤7 d) → `syntactically_valid: true`, bounded hint names execute tool.
 - [ ] **Preflight — legacy:** primary off + `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED=1` → same behavior.
 - [ ] **Primary + empty allowlist:** `…_ALLOWED_COUNTRIES=` (empty) with primary truthy → **fail-closed** (`feature_disabled` or equivalent).
 - [ ] **Execute gate off:** primary falsy **and** all four legacy falsy → execute **`feature_disabled`** — no Repo B HTTP.
@@ -156,8 +156,8 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 ### Bounded coverage inventory (multi-country read-only; optional)
 
 - [ ] **Feature gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`** falsy → **`inventory_powerunits_bounded_coverage_v1`** **`feature_disabled`** — no Repo B HTTP.
-- [ ] **Gate on:** **`inventory_powerunits_bounded_coverage_v1`** with **`[window_start_utc, window_end_utc)`**, ≤31 d UTC span, **`country_codes`** (one or several **Tier‑1 bounded ERA5** ISO2, e.g. `DE`, `NL`, `IT` — Repo B denies unknown ERA5 bbox keys with explicit skipped rows); omit **`families`** → Repo B returns **four** default inventory families (**ERA5**, ENTSO‑E **market**, **outage awareness**, ENTSO‑E **forecast**). Expect **`skipped`** rows from Repo B for non‑DE where v1 scanners are DE-only (**market / outage awareness / forecast**); **`repo_b_inventory`** JSON stays canonical (**no Hermes matrix**).
-- [ ] **`export_format=csv`:** response contains **`csv_export`** derived **only** from embedded **`repo_b_inventory.rows`** in the **same turn** (incl. **`warnings_json`**); still **no** workspace persistence requirement.
+- [ ] **Gate on:** **`inventory_powerunits_bounded_coverage_v1`** with **`[window_start_utc, window_end_utc)`**, ≤31 d UTC span, **`country_codes`** (one or several **Tier‑1 bounded ERA5** ISO2, e.g. `DE`, `NL`, `IT` — Repo B denies unknown ERA5 bbox keys with explicit skipped rows); omit **`families`** → Repo B returns **four** default inventory families (**ERA5**, ENTSO‑E **market**, **outage awareness**, ENTSO‑E **forecast**). Expect **`skipped`** rows for ISO2 outside each family Repo B v1 allowlist (notably **`bounded_outage_awareness_v1`** remains **DE-only**; **market** + **forecast** support **`DE`/`NL`**); **`repo_b_inventory`** JSON stays canonical (**no Hermes matrix**).
+- [ ] **`export_format=csv`:** response **`csv_export`** (UTF‑8 text) derives **only** from embedded **`repo_b_inventory.rows`** in the **same turn** (includes **`warnings_json`**). **Persist (optional):** set **`exports_csv_workspace_filename=my.csv`** (+ **`exports_csv_workspace_overwrite_mode`** as needed) → **`csv_workspace_saved`**, **`exports/…`** on bounded volume (`HERMES_HOME`); or **`save_hermes_workspace_note(kind=exports, name=….csv)`** with CSV content (**`.csv`** is now explicitly allowed alongside `.md`/`.txt`). Repo B **`rows` JSON stays canonical**.
 
 ### Bounded DE outage awareness (read-only; Hermes → Repo B)
 

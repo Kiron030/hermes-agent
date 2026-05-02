@@ -1,5 +1,5 @@
 """
-Shared local slice validation for bounded ENTSO-E **forecast** Hermes tools (DE / v1 / ≤7d).
+Shared local slice validation for bounded ENTSO-E forecast Hermes tools (Repo B Tier-1 ISO2 / v1 / ≤7 d).
 
 No registry.register — imported by entsoe forecast bounded tool modules only.
 """
@@ -7,6 +7,10 @@ No registry.register — imported by entsoe forecast bounded tool modules only.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+
+from tools.powerunits_entsoe_forecast_bounded_countries import (
+    ALLOWED_BOUNDED_ENTSOE_FORECAST_COUNTRY_CODES_V1,
+)
 
 
 def _parse_utc_iso(s: str) -> datetime:
@@ -28,8 +32,9 @@ def validate_entsoe_forecast_bounded_slice(
     version: str,
 ) -> tuple[str, datetime, datetime]:
     cc = (country or "").strip().upper()
-    if cc != "DE":
-        raise ValueError("country must be DE for bounded entsoe_forecast_sync v1")
+    if cc not in ALLOWED_BOUNDED_ENTSOE_FORECAST_COUNTRY_CODES_V1:
+        opts = ", ".join(sorted(ALLOWED_BOUNDED_ENTSOE_FORECAST_COUNTRY_CODES_V1))
+        raise ValueError(f"country must be one of ({opts}) for bounded entsoe_forecast_sync v1")
     if (version or "").strip() != "v1":
         raise ValueError("version must be v1 for this release")
     start = _parse_utc_iso(start_s)

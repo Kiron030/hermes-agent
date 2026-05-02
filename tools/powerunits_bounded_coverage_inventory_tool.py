@@ -24,6 +24,11 @@ from tools.powerunits_bounded_family_gates import (
     bounded_coverage_inventory_enabled,
     bounded_coverage_inventory_requirement_text,
 )
+from tools.powerunits_workspace_tool import (
+    _ensure_workspace_dirs,
+    _validate_save_name,
+    check_powerunits_workspace_requirements,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +193,37 @@ def _rows_to_csv(rows: list[dict[str, Any]]) -> str:
     return buf.getvalue()
 
 
+def _persist_csv_under_workspace_exports(
+    *,
+    basename: str,
+    csv_body: str,
+    overwrite_mode: str,
+) -> tuple[bool, str | None, str]:
+    """Write bounded-inventory CSV to ``exports/<basename>.csv``. Returns ok, relative path, note."""
+    if not basename.strip():
+        return False, None, "empty_filename"
+    mode = overwrite_mode.strip().lower()
+    if mode not in {"forbid", "overwrite"}:
+        return False, None, "exports_csv_workspace_overwrite_mode_must_be_forbid_or_overwrite"
+    if not csv_body.strip():
+        return False, None, "no_csv_body_to_persist"
+    try:
+        name = _validate_save_name(str(basename).strip())
+    except ValueError as e:
+        return False, None, f"invalid_workspace_filename:{e}"
+    if not name.lower().endswith(".csv"):
+        return False, None, "exports_snapshot_must_use_dot_csv_basename_only"
+    if not check_powerunits_workspace_requirements():
+        return False, None, "workspace_tools_disabled_or_root_unwritable"
+    root = _ensure_workspace_dirs()
+    out_path = (root / "exports" / name).resolve()
+    out_path.relative_to(root)
+    if mode == "forbid" and out_path.exists():
+        return False, out_path.relative_to(root).as_posix(), "file_already_exists_forbid_without_overwrite"
+    out_path.write_text(csv_body, encoding="utf-8")
+    return True, out_path.relative_to(root).as_posix(), "written"
+
+
 def inventory_powerunits_bounded_coverage_v1(
     *,
     window_start_utc: str,
@@ -196,6 +232,8 @@ def inventory_powerunits_bounded_coverage_v1(
     families: Any = None,
     version: str = "v1",
     export_format: str | None = None,
+    exports_csv_workspace_filename: str | None = None,
+    exports_csv_workspace_overwrite_mode: str | None = None,
     _http_post: Any = None,
 ) -> str:
     poster = _http_post or _default_http_post
@@ -260,6 +298,41 @@ def inventory_powerunits_bounded_coverage_v1(
 
     xf = ((export_format or "").strip().lower())
     export_csv_requested = xf in {"csv", "text/csv"}
+    persist_csv_stub = ((exports_csv_workspace_filename or "").strip())
+    if persist_csv_stub and not export_csv_requested:
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "error_code": "client_validation",
+                "validation_messages": [
+                    "exports_csv_workspace_filename requires export_format csv (derived CSV exists only "
+                    "from repo_b_inventory.rows in the same call)"
+                ],
+                "inventory_attempted": False,
+                "http_status": None,
+                "chat_summary": "",
+                "hermes_statement": stmt,
+            },
+            ensure_ascii=False,
+        )
+    if persist_csv_stub:
+        raw_ow = (exports_csv_workspace_overwrite_mode or "forbid").strip().lower()
+        if raw_ow not in {"forbid", "overwrite"}:
+            return json.dumps(
+                {
+                    "surface": _SURFACE,
+                    "error_code": "client_validation",
+                    "validation_messages": [
+                        "exports_csv_workspace_overwrite_mode must be forbid or overwrite"
+                    ],
+                    "inventory_attempted": False,
+                    "http_status": None,
+                    "chat_summary": "",
+                    "hermes_statement": stmt,
+                },
+                ensure_ascii=False,
+            )
+
     if xf and xf not in {"csv", "text/csv", "none", "", "null"}:
         return json.dumps(
             {
@@ -375,10 +448,23 @@ def inventory_powerunits_bounded_coverage_v1(
         "request_echo": {"path": _INVENTORY_PATH, "body": body_doc, "gate_env": BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV},
         "csv_export": export_csv_body,
         "hint_export": (
-            "`csv_export` is derived-only from `repo_b_inventory.rows` in **this response**, including "
-            "column **`warnings_json`** (same turn as Repo B payload; **no persisted matrix**)."
+            "`csv_export`: UTF-8 CSV derived **only** from `repo_b_inventory.rows` **in this reply** (`warnings_json` column). "
+            "Optional **`exports_csv_workspace_filename`**: persists that stream to **`hermes_workspace/exports/`** as "
+            "**`*.csv`** (Hermes bounded volume — not canonical state). Repo B **`rows`** JSON remains canonical."
         ),
     }
+
+    if persist_csv_stub:
+        csv_ow = str(exports_csv_workspace_overwrite_mode or "forbid").strip().lower()
+        saved, rel_path, pnote = _persist_csv_under_workspace_exports(
+            basename=persist_csv_stub,
+            csv_body=export_csv_body or "",
+            overwrite_mode=csv_ow,
+        )
+        out["csv_workspace_saved"] = saved
+        if rel_path:
+            out["csv_workspace_path"] = rel_path
+        out["csv_workspace_note"] = pnote
 
     if not rows_ok:
         content_type = resp.headers.get("content-type", "")
@@ -404,7 +490,10 @@ INVENTORY_BOUNDED_SCHEMA = {
         "and ENTSO‑E forecast delivery-hour semantics (incl. long-format Wind/Solar notes in `checks`) are **Repo B**-grounded "
         "(Hermes forwards JSON only). No writes/jobs — **Hermes caches no authoritative matrix**; rerun after repairs. Requires "
         f"`{BOUNDED_COVERAGE_INVENTORY_PRIMARY_ENV}`, {_BASE_ENV}, {_SECRET_ENV}. "
-        '`export_format="csv"` → `csv_export` with column **`warnings_json`** from the **same** `repo_b_inventory.rows`; no side store.'
+        '`export_format="csv"` fills **`csv_export`** (UTF-8) from **`repo_b_inventory.rows`** — same turn only. '
+        "Optional **`exports_csv_workspace_filename`** (basename `*.csv`): writes the same CSV bytes to **`exports/<filename>`** "
+        'on the bounded Hermes workspace volume when derivation succeeds. Alternative: **`save_hermes_workspace_note`** '
+        "with **`kind=exports`**, **`name` ending `.csv`**, content = **`csv_export`**. **Repo B** remains **`rows` JSON‑only canonical**."
     ),
     "parameters": {
         "type": "object",
@@ -421,8 +510,9 @@ INVENTORY_BOUNDED_SCHEMA = {
                 "description": (
                     "One or many ISO2 codes. **ERA5 family** evaluates each Tier‑1 code Repo B permits "
                     "(see Repo B ``ERA5_COUNTRY_BBOXES`` / bounded allowlist); unknown ISO2 → Repo B "
-                    "**skipped** row for ERA5 with allowlist rationale. ENTSO‑E market / outage / forecast "
-                    "inventory rows remain **DE-only skipped** off DE. CSV or comma string (e.g. "
+                    "**skipped** row for ERA5 with allowlist rationale. **ENTSO‑E market / forecast**: explicit **`skipped`** "
+                    "for ISO2 outside Repo B bounded v1 (**`DE`/`NL`** intersection). **Outage awareness** inventory stays "
+                    "**DE-only** skipped off DE (planner-scope unchanged). CSV or comma string (e.g. "
                     '`["DE","IT","ES"]` or `DE,IT`).'
                 ),
                 "oneOf": [
@@ -435,8 +525,9 @@ INVENTORY_BOUNDED_SCHEMA = {
                 "description": (
                     "Optional subset; Repo B inventory v1 family ids — **all four defaults** when omitted: "
                     "`bounded_era5_weather_normalized_v1`, `bounded_entsoe_market_normalized_v1`, "
-                    "`bounded_outage_awareness_v1`, `bounded_entsoe_forecast_v1`. "
-                    "Non-DE countries yield explicit **`skipped`** rows where Repo B inventory v1 is DE-only: ENTSO‑E market, outage awareness, ENTSO‑E forecast (`summary_code` explains each skip)."
+                    "`bounded_outage_awareness_v1`, `bounded_entsoe_forecast_v1`. Explicit **`skipped`** rows when a "
+                    "country is outside that family’s Repo B v1 inventory allowlist (**outage awareness** remains "
+                    "**DE-only**)."
                 ),
                 "items": {"type": "string"},
             },
@@ -444,8 +535,22 @@ INVENTORY_BOUNDED_SCHEMA = {
             "export_format": {
                 "type": "string",
                 "description": (
-                    'Optional. Set export_format to the string csv to populate csv_export from Repo B rows '
-                    "in **this single response**, including JSON column warnings_json (no Hermes persistence)."
+                    'Optional **`csv`** (aliases `text/csv`): fills **`csv_export`** from Repo B **`rows`** in this response only; '
+                    "Hermes-derived — no Repo B CSV route."
+                ),
+            },
+            "exports_csv_workspace_filename": {
+                "type": "string",
+                "description": (
+                    "Optional. Requires **`export_format=csv`**. Basename ending in `.csv`; wrote under bounded workspace **`exports/`** "
+                    "when **`csv_workspace_saved`** — same bytes as **`csv_export`**. Use forbid/overwrite modes for collision policy."
+                ),
+            },
+            "exports_csv_workspace_overwrite_mode": {
+                "type": "string",
+                "enum": ["forbid", "overwrite"],
+                "description": (
+                    'When **`exports_csv_workspace_filename`** is set — default **`forbid`** (matching `save_hermes_workspace_note`).'
                 ),
             },
         },
@@ -470,6 +575,16 @@ registry.register(
             None
             if (args or {}).get("export_format") is None
             else str((args or {}).get("export_format", "")).strip()
+        ),
+        exports_csv_workspace_filename=(
+            None
+            if (args or {}).get("exports_csv_workspace_filename") is None
+            else str((args or {}).get("exports_csv_workspace_filename", "")).strip()
+        ),
+        exports_csv_workspace_overwrite_mode=(
+            None
+            if (args or {}).get("exports_csv_workspace_overwrite_mode") is None
+            else str((args or {}).get("exports_csv_workspace_overwrite_mode", "")).strip()
         ),
     ),
     check_fn=check_powerunits_bounded_coverage_inventory_requirements,

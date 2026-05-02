@@ -22,7 +22,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _ALLOWED_SUBDIRS = ("analysis", "notes", "drafts", "exports")
-_ALLOWED_EXTS = (".md", ".txt")
+_ALLOWED_EXTS = (".md", ".txt", ".csv")
 _NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,180}$")
 _DEFAULT_MAX_CHARS = 16_000
 _ABS_MAX_CHARS = 32_000
@@ -76,7 +76,7 @@ def _validate_read_path(path: str) -> tuple[str, str]:
         raise ValueError(f"path must start with one of: {', '.join(_ALLOWED_SUBDIRS)}")
     fname = parts[-1]
     if not fname.lower().endswith(_ALLOWED_EXTS):
-        raise ValueError("only .md/.txt files are allowed")
+        raise ValueError("only .md, .txt, or .csv files are allowed")
     return subdir, "/".join(parts[1:])
 
 
@@ -91,7 +91,7 @@ def _validate_save_name(name: str) -> str:
     if not _NAME_RE.match(n):
         raise ValueError("name contains invalid characters")
     if not n.lower().endswith(_ALLOWED_EXTS):
-        raise ValueError("name must end with .md or .txt")
+        raise ValueError("name must end with .md, .txt, or .csv")
     return n
 
 
@@ -231,7 +231,7 @@ LIST_SCHEMA = {
 READ_SCHEMA = {
     "name": "read_hermes_workspace_file",
     "description": (
-        "Read .md/.txt file from bounded workspace /opt/data/hermes_workspace/<allowed-subdir>/..."
+        "Read .md/.txt/.csv file from bounded workspace /opt/data/hermes_workspace/<allowed-subdir>/..."
     ),
     "parameters": {
         "type": "object",
@@ -253,7 +253,7 @@ WRITE_SCHEMA = {
         "type": "object",
         "properties": {
             "kind": {"type": "string", "description": "One of analysis|notes|drafts|exports"},
-            "name": {"type": "string", "description": "File name ending with .md or .txt"},
+            "name": {"type": "string", "description": "File name ending with .md, .txt, or .csv"},
             "content": {"type": "string", "description": "Text content to save"},
             "overwrite_mode": {"type": "string", "enum": ["forbid", "overwrite"]},
         },

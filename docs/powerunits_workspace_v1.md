@@ -23,7 +23,7 @@ Toolset: `powerunits_workspace`
   - Path must be relative and start with allowed subdir (e.g. `notes/today.md`)
 - `save_hermes_workspace_note(kind, name, content, overwrite_mode?)`
   - `kind`: one of allowed subdirs
-  - `name`: file name only, `.md`/`.txt`
+  - `name`: file name only — **`.md`**, **`.txt`**, or **`.csv`** (UTF-8 flat text); **preferred** for bounded coverage snapshots: **`exports/your-matrix.csv`**
   - `overwrite_mode`: `forbid` (default) or `overwrite`
 
 ## Safety boundary
@@ -33,7 +33,7 @@ Toolset: `powerunits_workspace`
 - No `..`
 - No root escape
 - Only allowlisted subdirs
-- Only text extensions (`.md`, `.txt`)
+- Only flat-text extensions (**`.md`**, **`.txt`**, **`.csv`**)
 - No delete, no rename, no generic file-tool exposure
 
 ## Runtime behavior
@@ -46,7 +46,7 @@ Toolset: `powerunits_workspace`
 - `analysis`: strukturierte Auswertungen, Zwischenanalysen, Vergleichsnotizen
 - `notes`: kurze operative Mitschriften, Fakten, Session-Notizen
 - `drafts`: entstehende Entwuerfe (Prompts, Texte, Runbook-Entwuerfe)
-- `exports`: explizite Endresultate zum Weitergeben (readable output snapshots)
+- `exports`: downloadable snapshots — **tabular prefer `*.csv`** (bounded Hermes-derived inventory exports, etc.)
 
 ## Recommended markdown templates
 

@@ -201,7 +201,7 @@ TOOLSETS = {
     "powerunits_workspace": {
         "description": (
             "Bounded persistent workspace at /opt/data/hermes_workspace "
-            "(analysis/notes/drafts/exports), no delete/rename, text files only."
+            "(analysis/notes/drafts/exports), no delete/rename; *.md/*.txt/*.csv bounded text blobs only."
         ),
         "tools": [
             "list_hermes_workspace",
@@ -652,11 +652,12 @@ TOOLSETS = {
         "description": (
             "**Bounded coverage inventory (multi-country read-only)** — one HTTP POST to "
             "`/internal/hermes/bounded/v1/coverage-inventory` (Repo B). Default v1 families: ERA5 normalized, "
-            "ENTSO‑E **market** (DE scanners for inventory), DE‑only **outage awareness** inventory rows, "
-            "ENTSO‑E **forecast** (delivery‑hour semantics; DE‑scanner inventory rows). Non‑DE ⇒ explicit "
-            "`skipped` rows for DE‑only families. Requires `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`, "
+            "ENTSO‑E **market** + ENTSO‑E **forecast** (Repo B Tier **`DE`/`NL`** scanners; delivery‑hour forecast semantics); "
+            "DE‑only **outage awareness** inventory rows (unchanged phased scope). Countries outside each family "
+            "allowlist ⇒ explicit **`skipped`**. Requires `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`, "
             "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. "
-            "**No Hermes-side matrix**, no writes — rerun after bounded repairs."
+            "`export_format=csv` → inline `csv_export` (Hermes-derived from Repo `rows`). Optional **`exports_csv_workspace_filename`** persists the same CSV to **`hermes_workspace/exports/*.csv`** in one tool call (**Repo B stays JSON-canonical**)."
+            "**No Hermes-side canonical matrix**, no Repo B CSV route — rerun after bounded repairs."
         ),
         "tools": ["inventory_powerunits_bounded_coverage_v1"],
         "includes": [],

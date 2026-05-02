@@ -20,6 +20,10 @@ from tools.powerunits_bounded_family_gates import (
     ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV,
     entsoe_forecast_bounded_core_step_enabled,
     entsoe_forecast_bounded_gate_requirement_text,
+    entsoe_forecast_bounded_request_country_permitted,
+)
+from tools.powerunits_entsoe_forecast_bounded_countries import (
+    BOUNDED_ENTSOE_FORECAST_USER_FACING_ISO2_DOCUMENTATION_V1 as _ISO_DOC_ENTSO_FORECAST,
 )
 from tools.powerunits_entsoe_forecast_bounded_slice import validate_entsoe_forecast_bounded_slice
 
@@ -152,6 +156,31 @@ def summarize_powerunits_entsoe_forecast_bounded_window(
             ensure_ascii=False,
         )
 
+    if not entsoe_forecast_bounded_request_country_permitted(cc):
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "slice": {
+                    "country": cc,
+                    "version": version_s,
+                    "start_utc": start_dt.isoformat().replace("+00:00", "Z"),
+                    "end_utc_exclusive": end_dt.isoformat().replace("+00:00", "Z"),
+                },
+                "error_code": "country_not_permitted",
+                "summary_messages": [
+                    (
+                        "country not permitted under current Hermes "
+                        f"{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}/{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}"
+                    ),
+                ],
+                "summary_attempted": False,
+                "http_status": None,
+                "outcome_class": None,
+                "hermes_statement": base_statement,
+            },
+            ensure_ascii=False,
+        )
+
     slice_obj = {
         "country": cc,
         "version": version_s,
@@ -267,7 +296,7 @@ def summarize_powerunits_entsoe_forecast_bounded_window(
 SUMMARY_ENTSOE_FORECAST_SCHEMA = {
     "name": "summarize_powerunits_entsoe_forecast_bounded_window",
     "description": (
-        "**Bounded ENTSO-E forecast summary-window** — DE / v1 / ≤7d; one HTTP POST; "
+        "**Bounded ENTSO-E forecast summary-window** — Repo B Tier 1 **`DE`**/**`NL`** / **`v1`** / ≤7 d; one HTTP POST; "
         "forecast load + wind/solar delivery-hour rollup (see validate tool). "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`; {_BASE_ENV}, {_SECRET_ENV}."
@@ -275,7 +304,7 @@ SUMMARY_ENTSOE_FORECAST_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "country": {"type": "string", "description": "Must be DE (v1)."},
+            "country": {"type": "string", "description": _ISO_DOC_ENTSO_FORECAST},
             "start": {"type": "string", "description": "Inclusive UTC ISO-8601 with Z."},
             "end": {"type": "string", "description": "Exclusive UTC ISO-8601 with Z."},
             "version": {"type": "string", "description": "Must be v1."},
