@@ -2,7 +2,7 @@
 
 Operator-facing checklist for the **internal Hermes service** running in the **Powerunits Railway project** (or equivalent). Paths assume container defaults; adjust only if your image overrides them.
 
-**Doc set (Stage 1):** `SOUL.hermes.md` · `ACCESS_MATRIX.md` · **this runbook** · `RUNBOOK.hermes-stage1-validation.md` (repeatable checks + post-deploy verification) · `docs/powerunits_bounded_operating_model_v1.md` (bounded cross-family model; canonical detail in EU-PP-Database `docs/architecture/internal_hermes_bounded_operating_model_v1.md`) · `docs/hermes_v0_12_staged_upgrade_powerunits.md` (**Hermes v0.12.x** staging-first upgrade prep — Curator/self-improve guardrails; no Repo B change).
+**Doc set (Stage 1):** `SOUL.hermes.md` · `ACCESS_MATRIX.md` · **this runbook** · `RUNBOOK.hermes-stage1-validation.md` (repeatable checks + post-deploy verification) · `docs/powerunits_bounded_operating_model_v1.md` (bounded cross-family model; canonical detail in EU-PP-Database `docs/architecture/internal_hermes_bounded_operating_model_v1.md`) · `docs/hermes_v0_12_staged_upgrade_powerunits.md` (**Hermes v0.12.x** staging-first upgrade prep — Curator/self-improve guardrails; no Repo B change) · `docs/powerunits_runtime_v0_12_integration.md` (**Docker/runtime merge path** vs tag `v2026.4.30`, staging deploy order).
 
 **After any deploy or env change:** run `RUNBOOK.hermes-stage1-validation.md` first to confirm Trusted Analyst mode is still intact.
 

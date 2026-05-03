@@ -28,7 +28,9 @@ Unbundled-from-core items (Teams plugins, Spotify, Meet, Langfuse, achievements,
 | **Global `redaction.enabled`** | Default **off** unless you are debugging a specific leak; align with upstream default. | **Off** unless security review requires opt-in and operators accept patch/JSON distortion risk. |
 | **Bundled telemetry/plugins** | Do not enable Langfuse/achievements/Spotify/etc. unless testing in isolation. | **Leave inactive** until product/security sign-off. |
 | **`HERMES_POWERUNITS_RUNTIME_POLICY`** | Remains **`first_safe_v1`**. | Unchanged. |
-| **`config.yaml` merge** | After upgrading the **Hermes binary/image**, reconcile **`$HERMES_HOME/config.yaml`** with your existing Powerunits entries (Telegram toolsets applied by [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) or equivalent); **explicitly set Curator off** if the merged upstream template omits it. | Same; review on each production deploy. |
+| **`config.yaml` merge** | After upgrading the **Hermes binary/image**, reconcile **`$HERMES_HOME/config.yaml`** with your existing Powerunits entries (Telegram toolsets applied by [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) or equivalent).
+
+  **Hermes Agent v0.12+ (`first_safe_v1`):** the same script sets **`auxiliary.curator.enabled: false`** when absent (operators may still enforce stricter pinning). See **`docs/powerunits_runtime_v0_12_integration.md`**. | Same; review on each production deploy. |
 
 **Exact YAML shape** depends on the installed Hermes v0.12 build — verify keys with `hermes doctor` / upstream docs. A **commented illustration** lives at [`config/hermes_v0_12_powerunits_config_snippet.yaml.example`](../config/hermes_v0_12_powerunits_config_snippet.yaml.example) (not loaded automatically).
 
@@ -85,7 +87,7 @@ Use this as a **negative** checklist until separately approved:
 - **No new Railway variable is strictly required** solely to *prepare* this branch (documentation-only in git).
 - **After** you deploy a **v0.12** Hermes build to staging, ensure:
   - Existing Powerunits env vars unchanged unless the release notes require renames (check upstream changelog when merging).
-  - **`$HERMES_HOME/config.yaml`** on the volume is merged/reviewed and **Curator** is **explicitly off** for our policy.
+  - **`$HERMES_HOME/config.yaml`** on the volume is merged/reviewed; with **`first_safe_v1`**, [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) defaults **Curator** to **off** when the key was missing (see [`docs/powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md)).
 - Optional: run **`hermes update --check`** (or your image build’s equivalent) from a maintainer workstation before bumping the deploy tag.
 
 ---
@@ -94,4 +96,5 @@ Use this as a **negative** checklist until separately approved:
 
 - [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) — v0.12 staging cutover checklist (short).
 - [`RUNBOOK.hermes-trusted-analyst.md`](../RUNBOOK.hermes-trusted-analyst.md) — operator entry context.
+- [`docs/powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) — Docker/runtime merge path, tag `v2026.4.30`, staging deploy and smoke order.
 - [`config/hermes_v0_12_powerunits_config_snippet.yaml.example`](../config/hermes_v0_12_powerunits_config_snippet.yaml.example) — illustrative `config.yaml` fragment.
