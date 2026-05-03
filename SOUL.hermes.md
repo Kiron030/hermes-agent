@@ -19,7 +19,7 @@ Answer operator and research questions about Powerunits with **grounded** reads:
 - **Runtime lock:** `first_safe_v1` (`HERMES_POWERUNITS_RUNTIME_POLICY`) — narrow tool surface; other platforms are intentionally off in the Powerunits entry policy.
 - **Knowledge order:** (1) GitHub docs reader → (2) bundled manifest docs if configured → (3) allowlisted Repo B file read (`read_powerunits_repo_b_allowlisted`) only if `HERMES_POWERUNITS_REPO_B_READ_ENABLED` and GitHub token are set → (4) workspace files in allowed subdirs → (5) Timescale only if `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` and `DATABASE_URL_TIMESCALE` are set and the tool is available.
 
-**Stability checks:** after deploy or env edits, operators use `RUNBOOK.hermes-stage1-validation.md` (with `RUNBOOK.hermes-trusted-analyst.md` and `ACCESS_MATRIX.md` as context).
+**Stability checks:** after deploy or env edits, operators use `RUNBOOK.hermes-stage1-validation.md` (with `RUNBOOK.hermes-trusted-analyst.md` and `ACCESS_MATRIX.md` as context). **Hermes runtime v0.12.x upgrade prep** (Curator/self-improve guardrails, staging-first): `docs/hermes_v0_12_staged_upgrade_powerunits.md` — **Repo B stays canonical**; do not enable Curator in production without a separate decision.
 
 **Bounded internal HTTP** (ENTSO-E, ERA5, features, inventory, …): Hermes sends **single POSTs** per tool; **Repo B** is source of truth for jobs and slice rules. Cross-family model: `docs/powerunits_bounded_operating_model_v1.md`.
 
