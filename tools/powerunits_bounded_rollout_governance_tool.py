@@ -8,6 +8,8 @@ Repo B remains canonical for ``repo_b_allowed`` and ``*_ready`` flags; Hermes fi
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
@@ -18,6 +20,7 @@ from typing import Any
 import httpx
 
 from tools.bounded_rollout_governance_projection_v1 import merge_repo_b_rollout_governance_payload_v1
+from tools.powerunits_bounded_coverage_inventory_tool import _persist_csv_under_workspace_exports
 from tools.powerunits_bounded_family_gates import (
     BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV,
     bounded_rollout_governance_enabled,
@@ -87,14 +90,75 @@ def _default_http_post(
         return client.post(url, headers=headers, json=json_body)
 
 
+GOVERNANCE_CSV_EXPORT_COLUMNS_V1: tuple[str, ...] = (
+    "family",
+    "country_code",
+    "repo_b_allowed",
+    "hermes_allowed_now",
+    "inventory_ready",
+    "execute_ready",
+    "validate_ready",
+    "summary_ready",
+    "coverage_scan_ready",
+    "campaign_ready",
+    "planner_ready",
+    "effective_status",
+    "blocking_reason",
+    "suggested_next_action",
+    "effective_status_cross_layer",
+    "blocking_reason_cross_layer",
+)
+
+
+def _governance_rows_to_csv(rows: list[dict[str, Any]]) -> str:
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(GOVERNANCE_CSV_EXPORT_COLUMNS_V1)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        hnow = row.get("hermes_allowed_now")
+        hnow_s = (
+            json.dumps(hnow, ensure_ascii=False)
+            if isinstance(hnow, dict)
+            else ("" if hnow is None else json.dumps(hnow, ensure_ascii=False))
+        )
+        w.writerow(
+            [
+                row.get("family"),
+                row.get("country_code"),
+                row.get("repo_b_allowed"),
+                hnow_s,
+                row.get("inventory_ready"),
+                row.get("execute_ready"),
+                row.get("validate_ready"),
+                row.get("summary_ready"),
+                row.get("coverage_scan_ready"),
+                row.get("campaign_ready"),
+                row.get("planner_ready"),
+                row.get("effective_status"),
+                row.get("blocking_reason") if row.get("blocking_reason") is not None else "",
+                row.get("suggested_next_action") if row.get("suggested_next_action") is not None else "",
+                row.get("effective_status_cross_layer") if row.get("effective_status_cross_layer") else "",
+                row.get("blocking_reason_cross_layer") if row.get("blocking_reason_cross_layer") else "",
+            ]
+        )
+    return buf.getvalue()
+
+
 def governance_powerunits_bounded_rollout_read_v1(
     *,
     country_codes_csv: str | None = None,
     version: str = "v1",
     apply_hermes_overlay: bool = True,
+    export_format: str | None = None,
+    exports_csv_workspace_filename: str | None = None,
+    exports_csv_workspace_overwrite_mode: str | None = None,
     _http_post: Any = None,
 ) -> str:
     poster = _http_post or _default_http_post
+    ef_raw = str(export_format or "").strip().lower()
+    export_csv_requested = ef_raw in ("csv", "text/csv")
 
     base_stmt = (
         "Hermes performed no writes. One read-only POST to Repo B bounded rollout-governance. "
@@ -192,12 +256,65 @@ def governance_powerunits_bounded_rollout_read_v1(
             parsed["hermes_overlay_error"] = str(e)
 
     parsed.setdefault("hermes_statement", base_stmt)
+
+    if parsed.get("success") is True:
+        _meta = parsed.get("meta")
+        if isinstance(_meta, dict):
+            ga = _meta.get("generated_at_utc")
+            if isinstance(ga, str) and ga.strip():
+                parsed["repo_b_rollout_governance_generated_at_utc"] = ga.strip()
+            cm = _meta.get("canonical_bounded_entso_market_v1_iso2")
+            cf = _meta.get("canonical_bounded_entso_forecast_v1_iso2")
+            if isinstance(cm, list):
+                parsed["repo_b_canonical_bounded_entso_market_v1_iso2"] = cm
+            if isinstance(cf, list):
+                parsed["repo_b_canonical_bounded_entso_forecast_v1_iso2"] = cf
+            parsed.setdefault(
+                "hint_governance_truth_vs_overlay_v1",
+                "Repo B lane truth: **repo_b_allowed** + **execute_ready** on each row. "
+                "**effective_status_cross_layer** reflects Hermes Railway gates + allowlist projection. "
+                "If cross-layer says gated but HTTP to Repo B works, check **HERMES_POWERUNITS_ENTSOE_*_BOUNDED_ALLOWED_COUNTRIES** "
+                "(market vs forecast are separate env vars). "
+                "**repo_b_rollout_governance_generated_at_utc** + **repo_b_canonical_bounded_entso_*_v1_iso2** echo Repo B **meta** for Telegram-friendly reads.",
+            )
+
     if status != 200 or not parsed.get("success"):
         parsed.setdefault(
             "response_body_summary",
             raw_text,
         )
         return json.dumps(parsed, ensure_ascii=False)
+
+    persist_csv_stub = (
+        str(exports_csv_workspace_filename or "").strip() if exports_csv_workspace_filename else ""
+    )
+
+    rows = parsed.get("rows")
+    export_csv_body: str | None = None
+    if export_csv_requested and isinstance(rows, list) and rows:
+        export_csv_body = _governance_rows_to_csv(rows)
+        parsed["governance_csv_export_columns_v1"] = list(GOVERNANCE_CSV_EXPORT_COLUMNS_V1)
+        parsed["csv_export"] = export_csv_body
+        parsed["hint_export_governance_csv"] = (
+            "**`csv_export`**: Hermes-derived UTF‑8 CSV from **`rows`** in this reply (Repo B JSON remains canonical). "
+            "Columns **`effective_status`** / **`blocking_reason`** are Repo‑B rollup; **`_*_cross_layer`** appear "
+            "when **`apply_hermes_overlay`** merged Hermes gates. **`hermes_allowed_now`** is compact JSON in-cell. "
+            "Optional **`exports_csv_workspace_filename`**: persists the same CSV to **`hermes_workspace/exports/`** — "
+            "prefer a **timestamped** basename (e.g. `governance-20260430T120000Z.csv`) so clients do not silently "
+            "reuse an older export; use **`exports_csv_workspace_overwrite_mode=overwrite`** when reusing a fixed name."
+        )
+
+        if persist_csv_stub:
+            csv_ow = str(exports_csv_workspace_overwrite_mode or "forbid").strip().lower()
+            saved, rel_path, pnote = _persist_csv_under_workspace_exports(
+                basename=persist_csv_stub,
+                csv_body=export_csv_body or "",
+                overwrite_mode=csv_ow,
+            )
+            parsed["csv_workspace_saved"] = saved
+            if rel_path:
+                parsed["csv_workspace_path"] = rel_path
+            parsed["csv_workspace_note"] = pnote
 
     return json.dumps(parsed, ensure_ascii=False)
 
@@ -208,7 +325,9 @@ BOUNDED_ROLLOUT_GOVERNANCE_SCHEMA_V1 = {
         "**Read-only rollout governance v1**: single POST `POST /internal/hermes/bounded/v1/rollout-governance` "
         f"(Repo B). Optional Hermes merges Railway gate truth into **`hermes_allowed_now`** (+ cross-layer statuses) "
         f"without changing Repo canonical readiness flags. Gate `{BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV}` "
-        f"plus {_BASE_ENV} / {_SECRET_ENV}. Omit **country_codes_csv** ⇒ Repo B bounded default universe."
+        f"plus {_BASE_ENV} / {_SECRET_ENV}. Omit **country_codes_csv** ⇒ Repo B bounded default universe. "
+        '**export_format=`csv`** (alias **text/csv**) fills **`csv_export`** (+ optional workspace save) from governance '
+        "**`rows`** in this Hermes envelope only — Repo B remains JSON-canonical."
     ),
     "parameters": {
         "type": "object",
@@ -221,6 +340,25 @@ BOUNDED_ROLLOUT_GOVERNANCE_SCHEMA_V1 = {
             "apply_hermes_overlay": {
                 "type": "boolean",
                 "description": "When true (default), merge Hermes env projection into each row.",
+            },
+            "export_format": {
+                "type": "string",
+                "description": (
+                    'Optional **`csv`** (**`text/csv`**): derives **`csv_export`** from Repo B **`rows`** (Hermes-rounded '
+                    "envelope) in this reply; see **`hint_export_governance_csv`**."
+                ),
+            },
+            "exports_csv_workspace_filename": {
+                "type": "string",
+                "description": (
+                    "Optional basename ending in `.csv`; requires **`export_format=csv`**. Writes **`exports/`** on the "
+                    "bounded Hermes workspace volume when **`csv_workspace_saved`**. Prefer ISO‑8601 timestamped names "
+                    "to avoid stale workspace reads (e.g. `rollout-governance-20260430T120000Z.csv`)."
+                ),
+            },
+            "exports_csv_workspace_overwrite_mode": {
+                "type": "string",
+                "description": "`forbid` (default) or `overwrite` when saving governance CSV under workspace exports.",
             },
         },
         "required": [],
@@ -238,6 +376,13 @@ registry.register(
         country_codes_csv=str((args or {}).get("country_codes_csv") or "").strip() or None,
         version=str((args or {}).get("version") or "v1"),
         apply_hermes_overlay=bool((args or {}).get("apply_hermes_overlay", True)),
+        export_format=str((args or {}).get("export_format") or "").strip() or None,
+        exports_csv_workspace_filename=(
+            str((args or {}).get("exports_csv_workspace_filename") or "").strip() or None
+        ),
+        exports_csv_workspace_overwrite_mode=(
+            str((args or {}).get("exports_csv_workspace_overwrite_mode") or "").strip() or None
+        ),
     ),
     check_fn=check_powerunits_bounded_rollout_governance_requirements,
     requires_env=[
