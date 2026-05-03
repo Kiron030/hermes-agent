@@ -99,6 +99,26 @@ def _is_gemini_openai_compat_base_url(base_url: Any) -> bool:
     return normalized.endswith("/openai")
 
 
+def _custom_base_url_accepts_ollama_think_extra_body(base_url: Any) -> bool:
+    """Gate ``extra_body[\"think\"]`` (Ollama extension) to servers that support it.
+
+    Hermes injects ``think: false`` for some *custom* OpenAI-compatible backends
+    (notably Ollama) when reasoning is disabled.  Official OpenAI Chat
+    Completions and Azure OpenAI reject unknown body keys and return HTTP 400
+    ``Unrecognized request argument supplied: think`` — including boolean
+    ``false``.  See tests: ``test_openai_direct_custom_skips_think_extra_body``.
+    """
+    s = str(base_url or "").strip().lower()
+    if not s:
+        # Indeterminate URL (e.g. unit tests); keep legacy behavior.
+        return True
+    if "api.openai.com" in s:
+        return False
+    if "openai.azure.com" in s:
+        return False
+    return True
+
+
 class ChatCompletionsTransport(ProviderTransport):
     """Transport for api_mode='chat_completions'.
 
@@ -380,8 +400,11 @@ class ChatCompletionsTransport(ProviderTransport):
             options["num_ctx"] = ollama_ctx
             extra_body["options"] = options
 
-        # Ollama/custom think=false
-        if params.get("is_custom_provider", False):
+        # Ollama-style custom backends: extra_body.think=false disables thinking.
+        # Do not send this to official OpenAI / Azure OpenAI (HTTP 400).
+        if params.get("is_custom_provider", False) and _custom_base_url_accepts_ollama_think_extra_body(
+            base_url
+        ):
             if reasoning_config and isinstance(reasoning_config, dict):
                 _effort = (reasoning_config.get("effort") or "").strip().lower()
                 _enabled = reasoning_config.get("enabled", True)

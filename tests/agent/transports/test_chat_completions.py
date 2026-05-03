@@ -122,6 +122,18 @@ class TestChatCompletionsBuildKwargs:
         )
         assert kw["extra_body"]["think"] is False
 
+    def test_custom_openai_skips_think_even_when_reasoning_disabled(self, transport):
+        """api.openai.com rejects extra_body.think (official OpenAI-compatible)."""
+        msgs = [{"role": "user", "content": "Hi"}]
+        kw = transport.build_kwargs(
+            model="gpt-4.1-mini",
+            messages=msgs,
+            is_custom_provider=True,
+            base_url="https://api.openai.com/v1",
+            reasoning_config={"effort": "none", "enabled": False},
+        )
+        assert "think" not in kw.get("extra_body", {})
+
     def test_gemini_native_without_explicit_reasoning_config_keeps_existing_behavior(self, transport):
         msgs = [{"role": "user", "content": "Hi"}]
         kw = transport.build_kwargs(
