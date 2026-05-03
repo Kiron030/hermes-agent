@@ -22,6 +22,8 @@
 | `docs/powerunits_baseline_layer_preview_operator_v1.md` | Bounded baseline layer-coverage preview (Hermes POST to Repo B; read-only, DE). |
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual browser/preview smoke (read-only; no Hermes URL fetch). |
 | `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
+| `docs/hermes_v0_12_staged_upgrade_powerunits.md` | **Upgrade prep only:** Hermes Agent **v0.12.x** staging-first rollout, Curator/self-improve guardrails, pinning, first-boot checks (Repo B unchanged). |
+| `config/hermes_v0_12_powerunits_config_snippet.yaml.example` | Illustrative `config.yaml` fragment (Curator off, redaction note) — not auto-loaded. |
 | `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
 
 ---
@@ -37,6 +39,28 @@ Run this block **first** after any Railway deploy or variable edit:
 - [ ] **If Repo B read is supposed to be live:** `HERMES_POWERUNITS_REPO_B_READ_ENABLED` truthy **and** GitHub read token set; run the **Repo B read** subsection below.
 
 If any item fails → treat as **not** Trusted Analyst until fixed; do not widen toolsets to “unblock”.
+
+---
+
+## Hermes runtime v0.12.x — staging cutover (after image/binary upgrade)
+
+**Use once** when the deployed Hermes **runtime** is bumped to **v0.12.x** (NousResearch upstream or equivalent fork). **Repo B** needs no change for this step. Full policy: **`docs/hermes_v0_12_staged_upgrade_powerunits.md`**.
+
+**Config / guardrails (staging first):**
+
+- [ ] `$HERMES_HOME/config.yaml` reviewed after merge with upstream template; **Curator** remains **disabled** for Powerunits policy (`auxiliary.curator` / see [`config/hermes_v0_12_powerunits_config_snippet.yaml.example`](config/hermes_v0_12_powerunits_config_snippet.yaml.example) and `hermes doctor` for exact keys).
+- [ ] Global Hermes **`redaction.enabled`** left **off** unless you explicitly opt in (upstream v0.12 default off; bounded tools still use local URL redaction).
+- [ ] **Not enabled:** Langfuse, achievements, Spotify/Meet/Teams plugins, Vercel sandbox execute backend, or other optional surfaces — unless on a **separate** experiment service.
+- [ ] **Pinned** (as applicable): operator-authored Powerunits procedure skills so **Curator** / `skill_manage` cannot rewrite them — see pinning table in `docs/hermes_v0_12_staged_upgrade_powerunits.md`.
+
+**First boot / logs:**
+
+- [ ] First gateway start after upgrade: allow extra time; scan logs for **session/SQLite/FTS** migration messages — expect **no** crash loop.
+- [ ] Still **no** full secrets (`DATABASE_URL*`, internal bearer, raw tokens) in stdout/stderr.
+
+**Then** run the normal **Post-change deploy verification** block and bounded subsections above (Telegram, ENTSO-E, ERA5, inventory, governance, etc.).
+
+**Production:** repeat the same checklist only after staging confidence; **Curator stays off** until a separate operator decision.
 
 ---
 
@@ -127,7 +151,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 ### Bounded ENTSO-E forecast (Hermes → Repo B; forecast family only)
 
 - [ ] **Orthogonal:** This path is **`…/entsoe-forecast/*`** → **`entsoe_forecast_job`** only — **not** **`…/entsoe-market-sync/*`**, **not** `market_feature_job`, **not** `market_driver_feature_job`.
-- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (Tier **`DE`/`NL`** / **`v1`** / ≤7 d) → `syntactically_valid: true`, bounded hint names execute tool.
+- [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (Tier **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d) → `syntactically_valid: true`, bounded hint names execute tool.
 - [ ] **Preflight — legacy:** primary off + `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED=1` → same behavior.
 - [ ] **Primary + empty allowlist:** `…_ALLOWED_COUNTRIES=` (empty) with primary truthy → **fail-closed** (`feature_disabled` or equivalent).
 - [ ] **Execute gate off:** primary falsy **and** all four legacy falsy → execute **`feature_disabled`** — no Repo B HTTP.

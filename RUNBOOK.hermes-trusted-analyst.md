@@ -2,9 +2,11 @@
 
 Operator-facing checklist for the **internal Hermes service** running in the **Powerunits Railway project** (or equivalent). Paths assume container defaults; adjust only if your image overrides them.
 
-**Doc set (Stage 1):** `SOUL.hermes.md` · `ACCESS_MATRIX.md` · **this runbook** · `RUNBOOK.hermes-stage1-validation.md` (repeatable checks + post-deploy verification) · `docs/powerunits_bounded_operating_model_v1.md` (bounded cross-family model; canonical detail in EU-PP-Database `docs/architecture/internal_hermes_bounded_operating_model_v1.md`).
+**Doc set (Stage 1):** `SOUL.hermes.md` · `ACCESS_MATRIX.md` · **this runbook** · `RUNBOOK.hermes-stage1-validation.md` (repeatable checks + post-deploy verification) · `docs/powerunits_bounded_operating_model_v1.md` (bounded cross-family model; canonical detail in EU-PP-Database `docs/architecture/internal_hermes_bounded_operating_model_v1.md`) · `docs/hermes_v0_12_staged_upgrade_powerunits.md` (**Hermes v0.12.x** staging-first upgrade prep — Curator/self-improve guardrails; no Repo B change).
 
 **After any deploy or env change:** run `RUNBOOK.hermes-stage1-validation.md` first to confirm Trusted Analyst mode is still intact.
+
+**Before bumping the Hermes runtime to v0.12.x:** read `docs/hermes_v0_12_staged_upgrade_powerunits.md`, apply **staging-first**, keep **Curator disabled**, and use the **Hermes runtime v0.12.x — staging cutover** section in `RUNBOOK.hermes-stage1-validation.md` after the new image is live.
 
 **Stage 2 (future only):** Controlled Implementer / writer rules are scaffolded in `SOUL.hermes-writer.md` and `RUNBOOK.hermes-writer.md`. They are **not** active on this Railway service until explicitly enabled by maintainers.
 
@@ -39,6 +41,15 @@ Operator-facing checklist for the **internal Hermes service** running in the **P
 2. **Bundled:** only if your build ships a bundle and env points to it — expect explicit “bundled” messaging when used.
 3. **Workspace:** list/read only under allowed subdirs; no arbitrary filesystem.
 4. **Timescale:** with gate on, call bounded tool with valid `pattern_id` / `country_code` / `version` / `window_id`; invalid combo must fail closed.
+
+## Bounded ENTSO‑E market + forecast (Hermes ↔ Repo B)
+
+- **Repo B Tier‑1 ISO2 (bounded v1, same HTTP routes):** **DE, NL, BE, FR** for both **market** (`…/entsoe-market-sync/*`) and **forecast** (`…/entsoe-forecast/*`).
+- **Hermes narrowing:** optional **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** / **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** — **unset** still implies implicit **`DE`** intersection on the primary path; **explicit empty** ⇒ fail‑closed; set e.g. **`DE,NL,BE,FR`** to align Hermes with Repo B Core‑4 when primaries are on.
+
+## Bounded rollout governance CSV (read-only audit)
+
+- Tool **`governance_powerunits_bounded_rollout_read_v1`** (toolset **`powerunits_bounded_rollout_governance`**): Repo B JSON is canonical; use **`export_format=csv`** for a Hermes-derived **`csv_export`** (and optional **`exports_csv_workspace_filename`** to persist under **`hermes_workspace/exports/`**). Columns include **`effective_status`** / **`blocking_reason`** (Repo B) plus **`_*_cross_layer`** when the Hermes overlay is applied.
 
 ## If something is wrong
 
