@@ -98,6 +98,7 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
         "config_yaml_present": False,
         "telegram_toolsets_count": None,
         "powerunits_tier1_analysis_listed": None,
+        "powerunits_tier2_allowlisted_read_listed": None,
         "parse_error": False,
     }
     cfg_path = hermes_home / "config.yaml"
@@ -118,13 +119,16 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
             if isinstance(tg, list):
                 snap["telegram_toolsets_count"] = len(tg)
                 snap["powerunits_tier1_analysis_listed"] = "powerunits_tier1_analysis" in tg
+                snap["powerunits_tier2_allowlisted_read_listed"] = (
+                    "powerunits_tier2_allowlisted_read" in tg
+                )
     except Exception:
         snap["parse_error"] = True
     return snap
 
 
 def summarize_powerunits_operator_posture(**_: Any) -> str:
-    """Return JSON: capability tier, runtime policy hints, bounded posture, Phase 1A/2A overlay signals."""
+    """Return JSON: capability tier, runtime policy hints, bounded posture, Phase 1A/2A/2B overlays."""
 
     try:
         from powerunits_capability_tier import read_powerunits_capability_tier
@@ -172,6 +176,30 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                     "phase_2a_telegram_parse_error:with_tier_ge_1_reapply_policy_restart"
                 )
 
+        overlay_b_expected = tier_effective >= 2
+        tg_has_t2_read = telegram_obs.get("powerunits_tier2_allowlisted_read_listed")
+
+        phase_2b_readout = {
+            "tier_gate_allowlisted_locals_read": overlay_b_expected,
+            "roots": ["hermes_workspace", "powerunits_local_reference_optional"],
+            "tools": [
+                "manifest_powerunits_tier2_allowlisted_read_scope",
+                "summarize_powerunits_allowlisted_locals",
+                "search_powerunits_allowlisted_local_text",
+                "read_powerunits_allowlisted_workspace_extended_file",
+                "read_powerunits_local_reference_file",
+            ],
+            "telegram_powerunits_tier2_allowlisted_read_observed": tg_has_t2_read,
+            "overlay_detail_doc": "docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md",
+        }
+
+        if overlay_b_expected:
+            explicit_false_b = tg_has_t2_read is False
+            if explicit_false_b:
+                caution.append(
+                    "phase_2b_drift:tier>=2_but_powerunits_tier2_allowlisted_read_missing_from_config_telegram"
+                )
+
         if not policy:
             caution.append(
                 "runtime_policy_unset:expect HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1 for bounded Powerunits"
@@ -195,17 +223,19 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
 
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
-            "Telegram/tool surface remains gateway + first_safe_v1-derived allowlist (plus Phase 2A overlay when tier>=1 and policy applied).",
+            "Telegram/tool surface remains first_safe_v1-derived allowlist plus Phase 2A (tier>=1) and Phase 2B (tier>=2) overlays after policy.",
             "Workspace writes stay under hermes_workspace allowlisted dirs; exports Phase 1A uses summarize_powerunits_workspace_exports for hygiene hints.",
             "Hermes-derived CSV/files under exports are never authoritative over Repo B JSON.",
-            "Phase 2A Tier-1 analysis tools never write files, touch Repo B, or enable curator/self-improvement.",
+            "Phase 2A/2B Tier tools are read-only: no Repo B writes, curator, terminal, or unbounded filesystem freedom.",
         ]
 
         operator_before_tier_up = [
             "Run bounded smokes per RUNBOOK.hermes-stage1-validation.md § post-deploy.",
             "Before tier≥1 / Phase 2A: tag powerunits-tier0-baseline-* and snapshot HERMES_HOME (roadmap § Rollback).",
             "After enabling tier≥1: rerun policy / restart gateway — confirm phase_2a_overlay_read_only.telegram_powerunits_tier1_analysis_observed is true.",
-            "Monitor Phase 2A via summarize_powerunits_workspace_full caution_flags and bounded smokes.",
+            "Before tier≥2 / Phase 2B: replicate baseline tag; confirm Tier-1 overlays stable.",
+            "After enabling tier≥2: rerun policy / restart gateway — confirm phase_2b_overlay_read_only.telegram_powerunits_tier2_allowlisted_read_observed is true.",
+            "Monitor Phase 2B via summarize_powerunits_allowlisted_locals/search caution_flags.",
         ]
 
         return json.dumps(
@@ -225,6 +255,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "config_curator_observation_read_only": curator,
                 "telegram_toolsets_observation_read_only": telegram_obs,
                 "phase_2a_overlay_read_only": phase_2a_readout,
+                "phase_2b_overlay_read_only": phase_2b_readout,
                 "phase_1a_exports_signals_read_only": exports_signals,
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
@@ -248,7 +279,7 @@ POSTURE_SUMMARY_SCHEMA = {
     "name": "summarize_powerunits_operator_posture",
     "description": (
         "Read-only Powerunits operator posture: tier env, runtime policy, curator + Telegram toolset observation, "
-        "Phase 1A export signals, Phase 2A overlay readout when tier≥1, bounded assumptions, tier-up checklist. "
+        "Phase 1A export signals, Phase 2A/2B overlay readouts when tier≥1 / ≥2, bounded assumptions, tier-up checklist. "
         "Canonical roadmap: docs/powerunits_hermes_progressive_posture_v1.md"
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},

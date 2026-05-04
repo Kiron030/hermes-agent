@@ -11,7 +11,9 @@ This is intentionally narrow:
   Also align **global redaction default** with upstream v0.12 (**off**) when the key is
   absent, to reduce patch/JSON mangling (**bounded tools keep their own URL redactors**).
 - **Phase 2A:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 1``, insert **``powerunits_tier1_analysis``**
-  on Telegram immediately after ``powerunits_workspace``; **tier 0** strips it (see canonical roadmap).
+  on Telegram immediately after ``powerunits_workspace``.
+- **Phase 2B:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 2``, append **``powerunits_tier2_allowlisted_read``**
+  immediately after Phase 2A overlays; **tier below 2** strips the Phase 2B toolset (**tier below 1** strips both overlays).
 """
 
 from __future__ import annotations
@@ -72,7 +74,31 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "powerunits_bounded_rollout_governance",
 ]
 
-PHASE_2A_TIER_TOOLSET_TELEGRAM = "powerunits_tier1_analysis"
+POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM = (
+    "powerunits_tier1_analysis",
+    "powerunits_tier2_allowlisted_read",
+)
+
+
+def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[str]:
+    """Telegram toolset list with Phase 2A/2B overlays inserted after ``powerunits_workspace`` per tier."""
+    tier = _read_powerunits_capability_tier()
+    tg = [x for x in base if x not in POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM]
+    try:
+        wi = tg.index("powerunits_workspace")
+    except ValueError:
+        if tier >= 1:
+            tg.append("powerunits_tier1_analysis")
+        if tier >= 2:
+            tg.append("powerunits_tier2_allowlisted_read")
+        return tg
+    insert_pos = wi + 1
+    if tier >= 1:
+        tg.insert(insert_pos, "powerunits_tier1_analysis")
+        insert_pos += 1
+    if tier >= 2:
+        tg.insert(insert_pos, "powerunits_tier2_allowlisted_read")
+    return tg
 
 
 def _read_powerunits_capability_tier() -> int:
@@ -83,19 +109,6 @@ def _read_powerunits_capability_tier() -> int:
     except ValueError:
         return 0
     return max(0, min(3, v))
-
-
-def _telegram_allowlist_with_phase2a_overlay(base: list[str]) -> list[str]:
-    """Telegram toolset list with Phase 2A overlay inserted or dropped per capability tier."""
-    tier = _read_powerunits_capability_tier()
-    tg = [x for x in base if x != PHASE_2A_TIER_TOOLSET_TELEGRAM]
-    if tier >= 1:
-        try:
-            wi = tg.index("powerunits_workspace")
-            tg.insert(wi + 1, PHASE_2A_TIER_TOOLSET_TELEGRAM)
-        except ValueError:
-            tg.append(PHASE_2A_TIER_TOOLSET_TELEGRAM)
-    return tg
 
 
 DISABLED_PLATFORMS = [
@@ -173,7 +186,7 @@ def apply_policy(config_path: Path) -> None:
     platform_toolsets = cfg.get("platform_toolsets")
     if not isinstance(platform_toolsets, dict):
         platform_toolsets = {}
-    platform_toolsets["telegram"] = _telegram_allowlist_with_phase2a_overlay(
+    platform_toolsets["telegram"] = _telegram_allowlist_with_capability_phase_overlays(
         list(ALLOWED_TELEGRAM_TOOLSETS),
     )
     for p in DISABLED_PLATFORMS:

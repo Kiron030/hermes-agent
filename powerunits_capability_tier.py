@@ -1,10 +1,10 @@
-"""Powerunits progressive capability tier (Phase 0+) plus Phase 2A gate.
+"""Powerunits progressive capability tier (Phase 0+) plus Phase 2A/2B gates.
 
 Reads ``HERMES_POWERUNITS_CAPABILITY_TIER`` from the environment (integer ``0``–``3``).
 
-- **0:** Baseline; Phase **1A/1B** only; Telegram does **not** include ``powerunits_tier1_analysis``.
-- **≥ 1:** Enables **Phase 2A** read-heavy overlay (toolset ``powerunits_tier1_analysis``) when
-  ``docker/apply_powerunits_runtime_policy.py`` runs with this env on the gateway process.
+- **0:** Baseline; Phase **1A/1B** only; Telegram does **not** include overlay toolsets.
+- **≥ 1:** Enables **Phase 2A** (``powerunits_tier1_analysis``) when policy runs on the gateway.
+- **≥ 2:** Additionally enables **Phase 2B** (``powerunits_tier2_allowlisted_read``) — broader allowlisted locals read.
 
 Canonical roadmap: ``docs/powerunits_hermes_progressive_posture_v1.md``.
 """
@@ -32,7 +32,9 @@ def log_startup_capability_tier_notice() -> None:
     """Emit a single startup line for container logs (idempotent observation)."""
     tier = read_powerunits_capability_tier()
     extra = ""
-    if tier >= 1:
+    if tier >= 2:
+        extra = "; Phase 2A+2B overlays eligible (tier>=2)"
+    elif tier >= 1:
         extra = "; Phase 2A overlay eligible (tier>=1)"
     print(
         "[powerunits] HERMES_POWERUNITS_CAPABILITY_TIER="
