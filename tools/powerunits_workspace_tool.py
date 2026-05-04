@@ -2,12 +2,15 @@
 """
 Bounded persistent workspace tools for Powerunits Hermes.
 
-Workspace root is fixed to /opt/data/hermes_workspace (via HERMES_HOME default),
+Workspace root is fixed under $HERMES_HOME/hermes_workspace (default /opt/data),
 with allowlisted subdirectories:
 - analysis
 - notes
 - drafts
 - exports
+
+Phase 1A posture (see docs/powerunits_hermes_progressive_posture_v1.md): optional
+EXPORTS_PHASE1_OPERATOR.txt bootstrap under exports/ and read-only export summary tool.
 """
 
 from __future__ import annotations
@@ -28,6 +31,26 @@ _DEFAULT_MAX_CHARS = 16_000
 _ABS_MAX_CHARS = 32_000
 _ABS_MIN_CHARS = 2_000
 
+_EXPORTS_PHASE1_POINTER_NAME = "EXPORTS_PHASE1_OPERATOR.txt"
+_EXPORTS_PHASE1_POINTER_BODY = """Powerunits Hermes — Phase 1A exports posture (operator pointer).
+
+Canonical roadmap (do not fork): docs/powerunits_hermes_progressive_posture_v1.md
+Phase 1A export conventions + watcher hints: docs/powerunits_workspace_phase1_exports_v1.md
+General workspace: docs/powerunits_workspace_v1.md
+
+Read-only hygiene tool: summarize_powerunits_workspace_exports
+Writes: save_hermes_workspace_note(kind=exports, ...) — overwrite_mode=forbid default; overwrite deliberate only.
+
+Hermes-derived files here are NOT Repo B canon; Repo B stays authoritative HTTP/source of truth.
+"""
+
+# Soft caution thresholds — align with docs/powerunits_workspace_phase1_exports_v1.md
+_CAUTION_EXPORT_FILE_COUNT = 150
+_CAUTION_EXPORT_TOTAL_BYTES = 40 * 1024 * 1024
+_CAUTION_SINGLE_FILE_BYTES = 8 * 1024 * 1024
+# Max path segments under exports/ (excluding "exports" itself): a/b/file.csv -> 3
+_MAX_EXPORT_DEPTH_PARTS = 8
+
 
 def _workspace_root() -> Path:
     # Fixed production root under Railway persistent volume.
@@ -40,7 +63,136 @@ def _ensure_workspace_dirs() -> Path:
     root.mkdir(parents=True, exist_ok=True)
     for s in _ALLOWED_SUBDIRS:
         (root / s).mkdir(parents=True, exist_ok=True)
+    _write_exports_phase1_pointer_if_missing(root)
     return root
+
+
+def _write_exports_phase1_pointer_if_missing(root: Path) -> None:
+    """One-time exports/ readme pointer; never overwrites."""
+
+    try:
+        exports_dir = root / "exports"
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        marker = exports_dir / _EXPORTS_PHASE1_POINTER_NAME
+        marker.resolve().relative_to(root.resolve())
+        if marker.exists():
+            return
+        marker.write_text(_EXPORTS_PHASE1_POINTER_BODY.strip() + "\n", encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        logger.warning("Exports Phase 1A pointer skipped: %s", exc)
+
+
+def summarize_powerunits_workspace_exports(**_: Any) -> str:
+    """Aggregate read-only view of bounded exports subtree (Phase 1A hygiene)."""
+
+    from tools.registry import tool_error
+
+    try:
+        root = _ensure_workspace_dirs().resolve()
+        ex_dir = (root / "exports").resolve()
+        ex_dir.relative_to(root)
+
+        caution: list[str] = []
+        file_rows: list[dict[str, Any]] = []
+
+        deepest = 0
+
+        if not ex_dir.is_dir():
+            return json.dumps(
+                {
+                    "exports_root_relative": "exports",
+                    "file_count": 0,
+                    "total_bytes": 0,
+                    "max_depth_under_exports": 0,
+                    "largest_files": [],
+                    "caution_flags": [],
+                    "thresholds_hint": _export_summary_thresholds_payload(),
+                    "read_only": True,
+                    "phase": "1A",
+                    "doc_hint": "docs/powerunits_workspace_phase1_exports_v1.md",
+                },
+                ensure_ascii=False,
+            )
+
+        skipped_symlink = 0
+        seen_over_depth = False
+
+        for raw in sorted(ex_dir.rglob("*")):
+            if not raw.is_file():
+                continue
+            if raw.is_symlink():
+                skipped_symlink += 1
+                continue
+            if not raw.name.lower().endswith(_ALLOWED_EXTS):
+                continue
+            resolved = raw.resolve()
+            resolved.relative_to(root)
+            resolved.relative_to(ex_dir)
+            depth = len(raw.relative_to(ex_dir).parts)
+            deepest = max(deepest, depth)
+            if depth > _MAX_EXPORT_DEPTH_PARTS:
+                seen_over_depth = True
+                continue
+
+            try:
+                st = raw.stat()
+            except OSError:
+                caution.append(f"stat_failed:{raw.relative_to(root).as_posix()}")
+                continue
+
+            nbytes = int(st.st_size)
+            if nbytes >= _CAUTION_SINGLE_FILE_BYTES:
+                caution.append(f"large_single_file:{raw.name}:{nbytes}")
+
+            rel = raw.relative_to(root).as_posix()
+            file_rows.append(
+                {"path": rel, "bytes": nbytes, "mtime_epoch": int(st.st_mtime)},
+            )
+
+        if skipped_symlink:
+            caution.append(f"skipped_symlinks:{skipped_symlink}")
+        if seen_over_depth:
+            caution.append("skipped_paths_over_depth_cap")
+
+        file_rows.sort(key=lambda r: int(r["bytes"]), reverse=True)
+        total_bytes = sum(int(r["bytes"]) for r in file_rows)
+        nfiles = len(file_rows)
+
+        if nfiles >= _CAUTION_EXPORT_FILE_COUNT:
+            caution.append(f"high_file_count:{nfiles}")
+        if total_bytes >= _CAUTION_EXPORT_TOTAL_BYTES:
+            caution.append(f"high_total_bytes:{total_bytes}")
+
+        caution_sorted = sorted(set(caution))
+
+        return json.dumps(
+            {
+                "exports_root_relative": "exports",
+                "file_count": nfiles,
+                "total_bytes": total_bytes,
+                "max_depth_under_exports": deepest,
+                "largest_files": file_rows[:12],
+                "caution_flags": caution_sorted,
+                "thresholds_hint": _export_summary_thresholds_payload(),
+                "read_only": True,
+                "phase": "1A",
+                "doc_hint": "docs/powerunits_workspace_phase1_exports_v1.md",
+            },
+            ensure_ascii=False,
+        )
+    except ValueError:
+        return tool_error("workspace layout invalid", error_code="invalid_workspace_layout")
+    except Exception as exc:
+        return tool_error(f"exports summary failed: {exc}", error_code="exports_summary_failed")
+
+
+def _export_summary_thresholds_payload() -> dict[str, int]:
+    return {
+        "caution_files": _CAUTION_EXPORT_FILE_COUNT,
+        "caution_bytes": _CAUTION_EXPORT_TOTAL_BYTES,
+        "large_file_bytes": _CAUTION_SINGLE_FILE_BYTES,
+        "max_depth_parts": _MAX_EXPORT_DEPTH_PARTS,
+    }
 
 
 def _safe_int(value: Any, default: int) -> int:
@@ -213,8 +365,9 @@ def save_hermes_workspace_note(
 LIST_SCHEMA = {
     "name": "list_hermes_workspace",
     "description": (
-        "List files/directories in bounded persistent workspace /opt/data/hermes_workspace "
-        "(allowed subdirs: analysis, notes, drafts, exports). No repo/file-system escape."
+        "List files/directories in bounded persistent workspace $HERMES_HOME/hermes_workspace "
+        "(allowed subdirs: analysis, notes, drafts, exports). "
+        "After Phase 1A bootstrap, exports/ may include EXPORTS_PHASE1_OPERATOR.txt (readme pointer)."
     ),
     "parameters": {
         "type": "object",
@@ -243,11 +396,23 @@ READ_SCHEMA = {
     },
 }
 
+SUMMARY_SCHEMA = {
+    "name": "summarize_powerunits_workspace_exports",
+    "description": (
+        "Read-only Phase 1A snapshot of bounded hermes_workspace/exports: counts, sizes, largest files, "
+        "soft caution flags (thresholds: docs/powerunits_workspace_phase1_exports_v1.md). "
+        "No writes; skips symlinks; bounded scan depth from exports root."
+    ),
+    "parameters": {"type": "object", "properties": {}, "required": []},
+}
+
+
 WRITE_SCHEMA = {
     "name": "save_hermes_workspace_note",
     "description": (
         "Save text file in bounded workspace under one allowed subdir. "
-        "No delete/rename/generic path writes."
+        "overwrite_mode default forbid (no silent overwrite); use overwrite deliberately "
+        "(Phase 1A: docs/powerunits_workspace_phase1_exports_v1.md)."
     ),
     "parameters": {
         "type": "object",
@@ -263,6 +428,15 @@ WRITE_SCHEMA = {
 
 
 from tools.registry import registry
+
+registry.register(
+    name="summarize_powerunits_workspace_exports",
+    toolset="powerunits_workspace",
+    schema=SUMMARY_SCHEMA,
+    handler=lambda args, **kw: summarize_powerunits_workspace_exports(**kw),
+    check_fn=check_powerunits_workspace_requirements,
+    emoji="📎",
+)
 
 registry.register(
     name="list_hermes_workspace",

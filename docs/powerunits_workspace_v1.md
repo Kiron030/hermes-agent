@@ -13,6 +13,13 @@ Bounded persistent internal workspace for Hermes outputs on Railway volume:
 
 No repo writes, no GitHub writes, no DB writes.
 
+## Phase 1A — exports posture (see progressive roadmap)
+
+Export naming, overwrite defaults, and the read-only **`summarize_powerunits_workspace_exports`** tool are defined in:
+
+- [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md) — canonical staged-liberation roadmap
+- [`powerunits_workspace_phase1_exports_v1.md`](powerunits_workspace_phase1_exports_v1.md) — exports-only operational detail
+
 ## Tool contract
 
 Toolset: `powerunits_workspace`
@@ -25,6 +32,7 @@ Toolset: `powerunits_workspace`
   - `kind`: one of allowed subdirs
   - `name`: file name only — **`.md`**, **`.txt`**, or **`.csv`** (UTF-8 flat text); **preferred** for bounded coverage snapshots: **`exports/your-matrix.csv`**
   - `overwrite_mode`: `forbid` (default) or `overwrite`
+- `summarize_powerunits_workspace_exports()` — **Phase 1A**, read-only export hygiene (counts, caution flags — see posture docs above)
 
 ## Safety boundary
 

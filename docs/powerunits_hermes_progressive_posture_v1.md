@@ -1,9 +1,13 @@
-# Powerunits — Progressive Liberation posture (single main Hermes, Phase 0)
+# Powerunits — Progressive Liberation posture (single main Hermes)
 
 **Audience:** operators of the **internal Powerunits** Hermes (Repo A: `hermes-agent`).  
 **Canonical product truth:** **Repo B** — unchanged by this posture model.
 
-**Purpose (Phase 0):** Establish a **documented capability-tier vocabulary**, **rollback/baseline contract**, and **minimal pre-tier watchlist**. **No broader runtime freedom yet** — `tier0` matches today’s conservative operator baseline (`HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, Curator off by policy/docs).
+**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper workspace/export detail lives in **`docs/powerunits_workspace_phase1_exports_v1.md`** — cross-linked below, not duplicated here.
+
+**Phase 0 (established):** **capability-tier vocabulary**, **rollback/baseline contract**, **minimal pre-tier watchlist**, optional **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label (no extra runtime freedom by itself).
+
+**Phase 1A (first concrete tier1 carve-out):** **structured `exports/` posture** — conventions, read-only export summary tool, one-time operator pointer file under `exports/`; see **§ Phase 1A — workspace / exports** below.
 
 ---
 
@@ -15,6 +19,8 @@
 | [**`hermes_v0_12_staged_upgrade_powerunits.md`**](hermes_v0_12_staged_upgrade_powerunits.md) | v0.12 Curator/self-improve posture; negative checklist. |
 | [**`powerunits_hermes_upgrade_playbook.md`**](powerunits_hermes_upgrade_playbook.md) | Branches, tags, staging-first merges. |
 | [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) | Executable bounded checks post-deploy. |
+| [**`powerunits_workspace_v1.md`**](powerunits_workspace_v1.md) | Workspace tool contract (`analysis` / `notes` / `drafts` / `exports`). |
+| [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) | **Phase 1A detail:** export naming, overwrite semantics, hygiene thresholds, summary tool reference. |
 
 Optional env observability (Phase 0 **label only**, no behavior change for `tier>0` until explicitly wired):
 
@@ -29,10 +35,11 @@ Optional env observability (Phase 0 **label only**, no behavior change for `tier
 - **Means:** **`first_safe_v1`**, bounded Telegram tool surface, **`auxiliary.curator.enabled: false`** (policy + operator review), strict tool gating, Hermes as **thin operator** over Repo B HTTP.
 - **May change:** Hotfixes that **preserve** bounded contracts; Hermes/runtime patch versions per upgrade playbook.
 
-### `tier1` *(placeholder — not enabled by this doc alone)*
+### `tier1` — internal assistive expansion (incremental)
 
-- **Goal:** More **internal assistive** value with **low structural risk**.
-- **May change (when approved):** Additional **read-heavy** helper tooling; clarified **workspace/export** roots under explicit allowlists; operational metrics from existing logs.
+- **Goal:** More **internal assistive** value with **low structural risk** on the **same** main Hermes.
+- **Phase 1A (live experiment):** Stronger **`hermes_workspace/exports`** posture only — documented conventions, **read-only** **`summarize_powerunits_workspace_exports`**, non-destructive operator pointer file; see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). Does **not** widen bounded HTTP families or Telegram tool allowlists beyond existing workspace tools.
+- **Still deferred (later tier1 steps):** Additional read-heavy helpers **outside** exports hygiene, optional metrics aggregation, etc. — each as its own small change + watchlist update.
 - **Must not:** Weaken Repo B as source of truth; enable Curator writes; widen bounded family semantics without Repo B governance.
 
 ### `tier2` *(placeholder)*
@@ -107,21 +114,41 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | **Bounded governance recheck** | Governance read / bounded rollout sanity per runbook smoke order. |
 | **Inventory recheck** | Coverage inventory tool still behaves (`feature_disabled` when flags off matches expectations). |
 | **Config/runtime fingerprint** | Record: `HERMES_POWERUNITS_RUNTIME_POLICY`, image digest/semaphore, **`HERMES_POWERUNITS_CAPABILITY_TIER`**, model id in `config.yaml`, `auxiliary.curator.enabled`. |
-| **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths. |
+| **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths; **Phase 1A:** run **`summarize_powerunits_workspace_exports`** after material export work and archive or delete stale files per [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
 | **Curator** | **`enabled: false`** for `tier0`; any deviation is **explicit** and documented (not drift). |
 
 **Caution triggers:** Passing smoke regressions, new HTTP 400/422 patterns on LLM routes, unexplained Telegram tool errors, curator directories appearing when supposed off.
+
+**Phase 1A export sprawl (lightweight):** use summary tool **`caution`** hints (file count / total bytes / large single file). **Suspicious** = growth with no correlated operator task, many tiny CSVs from retries, or disk pressure on the Railway volume — see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) § Watcher.
+
+---
+
+## Phase 1A — workspace / exports (roadmap slice)
+
+**Intent:** Improve **internal reports and CSV snapshots** ergonomics **without** new write surfaces to Repo B or new bounded API families.
+
+| Item | Contract |
+|------|----------|
+| **Conventions** | Documented naming + `overwrite_mode` semantics — detail: [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
+| **Read-only hygiene** | Tool **`summarize_powerunits_workspace_exports`** (same `powerunits_workspace` toolset): counts, bytes, largest files, soft **caution** flags (thresholds in detail doc). |
+| **Operator pointer** | **`exports/EXPORTS_PHASE1_OPERATOR.txt`** created once if missing — points back to **this roadmap** + detail doc (**never overwrites** an existing file). |
+| **Rollback** | Git revert Repo A deployment; optional volume cleanup unchanged from general posture § Rollback. |
+
+**Frozen in Phase 1A:** No Curator, no new Telegram tool categories beyond documenting/using existing workspace helpers, no Repo B weakening.
 
 ---
 
 ## Phase 0 outcome summary
 
-Phase 0 **establishes:** tier vocabulary + placeholders, rollback/tag contract, watchlist, and a **single env-controlled tier integer** surfaced in logs (**no extra tools, no Curator**, no weakening of Repo B).
+Phase 0 **establishes:** tier vocabulary + placeholders (now **tier1** has first concrete slice), rollback/tag contract, watchlist, and **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label.
 
-**Intentionally unchanged:** `first_safe_v1` policy script behavior, bounded gateway lockdown, Repo B canonicality, Curator defaults for production/staging stance.
+**Phase 1A adds:** export posture documentation + non-invasive read-only summarization + Pointer-Datei (bounded-safe).
+
+**Intentionally unchanged:** `first_safe_v1` policy script behavior **for bounded families**, bounded gateway lockdown, Repo B canonicality, Curator defaults for production/staging stance.
 
 ---
 
-## Next step (Phase 1 experiment — strongest first candidate)
+## Next roadmap steps (after Phase 1A)
 
-**Tier 1 pilot:** introduce **one** narrowly scoped capability under explicit allowlist (e.g. additional **read-only** helper or **single export subdirectory** convention) **after** a `powerunits-tier0-baseline-*` tag and `HERMES_HOME` backup — with fingerprints captured and bounded smokes re-run unchanged.
+- **tier1 continuation:** deliberate **additional read-heavy** helpers (each with manifest + rollback note in **this file**).
+- **tier2 / tier3:** unchanged conceptual placeholders above — revisit only after tier1 learnings and fingerprint discipline.

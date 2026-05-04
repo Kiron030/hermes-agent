@@ -71,3 +71,43 @@ def test_only_allowed_ext_and_no_overwrite_default(ws) -> None:
         ws.save_hermes_workspace_note(kind="drafts", name="x.md", content="b", overwrite_mode="forbid")
     )
     assert second.get("error_code") == "already_exists"
+
+
+def test_exports_phase1_pointer_bootstrapped(ws) -> None:
+    json.loads(ws.list_hermes_workspace())
+    root = ws._workspace_root()
+    ptr = root / "exports" / "EXPORTS_PHASE1_OPERATOR.txt"
+    assert ptr.is_file()
+    text = ptr.read_text(encoding="utf-8")
+    assert "powerunits_hermes_progressive_posture_v1.md" in text
+
+
+def test_summarize_exports_counts_csv_and_pointer(ws) -> None:
+    json.loads(
+        ws.save_hermes_workspace_note(
+            kind="exports",
+            name="sample-matrix.csv",
+            content="col\nx\n",
+            overwrite_mode="forbid",
+        )
+    )
+    summary = json.loads(ws.summarize_powerunits_workspace_exports())
+    assert summary["read_only"] is True
+    assert summary["phase"] == "1A"
+    assert summary["file_count"] >= 2
+    paths = {r["path"] for r in summary["largest_files"]}
+    assert "exports/sample-matrix.csv" in paths
+
+
+def test_summarize_flags_large(monkeypatch: pytest.MonkeyPatch, ws) -> None:
+    monkeypatch.setattr(ws, "_CAUTION_SINGLE_FILE_BYTES", 48)
+    assert json.loads(
+        ws.save_hermes_workspace_note(
+            kind="exports",
+            name="big-ish.csv",
+            content="*" * 64,
+            overwrite_mode="forbid",
+        )
+    ).get("saved") is True
+    summary = json.loads(ws.summarize_powerunits_workspace_exports())
+    assert any(x.startswith("large_single_file") for x in summary["caution_flags"])
