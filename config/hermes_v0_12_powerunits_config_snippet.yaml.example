@@ -1,0 +1,24 @@
+# Example fragment for Hermes Agent v0.12+ on Powerunits Railway (NOT loaded automatically).
+# Merge into $HERMES_HOME/config.yaml after reviewing upstream defaults for your exact version.
+#
+# Sources of truth remain: Repo B bounded HTTP + docs in this repo (SOUL, RUNBOOKs, consolidated flags).
+#
+# -----------------------------------------------------------------------------
+# Curator — autonomous skill maintenance (gateway cron, upstream default cycle ~7 days).
+# Policy for Powerunits Stage 1: keep OFF on staging/production until deliberately tested.
+#
+# auxiliary:
+#   curator:
+#     enabled: false
+#
+# -----------------------------------------------------------------------------
+# Global secret redaction in tool outputs/logs (Hermes-wide). Upstream v0.12 default is OFF
+# to avoid corrupting patches/JSON with false-positive redaction.
+# Bounded Powerunits HTTP tools keep their own URL redactors regardless.
+#
+# redaction:
+#   enabled: false
+#
+# -----------------------------------------------------------------------------
+# Verify spelling and nesting with `hermes doctor` or official v0.12 docs — keys may vary slightly
+# by patch release. Do not copy uncommented blocks blindly into production without a diff review.
