@@ -65,6 +65,11 @@ fi
 # --- Running as hermes from here ---
 source "${INSTALL_DIR}/.venv/bin/activate"
 
+# Phase 0 Progressive Liberation: optional capability tier label for logs only
+# (tier>0 does not change runtime until explicitly wired). See
+# docs/powerunits_hermes_progressive_posture_v1.md
+python3 -c "from powerunits_capability_tier import log_startup_capability_tier_notice; log_startup_capability_tier_notice()" || true
+
 # Create essential directory structure.  Cache and platform directories
 # (cache/images, cache/audio, platforms/whatsapp, etc.) are created on
 # demand by the application — don't pre-create them here so new installs

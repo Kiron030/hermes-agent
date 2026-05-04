@@ -9,7 +9,7 @@ Instructions for AI coding assistants and developers working on the hermes-agent
 
 **Agent defaults here:** **Read-first**; prefer existing docs and tool outputs over speculation. **No broad repo writes** in this repo for product changes; **no infra mutation** (Railway, DNS, secrets) via code commits; **do not commit or edit `.env` / secrets`. Bounded **Timescale** access (`read_powerunits_timescale_dataset`) is an optional, **env-gated** factual supplement to docs — **not** a general-purpose database capability (single allowlisted view, fixed patterns only). Bounded **Repo B file** read (`read_powerunits_repo_b_allowlisted`) is optional and **env-gated** (`HERMES_POWERUNITS_REPO_B_READ_ENABLED`); **key-only**, GitHub API, allowlist in `config/powerunits_repo_b_read_allowlist.json` — not free-path repo browsing.
 
-**Operator / stage docs (Powerunits):** `SOUL.hermes.md` (Stage 1 Trusted Analyst profile), `RUNBOOK.hermes-trusted-analyst.md`, `ACCESS_MATRIX.md`, `RUNBOOK.hermes-stage1-validation.md` (post-deploy checks), `docs/powerunits_timescale_read_operator_v1.md`, `docs/powerunits_repo_b_read_operator_v1.md` (Repo B read prep — **no live tool yet**), `config/powerunits_repo_b_read_allowlist.json`. **Stage 2 (documentation only, not live):** `SOUL.hermes-writer.md`, `RUNBOOK.hermes-writer.md`, `CHECKLIST.hermes-writer-activation.md` (mandatory gate before any future enable).
+**Operator / stage docs (Powerunits):** `SOUL.hermes.md` (Stage 1 Trusted Analyst profile), `RUNBOOK.hermes-trusted-analyst.md`, `ACCESS_MATRIX.md`, `RUNBOOK.hermes-stage1-validation.md` (post-deploy checks), `docs/powerunits_hermes_progressive_posture_v1.md` (**tier0 baseline, rollback/watchlist**, Phase 0), `docs/powerunits_timescale_read_operator_v1.md`, `docs/powerunits_repo_b_read_operator_v1.md` (Repo B read prep — **no live tool yet**), `config/powerunits_repo_b_read_allowlist.json`. **Stage 2 (documentation only, not live):** `SOUL.hermes-writer.md`, `RUNBOOK.hermes-writer.md`, `CHECKLIST.hermes-writer-activation.md` (mandatory gate before any future enable).
 
 ## Development Environment
 
@@ -47,7 +47,7 @@ hermes-agent/
 │   │                     #   homeassistant, signal, matrix, mattermost, email, sms,
 │   │                     #   dingtalk, wecom, weixin, feishu, qqbot, bluebubbles,
 │   │                     #   webhook, api_server, ...). See ADDING_A_PLATFORM.md.
-│   └── builtin_hooks/    # Extension point for always-registered gateway hooks (none shipped)
+│   └── builtin_hooks/    # Always-registered gateway hooks (boot-md, ...)
 ├── plugins/              # Plugin system (see "Plugins" section below)
 │   ├── memory/           # Memory-provider plugins (honcho, mem0, supermemory, ...)
 │   ├── context_engine/   # Context-engine plugins
