@@ -8,6 +8,7 @@
 | **GitHub docs (allowlisted)** | Allowed (primary) | `POWERUNITS_GITHUB_TOKEN_READ` (or legacy docs token); paths/branches per `powerunits_github_knowledge` config. |
 | **Bundled Powerunits docs** | Allowed (fallback) | Build-time / env-directed; not primary when GitHub is healthy. |
 | **Workspace** (`hermes_workspace` allowlisted subdirs) | Allowed | Text notes / analysis under bounded paths; no delete/rename escapes. |
+| **Tier‑1 workspace analysis overlay** (**`summarize_powerunits_workspace_full`**, **`search_powerunits_workspace_text`**) | Allowed **only** when **`HERMES_POWERUNITS_CAPABILITY_TIER≥1`** **and** policy merge lists **`powerunits_tier1_analysis`** on Telegram — read-only within **`hermes_workspace`** `*.md`/`*.txt`/`*.csv`; no Repo B, no curator. |
 | **Operator posture snapshot** (`summarize_powerunits_operator_posture`, Phase 1B progressive roadmap) | Allowed | Read-only JSON: tier env, runtime policy string, best-effort curator flag from `config.yaml`, Phase 1A export signal subset; **no** writes to volume or Repo B. |
 | **Memory / session search / todo** | Allowed | Part of first_safe bounded set for continuity and tasks. |
 | **Timescale read** (`read_powerunits_timescale_dataset`) | Allowed **only** when gated | `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` + `DATABASE_URL_TIMESCALE`; single view `public.market_price_model_dataset_v`; fixed patterns only. |

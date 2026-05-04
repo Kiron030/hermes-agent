@@ -222,6 +222,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_tier1_analysis": {
+        "description": (
+            "Phase 2A overlay (requires HERMES_POWERUNITS_CAPABILITY_TIER>=1 env at policy apply + gateway): "
+            "read-only workspace-wide summary and bounded text search across hermes_workspace "
+            "— no Repo B, no deletes, no curator."
+        ),
+        "tools": [
+            "summarize_powerunits_workspace_full",
+            "search_powerunits_workspace_text",
+        ],
+        "includes": [],
+    },
+
     "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "

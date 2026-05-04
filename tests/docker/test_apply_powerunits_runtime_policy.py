@@ -60,3 +60,39 @@ def test_apply_policy_preserves_explicit_curator_enabled_true() -> None:
         apply_policy(p)
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         assert data["auxiliary"]["curator"]["enabled"] is True
+
+
+def test_apply_policy_includes_phase2a_toolset_when_capability_tier_ge_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "1")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        tg = data["platform_toolsets"]["telegram"]
+        assert "powerunits_tier1_analysis" in tg
+        assert tg.index("powerunits_tier1_analysis") == tg.index("powerunits_workspace") + 1
+
+
+def test_apply_policy_excludes_phase2a_toolset_when_capability_tier_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "0")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert "powerunits_tier1_analysis" not in data["platform_toolsets"]["telegram"]
