@@ -3,9 +3,9 @@
 **Audience:** operators of the **internal Powerunits** Hermes (Repo A: `hermes-agent`).  
 **Canonical product truth:** **Repo B** — unchanged by this posture model.
 
-**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper operational docs: workspace exports **1A**, operator diagnostics **1B**, Tier-1 analysis overlay **2A**, Tier-2 allowlisted locals **2B** — cross-linked below.
+**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper operational docs: workspace exports **1A**, operator diagnostics **1B**, Tier-1 workspace **2A**, Tier-2 allowlisted locals **2B**, **Tier 3** skills integration (**capability env `3`**) — cross-linked below.
 
-**Phase 0 (established):** **rollback/tag contract**, **watcher checklist**, **`HERMES_POWERUNITS_CAPABILITY_TIER`** (**`0`** = conservative Telegram allowlist baseline; **`≥ 1`** wires **Phase 2A** when policy runs; **`≥ 2`** adds **Phase 2B** — see **`powerunits_capability_tier.py`**).
+**Phase 0 (established):** **rollback/tag contract**, **watcher checklist**, **`HERMES_POWERUNITS_CAPABILITY_TIER`** (**`0`** … **`3`** — **`≥ 1`** **2A**, **`≥ 2`** **2B**, **`= 3`** **Tier 3 skills overlay** — see **`powerunits_capability_tier.py`**).
 
 **Phase 1A:** structured **`exports/`** posture + read-only summaries — § Phase 1A below.
 
@@ -14,6 +14,8 @@
 **Phase 2A (first controlled liberation on main agent):** **`powerunits_tier1_analysis`** toolset gated by **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 1`** — § Phase 2A below; detail [**`powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md`**](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md).
 
 **Phase 2B (broader bounded local read):** **`powerunits_tier2_allowlisted_read`** gated by **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 2`** — § Phase 2B below; detail [**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md).
+
+**Tier 3 — skills integration (capability env `3`):** **`powerunits_tier3_skills_integration`** — bounded observe/diagnose/propose-only tooling over **`SKILL.md`** inventory — § Tier 3 below; detail [**`powerunits_tier3_skills_integration_overlay_v1.md`**](powerunits_tier3_skills_integration_overlay_v1.md).
 
 ---
 
@@ -27,13 +29,14 @@
 | [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) | Executable bounded checks post-deploy. |
 | [**`powerunits_workspace_v1.md`**](powerunits_workspace_v1.md) | Workspace tool contract (`analysis` / `notes` / `drafts` / `exports`). |
 | [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) | **Phase 1A detail:** export naming, overwrite semantics, hygiene thresholds, summary tool reference. |
-| [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md) | Posture tool JSON (**1B** core + Phase **2A/2B** overlay readouts merged in same response). |
+| [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md) | Posture JSON (**1B** core + overlays **2A / 2B / Tier 3**). |
 | [**`powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md`**](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md) | **Phase 2A** gated workspace analytics + bounded search — thresholds/watchers/rollback only. |
-| [**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md) | **Phase 2B** Tier-2 allowlisted locals (JSON/YAML + optional reference tree) — thresholds/watchers/rollback only. |
+| [**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md) | **Phase 2B** Tier-2 allowlisted locals — thresholds/watchers/rollback only. |
+| [**`powerunits_tier3_skills_integration_overlay_v1.md`**](powerunits_tier3_skills_integration_overlay_v1.md) | **Tier 3** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 3`**) bounded skills observer + proposal JSON — Curator posture, rollback. |
 
-**Capability-tier env (**`HERMES_POWERUNITS_CAPABILITY_TIER`):** **`0`**–**`3`**, logged at container boot (**`docker/entrypoint.sh`** hook). Policy merge: **`0`** strips **`powerunits_tier1_analysis`** and **`powerunits_tier2_allowlisted_read`**; **`≥ 1`** inserts **2A** after **`powerunits_workspace`**; **`≥ 2`** inserts **2B** after **2A**. Tool **`check_fn`** gates match (**2A** requires **`≥ 1`**, **2B** requires **`≥ 2`**). **`powerunits_capability_tier.py`**.
+**Capability-tier env (**`HERMES_POWERUNITS_CAPABILITY_TIER`):** **`0`**–**`3`**. Policy merge (after **`powerunits_workspace`**): strip overlay toolsets not implied by tier; **`≥ 1`** inserts **2A**; **`≥ 2`** inserts **2B** after **2A**; **`= 3`** inserts **Tier 3** **`powerunits_tier3_skills_integration`** after **2B**. Tool **`check_fn`** gates align. **`powerunits_capability_tier.py`**.
 
-**Naming:** **Capability env `2`** (Phase **2B**) is **not** the same as the conceptual roadmap bucket **`tier2`** below (LLM/provider routing) — that remains a **separate**, deferred experiment class.
+**Naming:** **Capability env `3`** (Tier 3 skills tools) is **not** the same as the **conceptual** roadmap bucket **`tier3`** below (historic “curator product era” phrasing) — see § distinction there.
 
 ---
 
@@ -50,8 +53,9 @@
 - **Phase 1A (live experiment):** Stronger **`hermes_workspace/exports`** posture only — documented conventions, **read-only** **`summarize_powerunits_workspace_exports`**, non-destructive operator pointer file; see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). Does **not** widen bounded HTTP families from workspace-only scope.
 - **Phase 1B (live experiment):** **Read-only aggregated posture view** via **`summarize_powerunits_operator_posture`** (`toolset` **`powerunits_operator_posture`**) — merges tier env readout, **`HERMES_POWERUNITS_RUNTIME_POLICY`**, curator **`config.yaml`** observation, Phase **1A** **`caution_flags`**, Telegram toolset drift checks for **`powerunits_tier1_analysis`** when **`tier ≥ 1`**, and tier-up checklist; [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). **No** bounded family widen, Curator enablement, or Repo B weakening.
 - **Phase 2A (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER ≥ 1`):** **`powerunits_tier1_analysis`** overlay — **read-only** **`summarize_powerunits_workspace_full`**, **`search_powerunits_workspace_text`** bounded to **`hermes_workspace`** [**detail**](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md). Policy merge adds Telegram toolset; **`tier → 0`** removes it (**no migration**).
-- **Phase 2B (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER ≥ 2`):** **`powerunits_tier2_allowlisted_read`** — manifest + multi-root summary + search + extended workspace read (**JSON/YAML**) + optional **`powerunits_local_reference`** [**detail**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md). **`tier → 1`** removes **2B** only; **`tier → 0`** removes **2A+2B**.
-- **Still deferred (later roadmap steps):** Further internal tooling **beyond** Phase **2B** allowlisted surface — record each uplift as a roadmap bullet before shipping.
+- **Phase 2B (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER ≥ 2`):** **`powerunits_tier2_allowlisted_read`** — allowlisted locals read/summarize/search + extended workspace text types [**detail**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md). **`tier → 1`** drops **2B** only; **`tier → 0`** drops **2A+2B** (and Tier 3 cannot apply).
+- **Tier 3 skills integration (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER = 3`):** **`powerunits_tier3_skills_integration`** — observe/diagnose/propose JSON + bounded **`SKILL.md`** preview; **no** tool-level merges [**detail**](powerunits_tier3_skills_integration_overlay_v1.md). **`tier → 2`** drops **Tier 3** only.
+- **Still deferred:** Unbounded skill hub exposure on Telegram, silent merge agents, Repo B–authoritative skill truth, any overlay **without** watcher bullets in **this** file.
 - **Must not:** Weaken Repo B as source of truth; enable Curator writes; widen bounded family semantics without Repo B governance.
 
 ### `tier2` *(conceptual — alternate LLM / provider / transport; **not** “capability env = 2” / Phase 2B)*
@@ -60,11 +64,12 @@
 - **May change:** Non-default LLM routing for defined tasks; staged config flags documented in runbooks.
 - **Must not:** Silent elevation of autonomous self-improvement; unbounded outbound tools.
 
-### `tier3` *(placeholder)*
+### `tier3` *(conceptual — Curator/skills autonomy product era; **not** capability env ``3`` / Tier 3 overlay)*
 
-- **Goal:** **Observed** skill growth / curator / self-improvement paths — **proposal or human-gated** only until separately signed.
-- **May change:** Read-only observation of Curator output; staged enablement policies documented per decision record.
-- **Must not:** Treat auto-written artifacts as authoritative for Repo B schemas or bounded allowlists.
+- **Historical placeholder phrasing:** “Observed skill growth / Curator…” as a **future product class** requiring separate sign-off.
+- **Today's capability env `3`:** Bounded **skills integration observer** tooling only ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)) — **does not** license silent merges or Repo B weakening.
+- **May change:** Read-only/strawman Curator summaries when **explicitly enabled** upstream; staged flags per decision record.
+- **Must not:** Treat autonomous skill deltas as Repo B evaluator truth; broaden bounded HTTP semantics from skills paths.
 
 ---
 
@@ -128,17 +133,20 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | **Config/runtime fingerprint** | Record: `HERMES_POWERUNITS_RUNTIME_POLICY`, image digest/semaphore, **`HERMES_POWERUNITS_CAPABILITY_TIER`**, model id in `config.yaml`, `auxiliary.curator.enabled`. |
 | **Phase 2A analytics (when `tier ≥ 1`)** | Sample **`summarize_powerunits_workspace_full`** after major operator sessions; escalating **`high_*`** or depth-skip totals → reconcile sprawl (**[`powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md`](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md)**). |
 | **Phase 2B allowlisted-local analytics (when `tier ≥ 2`)** | Sample **`summarize_powerunits_allowlisted_locals`** after **`powerunits_local_reference`** drops or **`*.json`/`*.yaml`** growth; **`tier2_locals_full_scan_cap`** → prune or **`subdir`** work ([**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md)). |
+| **Tier 3 skills observer (`tier = 3`)** | **`summarize_powerunits_skills_observer`** / **`diagnose_*`** / **`propose_*`** — duplicate/stale/proposal-volume signals; keep **`auxiliary.curator`** posture explicit ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)). |
 | **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths; **Phase 1A:** run **`summarize_powerunits_workspace_exports`** after material export work and archive or delete stale files per [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
 | **Posture snapshot (env + exports subset)** | **`summarize_powerunits_operator_posture`** (Phase 1B) — quick JSON fingerprint before tier uplift; see [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
 | **Curator** | **`enabled: false`** for `tier0`; any deviation is **explicit** and documented (not drift). |
 
 **Caution triggers:** Passing smoke regressions, new HTTP 400/422 patterns on LLM routes, unexplained Telegram tool errors, curator directories appearing when supposed off.
 
-**Phase 1B posture rollup:** Non-empty **`caution_flags`** from **`summarize_powerunits_operator_posture`** → reconcile env (`HERMES_POWERUNITS_RUNTIME_POLICY`, **`HERMES_POWERUNITS_CAPABILITY_TIER`**), curator observation, **`phase_2a_*`** / **`phase_2b_drift*`** Telegram-list mismatches (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)).
+**Phase 1B posture rollup:** Non-empty **`caution_flags`** → reconcile env, curator, Telegram overlays (**`phase_2a_*`**, **`phase_2b_*`**, **`tier3_skills_drift*`** / **`tier3_curator_*`**) (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)).
 
 **Phase 2A rollback triggers:** Repeated **`workspace_full_scan_cap`** failures, unintended multi-gigabyte text drops into **`hermes_workspace`**, or unexplained spikes in **`search_powerunits_workspace_text`** scan caps → **set tier to `0`, restart gateway, re-run policy** (see [**Phase 2A detail**](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md)).
 
 **Phase 2B rollback triggers:** **`tier2_locals_full_scan_cap`**, unintended large secrets under **`powerunits_local_reference`** (never stage credentials intentionally), recurring **`phase_2b_drift*`** Telegram mismatches → **set capability tier to `1` or `0`**, re-run policy, restart ([**Phase 2B detail**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md)).
+
+**Tier 3 rollback triggers:** recurring **`tier3_skills_drift*`**, runaway **`proposal_count`** churn without human triage, or **`tier3_curator_autonomous_path_enabled`** without staffed review → **`HERMES_POWERUNITS_CAPABILITY_TIER≤2`**, policy + restart ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)).
 
 **Phase 1A export sprawl (lightweight):** use summary tool **`caution`** hints (file count / total bytes / large single file). **Suspicious** = growth with no correlated operator task, many tiny CSVs from retries, or disk pressure on the Railway volume — see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) § Watcher.
 
@@ -166,8 +174,8 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | Item | Contract |
 |------|----------|
 | **Tool** | **`summarize_powerunits_operator_posture`** (`toolset` **`powerunits_operator_posture`**, Telegram allowlist aligned with **`first_safe_v1`** alongside other bounded toolsets). |
-| **Reads** | Environment (`HERMES_HOME`, **`HERMES_POWERUNITS_CAPABILITY_TIER`**, **`HERMES_POWERUNITS_RUNTIME_POLICY`**) + best-effort YAML read of **`auxiliary.curator.enabled`** from **`config.yaml`** + **`platform_toolsets.telegram`** observation (Phase **2A** / **2B** drift) + condensed Phase **1A** **`summarize_powerunits_workspace_exports`** output; **never** emits secrets from config. |
-| **Watchers** | JSON **`caution_flags`** (tier unset reminder, unset/non-default runtime policy, curator `true`, export hygiene echoes, summarized errors, **`phase_2a_*`** when tier ≥ 1 and Telegram listing for **`powerunits_tier1_analysis`** is missing or unreadable; **`phase_2b_*`** drift when tier ≥ 2 misses **`powerunits_tier2_allowlisted_read`**). Operational detail [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
+| **Reads** | Env + **`auxiliary.curator.enabled`** + Telegram observation (**2A/2B/Tier 3** drift) + Phase **1A** export subset. |
+| **Watchers** | JSON **`caution_flags`** including **`tier3_*`** when **`tier ≥ 3`**, and Curator cautions when **`auxiliary.curator.enabled`** is **true** (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)). |
 | **Rollback** | Remove tool via Repo A revert; **no persistent side effects** from invoking the tool itself. |
 
 **Frozen in Phase 1B:** No bounded family widen; no curator or self-improvement **writes**; no Repo B authority shift.
@@ -202,23 +210,40 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 
 ---
 
+## Tier 3 — skills integration observer (capability env `3`)
+
+**Intent:** **Meaningful skill maturity** for the **same** main Hermes — read/assess/report/propose **without** silent merges, **without** treating skills as Repo B truth, **without** weakening bounded operations.
+
+| Item | Contract |
+|------|----------|
+| **Gate** | **`HERMES_POWERUNITS_CAPABILITY_TIER = 3`** at policy apply + gateway boot. **`tier ≤ 2`** omits **`powerunits_tier3_skills_integration`** from Telegram (**reversible** env + policy + restart). |
+| **Toolset** | **`powerunits_tier3_skills_integration`** — inventory, diagnostics, **human-review proposal JSON**, bounded **`SKILL.md` preview** ([**detail**](powerunits_tier3_skills_integration_overlay_v1.md)). **Writes:** none from these tools. |
+| **Curator** | Policy default **`auxiliary.curator.enabled: false`** (**unchanged**). Upstream Hermes Curator (**if ever enabled**) may still **observe/propose** per `agent/curator.py` — **explicit ops review** required; Tier 3 tools **never** imply approval to auto-merge **critical operator** skills. |
+| **Observers** | Posture **`phase_tier3_skills_observer_read_only`**, **`tier3_skills_drift*`**, **`tier3_curator_autonomous_path_enabled`** (**[`operator posture doc`](powerunits_operator_posture_diagnostics_v1.md)**). |
+| **Rollback** | Set **`HERMES_POWERUNITS_CAPABILITY_TIER`** to **`2`** or lower; **`apply_policy`**, restart. |
+
+---
+
 ## Phase 0 outcome summary
 
 Phase 0 **establishes:** tier vocabulary + placeholders (now **tier1** has first concrete slice), rollback/tag contract, watchlist, and **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label.
 
 Phase 1A **adds:** export posture documentation + non-invasive read-only summarization + pointer file (bounded-safe).
 
-**Phase 1B adds:** read-only posture diagnostics + drift signals (**Phase 2A/2B Telegram alignment**).
+**Phase 1B adds:** read-only posture diagnostics + drift signals (**2A / 2B / Tier 3** Telegram alignment + Curator posture signals).
 
 **Phase 2A adds:** gated **`powerunits_tier1_analysis`** read-heavy workspace summary + substring search (**no writes**, **no Repo B widen**).
 
 **Phase 2B adds:** gated **`powerunits_tier2_allowlisted_read`** — structured extensions, optional **`powerunits_local_reference`**, bounded multi-root search (**still read-only**, no shell).
 
-**Fallback ladder:** **`HERMES_POWERUNITS_CAPABILITY_TIER=1`** ⇒ **2A** without **2B**; **`0`** ⇒ neither overlay (**policy re-apply + restart**).
+**Tier 3 adds:** gated **`powerunits_tier3_skills_integration`** — skills inventory/diagnostics/review-only proposals (**no auto merge from this overlay**).
 
-## Next roadmap steps (after Phase 2B)
+**Fallback ladder:** **`3 → 2`** drops Tier 3 only; **`2 → 1`** drops **2B**; **`1 → 0`** drops **2A** (**policy re-apply + restart**).
 
-- **Later bounded-read overlays:** additive Powerunits-shaped tooling only when each ships with watcher + rollback bullets in **this file**.
-- **Conceptual `tier2`** (alternate **LLM** routing) and **`tier3`** (curator observation) remain **deferred** — separate from **capability env** overlays.
+## Next roadmap steps (after Tier 3 observer)
 
-**Intentionally unchanged:** Repo B canonicality, **`gateway/run.py`** bounded lockdown ethos, curator **off-by-policy** stance for staged/prod Hermes absent separate decision.
+- **Later:** tighter integration with **`skill_manage`** behind **explicit** approvals (not Tier 3); broader skill hub tooling only with roadmap bullets here.
+- **Conceptual LLM routing (`tier2`)** remains **deferred**.
+- **Full autonomous skill product / silent merge narratives** remain **explicitly out of scope** for Powerunits staged Hermes absent separate governance.
+
+**Intentionally unchanged:** Repo B canonicality, **`gateway/run.py`** bounded lockdown ethos, **`first_safe_v1`** default **Curator off** on fresh policy merges absent deliberate override.

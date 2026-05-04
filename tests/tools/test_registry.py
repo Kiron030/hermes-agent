@@ -349,6 +349,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_repo_b_read_tool",
             "tools.powerunits_tier1_workspace_analysis_tool",
             "tools.powerunits_tier2_allowlisted_locals_tool",
+            "tools.powerunits_tier3_skills_integration_tool",
             "tools.powerunits_timescale_read_tool",
             "tools.powerunits_workspace_tool",
             "tools.rl_training_tool",

@@ -251,6 +251,21 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_tier3_skills_integration": {
+        "description": (
+            "Tier 3 skills integration (requires HERMES_POWERUNITS_CAPABILITY_TIER>=3): "
+            "read-only inventory, diagnostics, bounded SKILL.md previews, structured human-review "
+            "proposals — no auto-merge; Curator autonomous apply remains off-policy by default."
+        ),
+        "tools": [
+            "summarize_powerunits_skills_observer",
+            "diagnose_powerunits_skills_signals",
+            "propose_powerunits_skill_integration_actions",
+            "read_powerunits_skill_body_preview",
+        ],
+        "includes": [],
+    },
+
     "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "

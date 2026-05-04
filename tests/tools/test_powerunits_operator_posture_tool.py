@@ -29,7 +29,9 @@ def test_posture_read_only_happy(posture_mod) -> None:
     assert p2b["tier_gate_allowlisted_locals_read"] is False
     assert p2b["telegram_powerunits_tier2_allowlisted_read_observed"] is None
     assert "bounded_assumptions_summary" in out
-    assert "operator_next_checks_before_tier_increase" in out
+    p3 = out["phase_tier3_skills_observer_read_only"]
+    assert p3["tier_gate_skills_integration"] is False
+    assert p3["telegram_powerunits_tier3_skills_integration_observed"] is None
 
 
 def test_posture_tier_ge_one_phase2a_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -97,6 +99,66 @@ def test_posture_tier_ge_two_phase2b_aligned(monkeypatch: pytest.MonkeyPatch, tm
         out["phase_2b_overlay_read_only"]["telegram_powerunits_tier2_allowlisted_read_observed"] is True
     )
     assert not any(x.startswith("phase_2b_drift") for x in out["caution_flags"])
+    assert (
+        out["phase_tier3_skills_observer_read_only"]["tier_gate_skills_integration"] is False
+    )
+
+
+def test_posture_tier_three_tier3_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
+    (tmp_path / "config.yaml").write_text(
+        "platform_toolsets:\n  telegram: "
+        "[memory, powerunits_tier1_analysis, powerunits_tier2_allowlisted_read]\n",
+        encoding="utf-8",
+    )
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    t3 = out["phase_tier3_skills_observer_read_only"]
+    assert t3["tier_gate_skills_integration"] is True
+    assert t3["telegram_powerunits_tier3_skills_integration_observed"] is False
+    assert any("tier3_skills_drift" in x for x in out["caution_flags"])
+
+
+def test_posture_tier_three_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
+    (tmp_path / "config.yaml").write_text(
+        "platform_toolsets:\n  telegram: "
+        "[memory, powerunits_tier1_analysis, powerunits_tier2_allowlisted_read, "
+        "powerunits_tier3_skills_integration]\n",
+        encoding="utf-8",
+    )
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    assert (
+        out["phase_tier3_skills_observer_read_only"][
+            "telegram_powerunits_tier3_skills_integration_observed"
+        ]
+        is True
+    )
+    assert not any(x.startswith("tier3_skills_drift") for x in out["caution_flags"])
+
+
+def test_posture_tier_three_curator_extra_caution(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
+    (tmp_path / "config.yaml").write_text(
+        "platform_toolsets:\n  telegram:\n"
+        "  - memory\n  - powerunits_tier1_analysis\n  - powerunits_tier2_allowlisted_read\n"
+        "  - powerunits_tier3_skills_integration\n"
+        "auxiliary:\n  curator:\n    enabled: true\n",
+        encoding="utf-8",
+    )
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    assert any("tier3_curator_autonomous_path_enabled" in x for x in out["caution_flags"])
 
 
 def test_posture_unset_policy_caution(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
