@@ -201,12 +201,14 @@ TOOLSETS = {
     "powerunits_workspace": {
         "description": (
             "Bounded persistent workspace at /opt/data/hermes_workspace "
-            "(analysis/notes/drafts/exports), no delete/rename; *.md/*.txt/*.csv bounded text blobs only."
+            "(analysis/notes/drafts/exports); Phase 1A: read-only summarize_powerunits_workspace_exports; "
+            "no delete/rename; *.md/*.txt/*.csv only."
         ),
         "tools": [
             "list_hermes_workspace",
             "read_hermes_workspace_file",
             "save_hermes_workspace_note",
+            "summarize_powerunits_workspace_exports",
         ],
         "includes": [],
     },
