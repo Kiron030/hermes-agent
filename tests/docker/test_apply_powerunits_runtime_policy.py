@@ -98,6 +98,7 @@ def test_apply_policy_excludes_phase2a_toolset_when_capability_tier_zero(
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         assert "powerunits_tier1_analysis" not in data["platform_toolsets"]["telegram"]
         assert "powerunits_tier2_allowlisted_read" not in data["platform_toolsets"]["telegram"]
+        assert "powerunits_tier3_skills_integration" not in data["platform_toolsets"]["telegram"]
 
 
 def test_apply_policy_includes_phase2b_toolset_when_capability_tier_ge_two(
@@ -118,3 +119,25 @@ def test_apply_policy_includes_phase2b_toolset_when_capability_tier_ge_two(
         wi = tg.index("powerunits_workspace")
         assert tg[wi + 1] == "powerunits_tier1_analysis"
         assert tg[wi + 2] == "powerunits_tier2_allowlisted_read"
+        assert "powerunits_tier3_skills_integration" not in tg
+
+
+def test_apply_policy_includes_tier3_skills_toolset_when_capability_tier_is_three(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        tg = data["platform_toolsets"]["telegram"]
+        wi = tg.index("powerunits_workspace")
+        assert tg[wi + 1] == "powerunits_tier1_analysis"
+        assert tg[wi + 2] == "powerunits_tier2_allowlisted_read"
+        assert tg[wi + 3] == "powerunits_tier3_skills_integration"

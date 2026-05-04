@@ -13,7 +13,9 @@ This is intentionally narrow:
 - **Phase 2A:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 1``, insert **``powerunits_tier1_analysis``**
   on Telegram immediately after ``powerunits_workspace``.
 - **Phase 2B:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 2``, append **``powerunits_tier2_allowlisted_read``**
-  immediately after Phase 2A overlays; **tier below 2** strips the Phase 2B toolset (**tier below 1** strips both overlays).
+  immediately after Phase 2A overlays.
+- **Tier 3 (skills integration):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 3``, append **``powerunits_tier3_skills_integration``**
+  after Phase 2B; **tier below 3** strips that toolset (**lower tiers** unchanged in their own overlay rules).
 """
 
 from __future__ import annotations
@@ -77,11 +79,12 @@ ALLOWED_TELEGRAM_TOOLSETS = [
 POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM = (
     "powerunits_tier1_analysis",
     "powerunits_tier2_allowlisted_read",
+    "powerunits_tier3_skills_integration",
 )
 
 
 def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[str]:
-    """Telegram toolset list with Phase 2A/2B overlays inserted after ``powerunits_workspace`` per tier."""
+    """Telegram toolset list with Phase 2A/2B/Tier-3 overlays inserted after ``powerunits_workspace`` per tier."""
     tier = _read_powerunits_capability_tier()
     tg = [x for x in base if x not in POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM]
     try:
@@ -91,6 +94,8 @@ def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[
             tg.append("powerunits_tier1_analysis")
         if tier >= 2:
             tg.append("powerunits_tier2_allowlisted_read")
+        if tier >= 3:
+            tg.append("powerunits_tier3_skills_integration")
         return tg
     insert_pos = wi + 1
     if tier >= 1:
@@ -98,6 +103,9 @@ def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[
         insert_pos += 1
     if tier >= 2:
         tg.insert(insert_pos, "powerunits_tier2_allowlisted_read")
+        insert_pos += 1
+    if tier >= 3:
+        tg.insert(insert_pos, "powerunits_tier3_skills_integration")
     return tg
 
 
