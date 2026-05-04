@@ -26,8 +26,9 @@
 | `docs/powerunits_runtime_v0_12_integration.md` | **Runtime bump path:** Docker/`uv` install, recommended upstream **tag `v2026.4.30`**, `HERMES_HOME` policy, staging sequence, bounded smoke order. |
 | `docs/powerunits_hermes_progressive_posture_v1.md` | **Single canonical staged-liberation roadmap** (Phase 0 + tier1 **Phase 1A/1B**); rollback / watcher; optional **`HERMES_POWERUNITS_CAPABILITY_TIER`**. |
 | `docs/powerunits_workspace_phase1_exports_v1.md` | Phase 1A **exports** conventions, thresholds, read-only **`summarize_powerunits_workspace_exports`**. |
-| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, Phase 2A Telegram drift flags). |
+| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, Phase **2A/2B** Telegram drift flags). |
 | `docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md` | Phase 2A Tier-1 **`powerunits_tier1_analysis`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥1`** + policy merge). |
+| `docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md` | Phase **2B** **`powerunits_tier2_allowlisted_read`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥2`** + policy merge). |
 | `docs/powerunits_hermes_upgrade_playbook.md` | **All Hermes bumps:** branch hygiene, staging-first, tag vs `main`, Railway verification, Curator posture, `think`/`extra_body` lesson (cross-links v0.12 docs). |
 | `config/hermes_v0_12_powerunits_config_snippet.yaml.example` | Illustrative `config.yaml` fragment (Curator off, redaction note) — not auto-loaded. |
 | `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
@@ -196,6 +197,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Phase 1A export hygiene (optional):** **`summarize_powerunits_workspace_exports`** → **`read_only: true`**; review **`caution_flags`** per [`docs/powerunits_workspace_phase1_exports_v1.md`](docs/powerunits_workspace_phase1_exports_v1.md); **`exports/EXPORTS_PHASE1_OPERATOR.txt`** present after first workspace bootstrap.
 - [ ] **Phase 1B operator posture snapshot (optional):** **`summarize_powerunits_operator_posture`** → **`read_only: true`**; review **`caution_flags`** + **`phase_2a_overlay_read_only`** + env fingerprint per [`docs/powerunits_operator_posture_diagnostics_v1.md`](docs/powerunits_operator_posture_diagnostics_v1.md).
 - [ ] **Phase 2A Tier-1 analysis (optional; only if `HERMES_POWERUNITS_CAPABILITY_TIER≥1`):** confirm posture shows **`telegram_powerunits_tier1_analysis_observed: true`** after policy + restart; probe read-only **`summarize_powerunits_workspace_full`** / **`search_powerunits_workspace_text`** per [`docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md`](docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md).
+- [ ] **Phase 2B Tier-2 locals (optional; only if `HERMES_POWERUNITS_CAPABILITY_TIER≥2`):** posture **`telegram_powerunits_tier2_allowlisted_read_observed: true`**; probe **`manifest_powerunits_tier2_allowlisted_read_scope`** and **`summarize_powerunits_allowlisted_locals`** per [`docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`](docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md).
 
 ### Bounded DE outage awareness (read-only; Hermes → Repo B)
 

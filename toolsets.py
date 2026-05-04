@@ -235,6 +235,22 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_tier2_allowlisted_read": {
+        "description": (
+            "Phase 2B overlay (requires HERMES_POWERUNITS_CAPABILITY_TIER>=2 at policy apply + gateway): "
+            "read-heavy navigation across bounded hermes_workspace + optional powerunits_local_reference "
+            "— structured/.json/.yaml readable; no Repo B widen, shell, curator, or arbitrary paths."
+        ),
+        "tools": [
+            "manifest_powerunits_tier2_allowlisted_read_scope",
+            "summarize_powerunits_allowlisted_locals",
+            "search_powerunits_allowlisted_local_text",
+            "read_powerunits_allowlisted_workspace_extended_file",
+            "read_powerunits_local_reference_file",
+        ],
+        "includes": [],
+    },
+
     "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "

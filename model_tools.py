@@ -43,6 +43,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_operator_posture",
     "powerunits_workspace",
     "powerunits_tier1_analysis",
+    "powerunits_tier2_allowlisted_read",
     "powerunits_timescale_read",
     "powerunits_repo_b_read",
     "powerunits_option_d_preflight",
