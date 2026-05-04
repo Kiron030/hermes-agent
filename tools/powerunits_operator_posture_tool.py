@@ -93,8 +93,38 @@ def _exports_phase1_signals(hermes_home: Path) -> dict[str, Any]:
     return brief
 
 
+def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
+    snap: dict[str, Any] = {
+        "config_yaml_present": False,
+        "telegram_toolsets_count": None,
+        "powerunits_tier1_analysis_listed": None,
+        "parse_error": False,
+    }
+    cfg_path = hermes_home / "config.yaml"
+    if not cfg_path.is_file():
+        return snap
+    snap["config_yaml_present"] = True
+    if yaml is None:
+        snap["parse_error"] = True
+        return snap
+    try:
+        data = yaml.safe_load(cfg_path.read_text(encoding="utf-8", errors="replace"))
+        if not isinstance(data, dict):
+            snap["parse_error"] = True
+            return snap
+        pt = data.get("platform_toolsets")
+        if isinstance(pt, dict):
+            tg = pt.get("telegram")
+            if isinstance(tg, list):
+                snap["telegram_toolsets_count"] = len(tg)
+                snap["powerunits_tier1_analysis_listed"] = "powerunits_tier1_analysis" in tg
+    except Exception:
+        snap["parse_error"] = True
+    return snap
+
+
 def summarize_powerunits_operator_posture(**_: Any) -> str:
-    """Return JSON: capability tier, runtime policy hints, bounded posture, Phase 1A export signals."""
+    """Return JSON: capability tier, runtime policy hints, bounded posture, Phase 1A/2A overlay signals."""
 
     try:
         from powerunits_capability_tier import read_powerunits_capability_tier
@@ -108,14 +138,40 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
         policy = os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip()
 
         curator = _safe_curator_snapshot(hermes_home.resolve())
+        telegram_obs = _telegram_toolset_observation(hermes_home.resolve())
         exports_signals = _exports_phase1_signals(hermes_home)
 
         caution: list[str] = []
 
-        if tier_effective > 0:
-            caution.append(
-                "tier_gt_zero_label_only:no extra runtime widen until roadmap wires tier (see roadmap)"
-            )
+        overlay_expected = tier_effective >= 1
+        tg_has_analysis = telegram_obs.get("powerunits_tier1_analysis_listed")
+
+        phase_2a_readout = {
+            "tier_gate_workspace_analysis": overlay_expected,
+            "tools": [
+                "summarize_powerunits_workspace_full",
+                "search_powerunits_workspace_text",
+            ],
+            "telegram_powerunits_tier1_analysis_observed": tg_has_analysis,
+            "overlay_detail_doc": "docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md",
+        }
+
+        if overlay_expected:
+            explicit_false = tg_has_analysis is False
+            unknown = tg_has_analysis is None and telegram_obs.get("config_yaml_present")
+            if explicit_false:
+                caution.append(
+                    "phase_2a_drift:tier>=1_but_powerunits_tier1_analysis_missing_from_config_telegram"
+                )
+            if unknown and not telegram_obs.get("parse_error"):
+                caution.append(
+                    "phase_2a_telegram_toolsets_unreadable:inspect_platform_toolsets_telegram"
+                )
+            if telegram_obs.get("parse_error"):
+                caution.append(
+                    "phase_2a_telegram_parse_error:with_tier_ge_1_reapply_policy_restart"
+                )
+
         if not policy:
             caution.append(
                 "runtime_policy_unset:expect HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1 for bounded Powerunits"
@@ -139,22 +195,23 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
 
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
-            "Telegram/tool surface remains gateway + first_safe_v1 allowlist unless explicitly redeployed otherwise.",
+            "Telegram/tool surface remains gateway + first_safe_v1-derived allowlist (plus Phase 2A overlay when tier>=1 and policy applied).",
             "Workspace writes stay under hermes_workspace allowlisted dirs; exports Phase 1A uses summarize_powerunits_workspace_exports for hygiene hints.",
             "Hermes-derived CSV/files under exports are never authoritative over Repo B JSON.",
+            "Phase 2A Tier-1 analysis tools never write files, touch Repo B, or enable curator/self-improvement.",
         ]
 
         operator_before_tier_up = [
             "Run bounded smokes per RUNBOOK.hermes-stage1-validation.md § post-deploy.",
-            "Record fingerprint: image digest or release tag + HERMES_POWERUNITS_CAPABILITY_TIER + policy env + curator flag.",
-            "Review caution_flags above; investigate exports summarize failures before expanding freedom.",
-            "Prefer git tag powerunits-tier0-baseline-* and optional HERMES_HOMEbackup before uplift (roadmap § Rollback).",
+            "Before tier≥1 / Phase 2A: tag powerunits-tier0-baseline-* and snapshot HERMES_HOME (roadmap § Rollback).",
+            "After enabling tier≥1: rerun policy / restart gateway — confirm phase_2a_overlay_read_only.telegram_powerunits_tier1_analysis_observed is true.",
+            "Monitor Phase 2A via summarize_powerunits_workspace_full caution_flags and bounded smokes.",
         ]
 
         return json.dumps(
             {
                 "read_only": True,
-                "phase": "1B",
+                "phase": "1B_operator_posture_tool",
                 "tool_name": "summarize_powerunits_operator_posture",
                 "detail_doc": "docs/powerunits_operator_posture_diagnostics_v1.md",
                 "canonical_roadmap": "docs/powerunits_hermes_progressive_posture_v1.md",
@@ -166,6 +223,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 },
                 "hermes_pkg_version_reported": _installed_hermes_version(),
                 "config_curator_observation_read_only": curator,
+                "telegram_toolsets_observation_read_only": telegram_obs,
+                "phase_2a_overlay_read_only": phase_2a_readout,
                 "phase_1a_exports_signals_read_only": exports_signals,
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
@@ -188,9 +247,9 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
 POSTURE_SUMMARY_SCHEMA = {
     "name": "summarize_powerunits_operator_posture",
     "description": (
-        "Read-only Powerunits operator posture (Phase 1B): tier label, runtime policy env, curator flag from "
-        "config.yaml (observation only), Phase 1A export hygiene subset, bounded assumptions pointers, tier-up checklist. "
-        "Does not mutate state. Canonical roadmap: docs/powerunits_hermes_progressive_posture_v1.md"
+        "Read-only Powerunits operator posture: tier env, runtime policy, curator + Telegram toolset observation, "
+        "Phase 1A export signals, Phase 2A overlay readout when tier≥1, bounded assumptions, tier-up checklist. "
+        "Canonical roadmap: docs/powerunits_hermes_progressive_posture_v1.md"
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
