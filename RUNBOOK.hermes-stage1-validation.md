@@ -24,6 +24,8 @@
 | `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
 | `docs/hermes_v0_12_staged_upgrade_powerunits.md` | **Upgrade prep only:** Hermes Agent **v0.12.x** staging-first rollout, Curator/self-improve guardrails, pinning, first-boot checks (Repo B unchanged). |
 | `docs/powerunits_runtime_v0_12_integration.md` | **Runtime bump path:** Docker/`uv` install, recommended upstream **tag `v2026.4.30`**, `HERMES_HOME` policy, staging sequence, bounded smoke order. |
+| `docs/powerunits_hermes_progressive_posture_v1.md` | **Progressive liberation Phase 0:** `tier0` baseline, placeholders `tier1`–`tier3`, git tag / `HERMES_HOME` rollback contract, pre-tier watcher checklist (optional **`HERMES_POWERUNITS_CAPABILITY_TIER`** label in logs). |
+| `docs/powerunits_hermes_upgrade_playbook.md` | **All Hermes bumps:** branch hygiene, staging-first, tag vs `main`, Railway verification, Curator posture, `think`/`extra_body` lesson (cross-links v0.12 docs). |
 | `config/hermes_v0_12_powerunits_config_snippet.yaml.example` | Illustrative `config.yaml` fragment (Curator off, redaction note) — not auto-loaded. |
 | `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
 
@@ -60,6 +62,7 @@ If any item fails → treat as **not** Trusted Analyst until fixed; do not widen
 
 - [ ] First gateway start after upgrade: allow extra time; scan logs for **session/SQLite/FTS** migration messages — expect **no** crash loop.
 - [ ] Still **no** full secrets (`DATABASE_URL*`, internal bearer, raw tokens) in stdout/stderr.
+- [ ] LLM route: **no** repeated HTTP **400** mentioning **`think`** when using `custom` + `api.openai.com` (regression fixed in `ChatCompletionsTransport` — see [`docs/powerunits_hermes_upgrade_playbook.md`](docs/powerunits_hermes_upgrade_playbook.md)).
 
 **Then** run the normal **Post-change deploy verification** block and bounded subsections above (Telegram, ENTSO-E, ERA5, inventory, governance, etc.).
 

@@ -2,6 +2,10 @@
 
 **Scope:** how the **Hermes runtime** is built and rolled out for the internal Powerunits Railway service. **Repo B** remains the bounded HTTP source of truth — no product API changes here.
 
+**Repeatable upgrades (all versions):** [`powerunits_hermes_upgrade_playbook.md`](powerunits_hermes_upgrade_playbook.md) — branches, staging-first, tag vs `main`, Curator posture, `think`/`extra_body` pitfall.
+
+**Progressive liberation (Phase 0 — tier vocabulary, rollback contract, watchlist):** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md).
+
 ---
 
 ## How Hermes enters this repo today
@@ -74,3 +78,10 @@ Run on **staging** Telegram (allowlisted operator):
 7. **Secrets:** logs must **not** contain raw `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET` or full `DATABASE_URL`.
 
 Then promote to production only after sign-off.
+
+---
+
+## Post-upgrade note (v0.12.0 / tag `v2026.4.30` — successful path)
+
+- Bounded smokes (governance, inventory, ENTSO‑E market + forecast, ERA5) validated on **staging** before production.
+- **HTTP 400 `think`:** if `provider` is `custom` and the endpoint is **official OpenAI** (or Azure OpenAI host), the runtime must **not** send Ollama-only `extra_body.think` — see playbook → **Lesson: `think`** and `agent/transports/chat_completions.py`.

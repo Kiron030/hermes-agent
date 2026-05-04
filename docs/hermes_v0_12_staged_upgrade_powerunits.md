@@ -4,6 +4,10 @@
 
 **Process:** preparation (this doc) → **staging** deploy & smoke → confidence → **production** rollout. Do **not** use this file to justify broadening bounded families or enabling Curator/self-improvement in production without a separate decision.
 
+**Repeatable merge workflow (branches, tags, pitfalls):** [`powerunits_hermes_upgrade_playbook.md`](powerunits_hermes_upgrade_playbook.md).
+
+**After v0.12 is baseline:** staged capability tiers + rollback anchors (same single deployment default) — **[`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md)**.
+
 ---
 
 ## What changes in v0.12 (relevant to us)
@@ -28,10 +32,7 @@ Unbundled-from-core items (Teams plugins, Spotify, Meet, Langfuse, achievements,
 | **Global `redaction.enabled`** | Default **off** unless you are debugging a specific leak; align with upstream default. | **Off** unless security review requires opt-in and operators accept patch/JSON distortion risk. |
 | **Bundled telemetry/plugins** | Do not enable Langfuse/achievements/Spotify/etc. unless testing in isolation. | **Leave inactive** until product/security sign-off. |
 | **`HERMES_POWERUNITS_RUNTIME_POLICY`** | Remains **`first_safe_v1`**. | Unchanged. |
-| **`config.yaml` merge** | After upgrading the **Hermes binary/image**, reconcile **`$HERMES_HOME/config.yaml`** with your existing Powerunits entries (Telegram toolsets applied by [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) or equivalent).
-
-  **Hermes Agent v0.12+ (`first_safe_v1`):** the same script sets **`auxiliary.curator.enabled: false`** when absent (operators may still enforce stricter pinning). See **`docs/powerunits_runtime_v0_12_integration.md`**. | Same; review on each production deploy. |
-
+| **`config.yaml` merge** | After upgrading the **Hermes binary/image**, reconcile **`$HERMES_HOME/config.yaml`** with your existing Powerunits entries (Telegram toolsets applied by [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) or equivalent). Hermes v0.12+ with **`first_safe_v1`** also applies **`auxiliary.curator.enabled: false`** when absent via that script — see **`docs/powerunits_runtime_v0_12_integration.md`**. | Same; review on each production deploy. |
 **Exact YAML shape** depends on the installed Hermes v0.12 build — verify keys with `hermes doctor` / upstream docs. A **commented illustration** lives at [`config/hermes_v0_12_powerunits_config_snippet.yaml.example`](../config/hermes_v0_12_powerunits_config_snippet.yaml.example) (not loaded automatically).
 
 ---
@@ -94,6 +95,7 @@ Use this as a **negative** checklist until separately approved:
 
 ## Related files
 
+- [`docs/powerunits_hermes_upgrade_playbook.md`](powerunits_hermes_upgrade_playbook.md) — **repeatable** upgrade workflow (branches, staging, tag vs `main`, Curator, `think` regression).
 - [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) — v0.12 staging cutover checklist (short).
 - [`RUNBOOK.hermes-trusted-analyst.md`](../RUNBOOK.hermes-trusted-analyst.md) — operator entry context.
 - [`docs/powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) — Docker/runtime merge path, tag `v2026.4.30`, staging deploy and smoke order.
