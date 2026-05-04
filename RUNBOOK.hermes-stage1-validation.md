@@ -23,6 +23,7 @@
 | `docs/hermes_stage1_preview_validation_v1.md` | Manual browser/preview smoke (read-only; no Hermes URL fetch). |
 | `docs/powerunits_hermes_growth_and_option_d_intake_v1.md` | Hermes growth decisions + Option D intake (read-only design path). |
 | `docs/hermes_v0_12_staged_upgrade_powerunits.md` | **Upgrade prep only:** Hermes Agent **v0.12.x** staging-first rollout, Curator/self-improve guardrails, pinning, first-boot checks (Repo B unchanged). |
+| `docs/powerunits_runtime_v0_12_integration.md` | **Runtime bump path:** Docker/`uv` install, recommended upstream **tag `v2026.4.30`**, `HERMES_HOME` policy, staging sequence, bounded smoke order. |
 | `config/hermes_v0_12_powerunits_config_snippet.yaml.example` | Illustrative `config.yaml` fragment (Curator off, redaction note) — not auto-loaded. |
 | `config/powerunits_repo_b_read_allowlist.json` | Allowlist keys → Repo B paths (authoritative for that tool; **version** field drives v2–v5 expectations in checks below). |
 
@@ -48,8 +49,10 @@ If any item fails → treat as **not** Trusted Analyst until fixed; do not widen
 
 **Config / guardrails (staging first):**
 
-- [ ] `$HERMES_HOME/config.yaml` reviewed after merge with upstream template; **Curator** remains **disabled** for Powerunits policy (`auxiliary.curator` / see [`config/hermes_v0_12_powerunits_config_snippet.yaml.example`](config/hermes_v0_12_powerunits_config_snippet.yaml.example) and `hermes doctor` for exact keys).
-- [ ] Global Hermes **`redaction.enabled`** left **off** unless you explicitly opt in (upstream v0.12 default off; bounded tools still use local URL redaction).
+- [ ] `$HERMES_HOME/config.yaml` reviewed after merge with upstream template; **Curator** remains **disabled** for Powerunits policy.
+
+  On **`HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`**, [`docker/apply_powerunits_runtime_policy.py`](docker/apply_powerunits_runtime_policy.py) sets **`auxiliary.curator.enabled: false`** via `setdefault` when the key was missing (explicit `true` in an existing file is preserved — avoid shipping that to prod). See [`docs/powerunits_runtime_v0_12_integration.md`](docs/powerunits_runtime_v0_12_integration.md).
+- [ ] Global Hermes **`redaction.enabled`** left **off** unless you explicitly opt in (**the same policy script** sets default **off** when absent; upstream v0.12 default is also off; bounded tools still use local URL redaction).
 - [ ] **Not enabled:** Langfuse, achievements, Spotify/Meet/Teams plugins, Vercel sandbox execute backend, or other optional surfaces — unless on a **separate** experiment service.
 - [ ] **Pinned** (as applicable): operator-authored Powerunits procedure skills so **Curator** / `skill_manage` cannot rewrite them — see pinning table in `docs/hermes_v0_12_staged_upgrade_powerunits.md`.
 

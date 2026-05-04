@@ -5,6 +5,11 @@ Apply Powerunits first-deployment runtime safety policy.
 This is intentionally narrow:
 - keep Hermes install intact for future phases
 - enforce a fail-closed platform/tool surface for first Railway deployment
+- Hermes Agent **v0.12+**: ensure **Curator stays off by default** in ``config.yaml``
+  (`auxiliary.curator.enabled`) unless operators already set it — staging/prod posture
+  for Powerunits (**no autonomous skill maintenance on the gateway** until explicitly opted in).
+  Also align **global redaction default** with upstream v0.12 (**off**) when the key is
+  absent, to reduce patch/JSON mangling (**bounded tools keep their own URL redactors**).
 """
 
 from __future__ import annotations
@@ -184,6 +189,25 @@ def apply_policy(config_path: Path) -> None:
     runtime_policy["enforced"] = True
     powerunits["runtime_policy"] = runtime_policy
     cfg["powerunits"] = powerunits
+
+    # v0.12+ autonomous Curator runs on gateway cron unless disabled. Policy: default off
+    # for Powerunits staged/prod installs when the flag is omitted (preserve explicit true).
+    auxiliary = cfg.get("auxiliary")
+    if not isinstance(auxiliary, dict):
+        auxiliary = {}
+    curator = auxiliary.get("curator")
+    if not isinstance(curator, dict):
+        curator = {}
+    curator.setdefault("enabled", False)
+    auxiliary["curator"] = curator
+    cfg["auxiliary"] = auxiliary
+
+    # Align with upstream v0.12 default (off) when unset; avoids over-redacting payloads.
+    redaction = cfg.get("redaction")
+    if not isinstance(redaction, dict):
+        redaction = {}
+    redaction.setdefault("enabled", False)
+    cfg["redaction"] = redaction
 
     _save_yaml(config_path, cfg)
 
