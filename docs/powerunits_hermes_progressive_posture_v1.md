@@ -3,11 +3,13 @@
 **Audience:** operators of the **internal Powerunits** Hermes (Repo A: `hermes-agent`).  
 **Canonical product truth:** **Repo B** — unchanged by this posture model.
 
-**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper workspace/export detail lives in **`docs/powerunits_workspace_phase1_exports_v1.md`** — cross-linked below, not duplicated here.
+**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper operational docs are cross-linked below (workspace exports **1A**, operator diagnostics **1B**) — not duplicated here.
 
 **Phase 0 (established):** **capability-tier vocabulary**, **rollback/baseline contract**, **minimal pre-tier watchlist**, optional **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label (no extra runtime freedom by itself).
 
 **Phase 1A (first concrete tier1 carve-out):** **structured `exports/` posture** — conventions, read-only export summary tool, one-time operator pointer file under `exports/`; see **§ Phase 1A — workspace / exports** below.
+
+**Phase 1B:** **read-only operator posture diagnostics** — tool **`summarize_powerunits_operator_posture`** aggregates tier env, runtime policy snapshot, curator **observation**, Phase 1A export signals subset, bounded-assumption reminders, tier-up checklist; see **§ Phase 1B — operator diagnostics** below.
 
 ---
 
@@ -21,6 +23,7 @@
 | [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) | Executable bounded checks post-deploy. |
 | [**`powerunits_workspace_v1.md`**](powerunits_workspace_v1.md) | Workspace tool contract (`analysis` / `notes` / `drafts` / `exports`). |
 | [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) | **Phase 1A detail:** export naming, overwrite semantics, hygiene thresholds, summary tool reference. |
+| [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md) | **Phase 1B:** read-only posture tool JSON semantics, watchers, rollup with Phase 1A signals. |
 
 Optional env observability (Phase 0 **label only**, no behavior change for `tier>0` until explicitly wired):
 
@@ -39,7 +42,8 @@ Optional env observability (Phase 0 **label only**, no behavior change for `tier
 
 - **Goal:** More **internal assistive** value with **low structural risk** on the **same** main Hermes.
 - **Phase 1A (live experiment):** Stronger **`hermes_workspace/exports`** posture only — documented conventions, **read-only** **`summarize_powerunits_workspace_exports`**, non-destructive operator pointer file; see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). Does **not** widen bounded HTTP families or Telegram tool allowlists beyond existing workspace tools.
-- **Still deferred (later tier1 steps):** Additional read-heavy helpers **outside** exports hygiene, optional metrics aggregation, etc. — each as its own small change + watchlist update.
+- **Phase 1B (live experiment):** **Read-only aggregated posture view** via **`summarize_powerunits_operator_posture`** (`toolset` **`powerunits_operator_posture`** first_safe_v1 Telegram) — merges tier env readout, **`HERMES_POWERUNITS_RUNTIME_POLICY`**, best-effort **`auxiliary.curator.enabled`** observation from **`config.yaml`**, condensed Phase **1A** export **`caution_flags`**, roadmap-aligned operator checklist strings; [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). **Still no** runtime mutations, bounded family widen, Curator enablement, or Repo B weakening.
+- **Still deferred (later tier1 steps):** Additional helpers **beyond** diagnostics + exports hygiene — each small change plus watchlist bullet in **this roadmap**.
 - **Must not:** Weaken Repo B as source of truth; enable Curator writes; widen bounded family semantics without Repo B governance.
 
 ### `tier2` *(placeholder)*
@@ -115,9 +119,12 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | **Inventory recheck** | Coverage inventory tool still behaves (`feature_disabled` when flags off matches expectations). |
 | **Config/runtime fingerprint** | Record: `HERMES_POWERUNITS_RUNTIME_POLICY`, image digest/semaphore, **`HERMES_POWERUNITS_CAPABILITY_TIER`**, model id in `config.yaml`, `auxiliary.curator.enabled`. |
 | **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths; **Phase 1A:** run **`summarize_powerunits_workspace_exports`** after material export work and archive or delete stale files per [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
+| **Posture snapshot (env + exports subset)** | **`summarize_powerunits_operator_posture`** (Phase 1B) — quick JSON fingerprint before tier uplift; see [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
 | **Curator** | **`enabled: false`** for `tier0`; any deviation is **explicit** and documented (not drift). |
 
 **Caution triggers:** Passing smoke regressions, new HTTP 400/422 patterns on LLM routes, unexplained Telegram tool errors, curator directories appearing when supposed off.
+
+**Phase 1B posture rollup:** Non-empty **`caution_flags`** from **`summarize_powerunits_operator_posture`** → reconcile env (`HERMES_POWERUNITS_RUNTIME_POLICY`, tier label), curator observation, failed export summarization (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)).
 
 **Phase 1A export sprawl (lightweight):** use summary tool **`caution`** hints (file count / total bytes / large single file). **Suspicious** = growth with no correlated operator task, many tiny CSVs from retries, or disk pressure on the Railway volume — see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) § Watcher.
 
@@ -138,17 +145,34 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 
 ---
 
+## Phase 1B — operator diagnostics (roadmap slice)
+
+**Intent:** Consolidated **read-only posture awareness** so operators answer “what tier label / policy snapshot / curator observation / exports hygiene rollup applies **right now**?” before raising freedom — **without** mutating **`HERMES_HOME`**.
+
+| Item | Contract |
+|------|----------|
+| **Tool** | **`summarize_powerunits_operator_posture`** (`toolset` **`powerunits_operator_posture`**, Telegram allowlist aligned with **`first_safe_v1`** alongside other bounded toolsets). |
+| **Reads** | Environment (`HERMES_HOME`, **`HERMES_POWERUNITS_CAPABILITY_TIER`**, **`HERMES_POWERUNITS_RUNTIME_POLICY`**) + best-effort YAML read of **`auxiliary.curator.enabled`** from **`config.yaml`** + condensed Phase **1A** **`summarize_powerunits_workspace_exports`** output; **never** emits secrets from config. |
+| **Watchers** | JSON **`caution_flags`** (tier unset reminder, unset/non-default runtime policy, curator `true`, export hygiene echoes, summarized errors). Operational detail [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
+| **Rollback** | Remove tool via Repo A revert; **no persistent side effects** from invoking the tool itself. |
+
+**Frozen in Phase 1B:** No bounded family widen; no curator or self-improvement **writes**; no Repo B authority shift.
+
+---
+
 ## Phase 0 outcome summary
 
 Phase 0 **establishes:** tier vocabulary + placeholders (now **tier1** has first concrete slice), rollback/tag contract, watchlist, and **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label.
 
-**Phase 1A adds:** export posture documentation + non-invasive read-only summarization + Pointer-Datei (bounded-safe).
+Phase 1A **adds:** export posture documentation + non-invasive read-only summarization + pointer file (bounded-safe).
+
+**Phase 1B adds:** read-only **`summarize_powerunits_operator_posture`** + diagnostics reference doc (**no state mutation**).
 
 **Intentionally unchanged:** `first_safe_v1` policy script behavior **for bounded families**, bounded gateway lockdown, Repo B canonicality, Curator defaults for production/staging stance.
 
 ---
 
-## Next roadmap steps (after Phase 1A)
+## Next roadmap steps (after Phase 1A / Phase 1B)
 
-- **tier1 continuation:** deliberate **additional read-heavy** helpers (each with manifest + rollback note in **this file**).
+- **tier1 continuation:** additional **read-heavy** helpers beyond exports + diagnostics (each documented with rollback snippet in **this file**).
 - **tier2 / tier3:** unchanged conceptual placeholders above — revisit only after tier1 learnings and fingerprint discipline.

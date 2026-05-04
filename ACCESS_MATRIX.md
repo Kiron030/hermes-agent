@@ -8,6 +8,7 @@
 | **GitHub docs (allowlisted)** | Allowed (primary) | `POWERUNITS_GITHUB_TOKEN_READ` (or legacy docs token); paths/branches per `powerunits_github_knowledge` config. |
 | **Bundled Powerunits docs** | Allowed (fallback) | Build-time / env-directed; not primary when GitHub is healthy. |
 | **Workspace** (`hermes_workspace` allowlisted subdirs) | Allowed | Text notes / analysis under bounded paths; no delete/rename escapes. |
+| **Operator posture snapshot** (`summarize_powerunits_operator_posture`, Phase 1B progressive roadmap) | Allowed | Read-only JSON: tier env, runtime policy string, best-effort curator flag from `config.yaml`, Phase 1A export signal subset; **no** writes to volume or Repo B. |
 | **Memory / session search / todo** | Allowed | Part of first_safe bounded set for continuity and tasks. |
 | **Timescale read** (`read_powerunits_timescale_dataset`) | Allowed **only** when gated | `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` + `DATABASE_URL_TIMESCALE`; single view `public.market_price_model_dataset_v`; fixed patterns only. |
 | **Repo B file read** (`read_powerunits_repo_b_allowlisted`) | Allowed **only** when gated | `HERMES_POWERUNITS_REPO_B_READ_ENABLED` + GitHub read token; actions `list_repo_b_keys` / `read_repo_b_key` only (snake_case keys from `config/powerunits_repo_b_read_allowlist.json`); not the doc manifest tool. |

@@ -198,6 +198,15 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_operator_posture": {
+        "description": (
+            "Read-only Phase 1B posture snapshot — tier env, runtime policy fingerprint, curator observation, "
+            "Phase 1A export signals subset; operator tier-up checklist. No mutations."
+        ),
+        "tools": ["summarize_powerunits_operator_posture"],
+        "includes": [],
+    },
+
     "powerunits_workspace": {
         "description": (
             "Bounded persistent workspace at /opt/data/hermes_workspace "

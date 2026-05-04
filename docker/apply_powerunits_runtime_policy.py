@@ -28,6 +28,7 @@ ALLOWED_TELEGRAM_TOOLSETS = [
     "todo",
     "powerunits_docs",
     "powerunits_github_docs",
+    "powerunits_operator_posture",
     "powerunits_workspace",
     "powerunits_timescale_read",
     "powerunits_repo_b_read",

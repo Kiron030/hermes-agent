@@ -337,6 +337,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_market_features_bounded_de_summary_tool",
             "tools.powerunits_market_features_bounded_de_validate_tool",
             "tools.powerunits_github_docs_tool",
+            "tools.powerunits_operator_posture_tool",
             "tools.powerunits_option_d_execute_tool",
             "tools.powerunits_option_d_preflight_tool",
             "tools.powerunits_option_d_readiness_tool",
