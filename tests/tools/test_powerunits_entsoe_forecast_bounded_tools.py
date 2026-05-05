@@ -101,7 +101,7 @@ def test_execute_http_200_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["operator_statement"] == "forecast only"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI", "HU", "SK", "RO"])
 def test_execute_http_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -146,7 +146,7 @@ def test_execute_http_be_fr_via_primary_allowlist_unset(
     assert out["success"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI", "HU", "SK", "RO"])
 def test_preflight_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -411,7 +411,7 @@ def test_execute_blocked_when_allowlist_de_nl_only_forecast(
     assert out.get("error_code") == "country_not_permitted"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI", "HU", "SK", "RO"])
 def test_validate_via_primary_be_fr_allowlist_unset_forecast(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -459,7 +459,7 @@ def test_validate_via_primary_be_fr_allowlist_unset_forecast(
     assert out["validation_attempted"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI", "HU", "SK", "RO"])
 def test_summary_via_primary_be_fr_allowlist_unset_forecast(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -531,7 +531,7 @@ def test_execute_forecast_blocked_when_allowlist_explicit_de_through_at_blocks_c
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL,BE,FR,AT")
     monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
     monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
-    for country in ("CZ", "PL", "FI"):
+    for country in ("CZ", "PL", "FI", "HU", "SK", "RO"):
         out = json.loads(
             exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
                 country=country,
@@ -544,7 +544,31 @@ def test_execute_forecast_blocked_when_allowlist_explicit_de_through_at_blocks_c
         assert out.get("error_code") == "country_not_permitted"
 
 
-@pytest.mark.parametrize("iso2", ["ES", "IT", "SE"])
+def test_execute_forecast_blocked_when_allowlist_pre_hu_sk_ro_excludes_hu_sk_ro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_fcst_bounded_core(monkeypatch)
+    monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(
+        ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV,
+        "DE,NL,BE,FR,AT,CZ,PL,FI",
+    )
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
+    for country in ("HU", "SK", "RO"):
+        out = json.loads(
+            exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
+                country=country,
+                start="2024-01-01T00:00:00Z",
+                end="2024-01-01T12:00:00Z",
+                version="v1",
+                _http_post=lambda *_a, **_k: (_ for _ in ()).throw(AssertionError()),
+            )
+        )
+        assert out.get("error_code") == "country_not_permitted"
+
+
+@pytest.mark.parametrize("iso2", ["ES", "IT", "SE", "DK", "NO"])
 def test_preflight_es_it_rejected_slice_forecast(monkeypatch: pytest.MonkeyPatch, iso2: str) -> None:
     _clear_fcst_bounded_core(monkeypatch)
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
