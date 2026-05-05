@@ -28,7 +28,7 @@ def test_invalid_string_defaults_zero(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_clamps_high(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "99")
-    assert read_powerunits_capability_tier() == 3
+    assert read_powerunits_capability_tier() == 4
 
 
 def test_clamps_low(monkeypatch: pytest.MonkeyPatch) -> None:

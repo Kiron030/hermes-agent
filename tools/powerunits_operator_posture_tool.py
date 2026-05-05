@@ -100,6 +100,7 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
         "powerunits_tier1_analysis_listed": None,
         "powerunits_tier2_allowlisted_read_listed": None,
         "powerunits_tier3_skills_integration_listed": None,
+        "powerunits_tier4a_skill_draft_proposals_listed": None,
         "parse_error": False,
     }
     cfg_path = hermes_home / "config.yaml"
@@ -126,13 +127,16 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
                 snap["powerunits_tier3_skills_integration_listed"] = (
                     "powerunits_tier3_skills_integration" in tg
                 )
+                snap["powerunits_tier4a_skill_draft_proposals_listed"] = (
+                    "powerunits_tier4a_skill_draft_proposals" in tg
+                )
     except Exception:
         snap["parse_error"] = True
     return snap
 
 
 def summarize_powerunits_operator_posture(**_: Any) -> str:
-    """Return JSON: tier env, bounded posture, overlays 2A/2B + Tier 3 skills integration."""
+    """Return JSON: tier env, bounded posture, overlays 2A/2B + Tier 3 + Tier 4A."""
 
     try:
         from powerunits_capability_tier import read_powerunits_capability_tier
@@ -229,6 +233,30 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "tier3_skills_drift:tier>=3_but_powerunits_tier3_skills_integration_missing_from_telegram"
             )
 
+        overlay_t4a = tier_effective >= 4
+        tg_has_t4a = telegram_obs.get("powerunits_tier4a_skill_draft_proposals_listed")
+
+        phase_tier4a_skill_drafts_readout = {
+            "tier_gate_skill_draft_proposals": overlay_t4a,
+            "drafts_root_relative": "drafts/powerunits_skill_proposals",
+            "tools": [
+                "manifest_powerunits_tier4a_skill_draft_scope",
+                "write_powerunits_skill_draft_proposal",
+                "list_powerunits_skill_draft_proposals",
+                "read_powerunits_skill_draft_proposal",
+                "summarize_powerunits_skill_draft_proposals",
+            ],
+            "telegram_powerunits_tier4a_skill_draft_proposals_observed": tg_has_t4a,
+            "overlay_detail_doc": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
+            "tier4a_live_skills_writes": False,
+            "tier4a_not_auto_applied_contract": True,
+        }
+
+        if overlay_t4a and tg_has_t4a is False:
+            caution.append(
+                "tier4a_skill_drafts_drift:tier>=4_but_powerunits_tier4a_skill_draft_proposals_missing_from_telegram"
+            )
+
         if not policy:
             caution.append(
                 "runtime_policy_unset:expect HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1 for bounded Powerunits"
@@ -255,12 +283,46 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
         if exports_signals.get("summarize_error"):
             caution.append(f"exports_summarize_failed:{exports_signals['summarize_error']}")
 
+        tier4a_watch: dict[str, Any] = {"summarize_attempted": False, "skipped_not_tier4a": True}
+        if overlay_t4a:
+            tier4a_watch["skipped_not_tier4a"] = False
+            try:
+                from tools.powerunits_tier4a_skill_draft_proposals_tool import (
+                    summarize_powerunits_skill_draft_proposals,
+                )
+
+                raw_tw = summarize_powerunits_skill_draft_proposals()
+                tw = json.loads(raw_tw)
+                if isinstance(tw, dict) and not tw.get("error_code"):
+                    cflags = tw.get("caution_flags") or []
+                    tier4a_watch.update(
+                        {
+                            "summarize_attempted": True,
+                            "proposal_file_count": tw.get("proposal_file_count"),
+                            "proposal_total_bytes": tw.get("proposal_total_bytes"),
+                            "touched_last_24h_count": tw.get("touched_last_24h_count"),
+                            "stale_file_count_older_than_days": tw.get(
+                                "stale_file_count_older_than_days"
+                            ),
+                            "caution_flags": cflags,
+                        }
+                    )
+                    for fl in cflags:
+                        caution.append(f"tier4a_drafts_watch:{fl}")
+                elif isinstance(tw, dict):
+                    tier4a_watch["summarize_attempted"] = True
+                    tier4a_watch["summarize_error"] = tw.get("error")
+            except Exception as exc:
+                tier4a_watch["summarize_error"] = str(exc)[:240]
+                caution.append(f"tier4a_drafts_watch_summary_failed:{str(exc)[:120]}")
+
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
-            "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3).",
+            "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3) / Tier 4A (tier>=4).",
             "Workspace writes stay under hermes_workspace allowlisted dirs; exports Phase 1A uses summarize_powerunits_workspace_exports for hygiene hints.",
             "Hermes-derived CSV/files under exports are never authoritative over Repo B JSON.",
             "Phase 2A/2B tools are read-only; Tier 3 skills tools are observe/diagnose/propose-only (no auto merge).",
+            "Tier 4A writes only under hermes_workspace/drafts/powerunits_skill_proposals with explicit review metadata — never live $HERMES_HOME/skills.",
             "auxiliary.curator.enabled defaults false in policy; autonomous Curator paths require explicit ops review.",
         ]
 
@@ -273,6 +335,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
             "Monitor Phase 2B via summarize_powerunits_allowlisted_locals/search caution_flags.",
             "Before tier≥3: review Curator posture (keep default off); confirm Tier-2 stable.",
             "After enabling tier≥3: confirm phase_tier3_skills_observer_read_only.telegram_powerunits_tier3_skills_integration_observed is true; sample skills observer tools.",
+            "Before tier≥4 / Tier 4A: confirm Tier-3 observer signals clean; snapshot volume; review summarize_powerunits_skill_draft_proposals thresholds in overlay doc.",
+            "After enabling tier≥4: confirm phase_tier4a_skill_drafts_read_only.telegram_powerunits_tier4a_skill_draft_proposals_observed is true; probe manifest + summarize draft tools.",
         ]
 
         return json.dumps(
@@ -294,6 +358,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "phase_2a_overlay_read_only": phase_2a_readout,
                 "phase_2b_overlay_read_only": phase_2b_readout,
                 "phase_tier3_skills_observer_read_only": phase_tier3_skills_readout,
+                "phase_tier4a_skill_drafts_read_only": phase_tier4a_skill_drafts_readout,
+                "tier4a_draft_proposals_watch_read_only": tier4a_watch,
                 "phase_1a_exports_signals_read_only": exports_signals,
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
@@ -316,7 +382,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
 POSTURE_SUMMARY_SCHEMA = {
     "name": "summarize_powerunits_operator_posture",
     "description": (
-        "Phase 1B posture tool + overlays 2A/2B/Tier 3 Telegram alignment; Curator tier-3 cautions when applicable; "
+        "Phase 1B posture tool + overlays 2A/2B/Tier 3/Tier 4A Telegram alignment; Curator tier≥3 cautions when applicable; "
         "Phase 1A export signals. Canonical roadmap: docs/powerunits_hermes_progressive_posture_v1.md"
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},

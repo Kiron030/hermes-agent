@@ -45,6 +45,7 @@ _POWERUNITS_ALLOWED_TOOLSETS = (
     "powerunits_tier1_analysis",
     "powerunits_tier2_allowlisted_read",
     "powerunits_tier3_skills_integration",
+    "powerunits_tier4a_skill_draft_proposals",
     "powerunits_timescale_read",
     "powerunits_repo_b_read",
     "powerunits_option_d_preflight",
