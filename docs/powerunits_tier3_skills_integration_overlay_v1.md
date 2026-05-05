@@ -23,9 +23,33 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 3`**.
 | **`summarize_powerunits_skills_observer`** | Inventory: provenance-ish buckets (**bundled manifest / hub lock / agent-eligible paths** heuristic), **`SKILL.md` scan cap**, `.usage.json` histogram, **`agent.curator.load_state`** slice (read-only). |
 | **`diagnose_powerunits_skills_signals`** | Duplicates (**same declared `name:`**), stale/archived agent usage rows, idle hints, heuristic “injection-like” head markers (**advisory**, not antivirus). |
 | **`propose_powerunits_skill_integration_actions`** | Consolidates diagnoses into **`proposal_items`** for **human merge** (`explicitly_not_auto_applied: true`). |
-| **`read_powerunits_skill_body_preview`** | Bounded **`SKILL.md`** read for one slug under **`$HERMES_HOME/skills`** (validated name). |
+| **`read_powerunits_skill_body_preview`** | Bounded **`SKILL.md`** read for a path under **`$HERMES_HOME/skills`**: flat slug or nested path (**`category/sub-skill`**); category folders with **`DESCRIPTION.md`** and no **`SKILL.md`** return a hub JSON (excerpt + **`nested_skill_slugs`**). |
 
 **Scope boundaries:** Reads only under **`skills/`** (with the same **`SKILL.md` enumeration skips** as core Hermes: **`.hub`**, **`.archive`**, dot dirs). Does **not** read **`config.yaml`** secrets wholesale; **not** Repo B.
+
+---
+
+## Tier 0–4A wiring audit (operators, non-authoritative)
+
+Quick consistency check (canonical numbers live in [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md)):
+
+- **`HERMES_POWERUNITS_CAPABILITY_TIER`**: `0` baseline → `1` **2A** → `2` **2B** → `3` Tier 3 skills observer → `4` adds **Tier 4A** draft proposals only — **no** live **`skills/`** writes from Tier 4A tools.
+- **`docker/apply_powerunits_runtime_policy.py`** merges Telegram toolsets in that order after **`powerunits_workspace`**; **`model_tools.py`** / **`toolsets.py`** list the same bounded Powerunits toolset names.
+- **Curator**: policy default remains **`auxiliary.curator.enabled: false`**; Tier 3 stays **observe / propose-only** (no tool-level merges).
+- **Tier 4A**: writes only under **`hermes_workspace/drafts/powerunits_skill_proposals/`** — snapshot via **`summarize_powerunits_operator_posture`** / Tier 4A summarize when enabled.
+
+---
+
+## Nested / category **`read_powerunits_skill_body_preview`**
+
+| `skill_name` input | Result |
+|--------------------|--------|
+| **`dogfood`** | Resolves to **`dogfood/SKILL.md`** when present, or legacy match on declared skill **`name:`** elsewhere. |
+| **`research/arxiv`** | Path join under **`skills/`** → reads that directory’s **`SKILL.md`**. |
+| **Category** (e.g. **`research`**) with **`DESCRIPTION.md`**, no **`SKILL.md`** | JSON **`preview_kind`:** **`skill_category_hub_with_description`** with **`description_excerpt`** and **`nested_skill_slugs`** (immediate subdirs that contain **`SKILL.md`**). |
+| **Category** without **`DESCRIPTION.md`**, with nested skills | JSON **`preview_kind`:** **`skill_category_index`** listing **`nested_skill_slugs`** only. |
+| **`foo/../bar`**, **`.hub/foo`**, **`foo/../../etc/passwd`** segments | Rejected **`invalid_skill_name`** (**no** traversal); reserved tree parts (**`.hub`**, **`.archive`**, …) rejected. |
+| Normal skill | JSON includes **`preview_kind`:** **`skill_md_body`** plus **`body`** (unchanged fields: **`canonical_name_observed`**, **`path_relative_to_skills`**, …). |
 
 ---
 

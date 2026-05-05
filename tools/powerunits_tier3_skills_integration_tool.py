@@ -34,6 +34,11 @@ from tools.skill_usage import (
 )
 
 _NAME_SLUG_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$")
+_PREVIEW_SEGMENT_SLUG_RE = _NAME_SLUG_RE  # identical rules per UTF-8 path segment
+_MAX_PREVIEW_PATH_SEGMENTS = 8
+_PREVIEW_SKIP_PARTS = frozenset({".git", ".github", ".hub", ".archive", "node_modules"})
+_MAX_CATEGORY_CHILD_SKILLS = 80
+_MAX_DESCRIPTION_PREVIEW = 6000
 _MAX_SKILLS_SCAN = 450
 _MAX_PREVIEW_CHARS_DEFAULT = 14_000
 _MAX_PREVIEW_CHARS_CAP = 28_000
@@ -56,6 +61,74 @@ def check_powerunits_tier3_skills_integration() -> bool:
 
 def _skills_root() -> Path:
     return (get_hermes_home() / "skills").resolve()
+
+
+def _forbidden_skill_tree_part(part: str) -> bool:
+    return part.startswith(".") or part in _PREVIEW_SKIP_PARTS
+
+
+def _parse_skill_preview_segments(slug: str) -> tuple[list[str] | None, str | None]:
+    """Split slug into allowed path segments under ``skills/``. Returns (parts, None) or (None, err)."""
+
+    raw = slug.strip().strip("/")
+    if not raw:
+        return None, "invalid_skill_name"
+    parts = [p for p in raw.split("/") if p]
+    if not parts or len(parts) > _MAX_PREVIEW_PATH_SEGMENTS:
+        return None, "invalid_skill_name"
+    for seg in parts:
+        if seg in {".", ".."} or not _PREVIEW_SEGMENT_SLUG_RE.match(seg):
+            return None, "invalid_skill_name"
+        if _forbidden_skill_tree_part(seg):
+            return None, "invalid_skill_name"
+    return parts, None
+
+
+def _resolve_under_skills_root(parts: list[str], root: Path) -> tuple[Path | None, str | None]:
+    target = (root.joinpath(*parts)).resolve()
+    try:
+        rel = target.relative_to(root)
+    except ValueError:
+        return None, "invalid_skill_name"
+    for rp in rel.parts:
+        if _forbidden_skill_tree_part(rp):
+            return None, "invalid_skill_name"
+    return target, None
+
+
+def _list_immediate_nested_skill_slugs(category_dir: Path, root: Path, prefix_parts: list[str]) -> list[str]:
+    out: list[str] = []
+    if not category_dir.is_dir():
+        return out
+    try:
+        children = sorted(category_dir.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        return out
+    for ch in children:
+        if not ch.is_dir() or ch.is_symlink():
+            continue
+        if _forbidden_skill_tree_part(ch.name) or not _PREVIEW_SEGMENT_SLUG_RE.match(ch.name):
+            continue
+        sm = ch / "SKILL.md"
+        try:
+            sm_r = sm.resolve()
+            sm_r.relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if sm_r.is_file() and not sm.is_symlink():
+            out.append("/".join(prefix_parts + [ch.name]))
+        if len(out) >= _MAX_CATEGORY_CHILD_SKILLS:
+            break
+    return out
+
+
+def _read_bounded_description(path: Path, limit: int) -> tuple[str, bool]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "", False
+    truncated = len(text) > limit
+    return text[:limit] + ("\n\n[truncated]" if truncated else ""), truncated
 
 
 def _safe_curator_state_slice() -> dict[str, Any]:
@@ -378,8 +451,25 @@ def propose_powerunits_skill_integration_actions(**_: Any) -> str:
     )
 
 
+def _safe_skill_md_under_root(skill_parent_dir: Path, root: Path) -> Path | None:
+    """Return resolved ``SKILL.md`` if it is a non-link file under ``root``."""
+
+    md = (skill_parent_dir / "SKILL.md").resolve()
+    try:
+        md.relative_to(root)
+    except ValueError:
+        return None
+    if not md.is_file() or md.is_symlink():
+        return None
+    return md
+
+
 def read_powerunits_skill_body_preview(skill_name: str, max_chars: int | None = None, **_: Any) -> str:
-    """Bounded read of a single SKILL.md under ``HERMES_HOME/skills``."""
+    """Bounded read of ``SKILL.md`` or a category hub listing under ``HERMES_HOME/skills``.
+
+    Accepts flat slugs ``my-skill`` (legacy: also resolved by declared ``name:`` elsewhere
+    under ``skills/``) or nested paths ``research/arxiv`` bounded to a safe segment alphabet.
+    """
 
     from tools.registry import tool_error
 
@@ -388,19 +478,92 @@ def read_powerunits_skill_body_preview(skill_name: str, max_chars: int | None = 
             "HERMES_POWERUNITS_CAPABILITY_TIER>=3 required for Tier 3 skills integration overlay",
             error_code="tier_gate",
         )
-    slug = str(skill_name or "").strip()
-    if not _NAME_SLUG_RE.match(slug):
-        return tool_error("invalid skill_name slug", error_code="invalid_skill_name")
 
+    slug = str(skill_name or "").strip()
     root = _skills_root()
-    skill_dir = _find_skill_dir(slug)
+    parts, perr = _parse_skill_preview_segments(slug)
+    if perr:
+        return tool_error("invalid skill_name slug (use safe segments, no ..)", error_code="invalid_skill_name")
+
+    skill_dir: Path | None = None
+
+    resolved, verr = _resolve_under_skills_root(parts, root)
+    if verr:
+        return tool_error("invalid skill path", error_code="invalid_skill_name")
+
+    # Path-based resolution (nested layouts + category hubs).
+    if resolved is not None:
+        if resolved.is_file():
+            md_path = resolved.resolve()
+            try:
+                md_path.relative_to(root)
+            except ValueError:
+                return tool_error("skill path escape rejected", error_code="invalid_skill_name")
+            if md_path.name != "SKILL.md" or md_path.is_symlink():
+                return tool_error(f"skill not found: {slug}", error_code="not_found")
+            skill_dir = md_path.parent
+        elif resolved.is_dir() and not resolved.is_symlink():
+            safe_md = _safe_skill_md_under_root(resolved, root)
+            if safe_md is not None:
+                skill_dir = resolved.resolve()
+            else:
+                desc = resolved / "DESCRIPTION.md"
+                if desc.is_file() and not desc.is_symlink():
+                    excerpt, truncated = _read_bounded_description(desc, _MAX_DESCRIPTION_PREVIEW)
+                    nested_slugs_for_category = _list_immediate_nested_skill_slugs(resolved, root, parts)
+                    rel_base = resolved.relative_to(root).as_posix()
+                    return json.dumps(
+                        {
+                            "read_only": True,
+                            "tier": "3_skills_observer",
+                            "preview_kind": "skill_category_hub_with_description",
+                            "path_relative_to_skills": rel_base,
+                            "description_excerpt": excerpt,
+                            "description_truncated": truncated,
+                            "nested_skill_slugs": nested_slugs_for_category,
+                            "nested_slugs_truncated": len(nested_slugs_for_category)
+                            >= _MAX_CATEGORY_CHILD_SKILLS,
+                            "hint": (
+                                "Folder has DESCRIPTION.md but no SKILL.md — pick a nested_skill_slugs entry "
+                                "for read_powerunits_skill_body_preview, or add SKILL.md here if appropriate."
+                            ),
+                            "doc_hint": "docs/powerunits_tier3_skills_integration_overlay_v1.md",
+                        },
+                        ensure_ascii=False,
+                    )
+                nested_slugs_for_category = _list_immediate_nested_skill_slugs(resolved, root, parts)
+                if nested_slugs_for_category:
+                    return json.dumps(
+                        {
+                            "read_only": True,
+                            "tier": "3_skills_observer",
+                            "preview_kind": "skill_category_index",
+                            "path_relative_to_skills": resolved.relative_to(root).as_posix(),
+                            "nested_skill_slugs": nested_slugs_for_category,
+                            "nested_slugs_truncated": len(nested_slugs_for_category)
+                            >= _MAX_CATEGORY_CHILD_SKILLS,
+                            "hint": (
+                                "No SKILL.md at this path — nested skills listed below "
+                                "(no DESCRIPTION.md). Use nested_skill_slugs with this tool."
+                            ),
+                            "doc_hint": "docs/powerunits_tier3_skills_integration_overlay_v1.md",
+                        },
+                        ensure_ascii=False,
+                    )
+
+    if skill_dir is None and "/" not in slug and _NAME_SLUG_RE.match(parts[0]):
+        skill_dir = _find_skill_dir(parts[0])
+
     if skill_dir is None:
         return tool_error(f"skill not found: {slug}", error_code="not_found")
 
-    md = skill_dir / "SKILL.md"
-    md = md.resolve()
-    md.relative_to(root)
-    if not md.is_file():
+    md = (skill_dir / "SKILL.md").resolve()
+    try:
+        md.relative_to(root)
+    except ValueError:
+        return tool_error("skill path escape rejected", error_code="invalid_skill_name")
+
+    if not md.is_file() or md.is_symlink():
         return tool_error("SKILL.md missing", error_code="not_found")
 
     try:
@@ -410,21 +573,22 @@ def read_powerunits_skill_body_preview(skill_name: str, max_chars: int | None = 
 
     lim_i = int(max_chars) if max_chars is not None else _MAX_PREVIEW_CHARS_DEFAULT
     lim = max(2000, min(lim_i, _MAX_PREVIEW_CHARS_CAP))
-    truncated = len(text) > lim
-    out = text[:lim] + ("\n\n[truncated]" if truncated else "")
-    canonical = _read_skill_name(md, fallback=slug)
+    truncated_body = len(text) > lim
+    out_body = text[:lim] + ("\n\n[truncated]" if truncated_body else "")
+    canonical = _read_skill_name(md, fallback=parts[-1])
     prov = _provenance(canonical, _read_bundled_manifest_names(), _read_hub_installed_names())
 
     return json.dumps(
         {
             "read_only": True,
             "tier": "3_skills_observer",
+            "preview_kind": "skill_md_body",
             "canonical_name_observed": canonical,
             "path_relative_to_skills": md.relative_to(root).as_posix(),
             "provenance_class": prov,
-            "truncated": truncated,
-            "chars_returned": len(out),
-            "body": out,
+            "truncated": truncated_body,
+            "chars_returned": len(out_body),
+            "body": out_body,
             "doc_hint": "docs/powerunits_tier3_skills_integration_overlay_v1.md",
         },
         ensure_ascii=False,
@@ -458,7 +622,11 @@ PROPOSE_SCHEMA = {
 
 PREVIEW_SCHEMA = {
     "name": "read_powerunits_skill_body_preview",
-    "description": "Tier>=3 read bounded SKILL.md text for one skill slug under HERMES_HOME/skills.",
+    "description": (
+        "Tier>=3 read bounded SKILL.md (or category hub: DESCRIPTION + nested slugs) under "
+        "$HERMES_HOME/skills. skill_name may be a flat slug or a nested path "
+        "such as research/arxiv — path segments are validated; no traversal."
+    ),
     "parameters": {
         "type": "object",
         "properties": {

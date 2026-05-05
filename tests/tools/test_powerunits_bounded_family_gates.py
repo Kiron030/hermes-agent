@@ -142,9 +142,16 @@ def test_entsoe_requested_tier1_permitted_when_primary_allowlist_unset(monkeypat
     """Primary with **no** ALLOWED env ⇒ Hermes uses full Repo B Tier‑1 mirror for ENTSO‑E (mirrored frozenset; widens only when Repo B does), alongside unrelated DE‑only legacy bounded families."""
     monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.delenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
-    for cc in ("NL", "BE", "FR"):
+    for cc in ("NL", "BE", "FR", "AT"):
         assert g.entsoe_market_bounded_request_country_permitted(cc) is True
     assert g.entsoe_market_bounded_request_country_permitted("ES") is False
+
+
+def test_entsoe_explicit_core_four_allowlist_blocks_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL,BE,FR")
+    assert g.entsoe_market_bounded_request_country_permitted("AT") is False
+    assert g.entsoe_market_bounded_request_country_permitted("DE") is True
 
 
 def test_era5_primary_nonempty_allowlist_without_de_still_unlocks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -206,9 +213,15 @@ def test_entsoe_forecast_tier1_permitted_when_allowlist_env_unset(
 ) -> None:
     monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.delenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
-    for cc in ("NL", "BE", "FR"):
+    for cc in ("NL", "BE", "FR", "AT"):
         assert g.entsoe_forecast_bounded_request_country_permitted(cc) is True
     assert g.entsoe_forecast_bounded_request_country_permitted("IT") is False
+
+
+def test_entsoe_forecast_explicit_core_four_allowlist_blocks_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
+    monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL,BE,FR")
+    assert g.entsoe_forecast_bounded_request_country_permitted("AT") is False
 
 
 def test_entsoe_market_and_forecast_tier1_mirrors_stay_identical() -> None:

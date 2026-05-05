@@ -288,7 +288,7 @@ EXECUTE_ENTSOE_FORECAST_SCHEMA = {
     "name": "execute_powerunits_entsoe_forecast_bounded_slice",
     "description": (
         "**Bounded ENTSO-E forecast execute** — one HTTP POST to Powerunits "
-        f"`{_EXECUTE_PATH}` (Repo B mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`** / **`v1`** / ≤7 d UTC). "
+        f"`{_EXECUTE_PATH}` (Repo B mirrored Tier‑v1 **`DE`/`NL`/`BE`/`FR`/`AT`** / **`v1`** / ≤7 d UTC). "
         "F3b+F4 hourly forecast ingestion only. "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or legacy `{_LEGACY_ENV}`; "
         f"optional `{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); {_BASE_ENV}, {_SECRET_ENV}."

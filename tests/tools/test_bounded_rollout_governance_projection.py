@@ -103,3 +103,31 @@ def test_overlay_be_forecast_execute_open_when_allowlist_unset(monkeypatch: pyte
     merged = pv1.merge_repo_b_rollout_governance_payload_v1(repo_like)
     row = merged["rows"][0]
     assert row["hermes_allowed_now"]["execute_tool_open"] is True
+
+
+def test_overlay_at_forecast_execute_open_when_allowlist_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES", raising=False)
+    repo_like = {
+        "success": True,
+        "rows": [
+            {
+                "family": pv1.ENTSOE_FORECAST_FAMILY,
+                "country_code": "AT",
+                "repo_b_allowed": True,
+                "hermes_allowed_now": None,
+                "inventory_ready": True,
+                "execute_ready": True,
+                "validate_ready": True,
+                "summary_ready": True,
+                "coverage_scan_ready": True,
+                "campaign_ready": True,
+                "planner_ready": False,
+                "effective_status": "bounded_execute_lane_open_repo_b",
+                "blocking_reason": None,
+                "suggested_next_action": "",
+            },
+        ],
+    }
+    merged = pv1.merge_repo_b_rollout_governance_payload_v1(repo_like)
+    row = merged["rows"][0]
+    assert row["hermes_allowed_now"]["execute_tool_open"] is True

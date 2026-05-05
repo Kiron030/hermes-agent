@@ -333,7 +333,7 @@ VALIDATE_ENTSOE_FORECAST_SCHEMA = {
     "description": (
         "**Bounded ENTSO‑E forecast validate-window** — one HTTP **`POST …/entsoe-forecast/validate-window`** "
         "(**not** `…/entsoe-market-sync/validate-window`; not `validate_powerunits_entsoe_market_bounded_window`). "
-        "Repo B mirrored Tier‑v1 ISO2 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d. Counts **`market_entsoe_load_forecast_hourly`** (F3b) "
+        "Repo B mirrored Tier‑v1 ISO2 (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** / ≤7 d. Counts **`market_entsoe_load_forecast_hourly`** (F3b) "
         "and **`market_entsoe_wind_solar_forecast_hourly`** (F4) — **not** **`market_demand_hourly`** / "
         "**`market_prices_day_ahead`** / **`market_generation_by_type_hourly`**. "
         "Delivery hour **`delivery_start_utc`**; Wind/Solar long-format per `technology`. "

@@ -123,7 +123,7 @@ def preflight_powerunits_entsoe_market_bounded_slice(
 PREFLIGHT_ENTSOE_SCHEMA = {
     "name": "preflight_powerunits_entsoe_market_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E market sync preflight** — local Tier v1 mirrored bundle (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d check only; "
+        "**Bounded ENTSO-E market sync preflight** — local Tier v1 mirrored bundle (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** / ≤7 d check only; "
         "no HTTP. "
         f"Gate: `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
