@@ -296,7 +296,7 @@ def validate_powerunits_entsoe_market_bounded_window(
 VALIDATE_ENTSOE_SCHEMA = {
     "name": "validate_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync validate-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** ≤7 d; one HTTP POST. "
+        "**Bounded ENTSO-E market sync validate-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** ≤7 d; one HTTP POST. "
         "Repo B returns counts on **normalized UTC hour-bucket** tables (`market_*_hourly`); raw ENTSO-E "
         "may be sub-hourly but this path persists hourly rows. Generation is long-format by "
         "`technology_group`, so `row_count` ≫ `distinct_timestamps` is normal. "

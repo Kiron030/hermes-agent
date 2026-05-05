@@ -293,7 +293,7 @@ def summarize_powerunits_entsoe_market_bounded_window(
 SUMMARY_ENTSOE_SCHEMA = {
     "name": "summarize_powerunits_entsoe_market_bounded_window",
     "description": (
-        "**Bounded ENTSO-E market sync summary-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** ≤7 d; one HTTP POST. "
+        "**Bounded ENTSO-E market sync summary-window** — Repo B mirrored Tier‑v1 (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** ≤7 d; one HTTP POST. "
         "Includes the same **normalized hourly UTC** semantics as validate (see Repo B "
         "`checks.normalized_time_grain` / `semantics_notes`). "
         f"Gate `{ENTSOE_MARKET_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "

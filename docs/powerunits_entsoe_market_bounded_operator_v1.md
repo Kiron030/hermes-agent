@@ -2,7 +2,7 @@
 
 ## Country
 
-**Bounded v1 ISO2 set (Repo B authoritative):** **`DE`**, **`NL`**, **`BE`**, **`FR`**. Hermes mirrors this set in code; optional
+**Bounded v1 ISO2 set (Repo B authoritative):** **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**. Hermes mirrors this set in code; optional
 `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` intersects per request when the family **primary** flag is on (**omit env ⇒ full mirrored Repo B Tier‑v1 intersection** — no extra Hermes narrowing; **non‑empty ⇒ intersection for intentional narrowing**; **empty string ⇒ primary path fail-closed**). Legacy per-step flags ignore the allowlist.
 
 ## Live path (Hermes)
@@ -18,7 +18,7 @@ Same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** and **`POWERUNITS_HERMES_INTERNA
 
 Tool: **`scan_powerunits_entsoe_market_bounded_coverage_de`** (toolset **`powerunits_entsoe_market_bounded_coverage_scan`**) → **`POST …/entsoe-market-sync/coverage-scan`**.
 
-- **Repo B Tier v1 **`DE`/`NL`/`BE`/`FR`**, **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded campaign partitioning.
+- **Repo B Tier v1 **`DE`/`NL`/`BE`/`FR`/`AT`**, **v1**. Range `[scan_start_utc, scan_end_utc)` with **exclusive** end — same **≤ 31 d** span and **≤ 5** contiguous **≤ 7 d** sub-windows as the bounded campaign partitioning.
 - **Read-only**: no `entsoe_market_job`, no bounded recompute path, no downstream feature jobs — response includes **`hermes_statement`: `read_only_scan_no_writes`** and per-sub-window checks on `market_demand_hourly`, `market_prices_day_ahead`, `market_generation_by_type_hourly`.
 - Gated separately: **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_COVERAGE_SCAN_ENABLED`** (plus same base URL and bearer as bounded validate/summary/campaign POSTs).
 
@@ -27,18 +27,18 @@ Tool: **`scan_powerunits_entsoe_market_bounded_coverage_de`** (toolset **`poweru
 Tool: **`campaign_powerunits_entsoe_market_bounded_de`** (requires toolset `powerunits_entsoe_market_bounded_campaign`).
 
 - Chains the **existing** execute + summary bounded HTTP paths for each sub-window only (no Repo B orchestration changes).
-- **Repo B Tier v1 **`DE`/`NL`/`BE`/`FR`**, **v1** only (per-slice `country_code`). Campaign range `[campaign_start_utc, campaign_end_utc)` with **exclusive end**; **total span ≤ 31 days**; split into **contiguous** sub-windows each **≤ 7 days** (**≤ 5** sub-windows).
+- **Repo B Tier v1 **`DE`/`NL`/`BE`/`FR`/`AT`**, **v1** only (per-slice `country_code`). Campaign range `[campaign_start_utc, campaign_end_utc)` with **exclusive end**; **total span ≤ 31 days**; split into **contiguous** sub-windows each **≤ 7 days** (**≤ 5** sub-windows).
 - **Fail-fast:** stops on the first non-success execute (HTTP ≠ 200 or `success: false`) or on the first unsuccessful summary (same criteria as the single-slice summary tool).
 - **Non-goals:** does **not** call `market_feature_job`, `market_driver_feature_job`, `expand_market_data`, or open countries outside the Repo B bounded v1 set.
 
 ## Slice rules (v1)
 
-- `country_code` ∈ {**`DE`**, **`NL`**, **`BE`**, **`FR`**}, `version` = **v1**
+- `country_code` ∈ {**`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**}, `version` = **v1**
 - `window_start_utc` inclusive, `window_end_utc` exclusive, duration **≤ 7 days** UTC
 
 ## Railway / Hermes env
 
-**Recommended (fewer Railway variables):** set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2 subset of Repo B **`DE`/`NL`/`BE`/`FR`**; **omit ⇒ full mirrored Tier‑v1 Hermes ∩ Repo B**; **explicitly empty ⇒ fail-closed with primary on**). When the primary flag is unset/falsy, each step still honors its **legacy** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` — legacy ignores the allowlist (**no broadening** vs pre-consolidation behavior).
+**Recommended (fewer Railway variables):** set **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED=1`**. Optionally **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** (comma ISO2 subset of Repo B **`DE`/`NL`/`BE`/`FR`/`AT`**; **omit ⇒ full mirrored Tier‑v1 Hermes ∩ Repo B**; **explicitly empty ⇒ fail-closed with primary on**). When the primary flag is unset/falsy, each step still honors its **legacy** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_{PREFLIGHT,EXECUTE,VALIDATE,SUMMARY}_ENABLED` — legacy ignores the allowlist (**no broadening** vs pre-consolidation behavior).
 
 | Variable | Execute | Validate | Summary | Coverage-scan | Preflight |
 |----------|---------|----------|---------|---------------|-----------|

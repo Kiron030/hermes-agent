@@ -297,7 +297,7 @@ def summarize_powerunits_entsoe_forecast_bounded_window(
 SUMMARY_ENTSOE_FORECAST_SCHEMA = {
     "name": "summarize_powerunits_entsoe_forecast_bounded_window",
     "description": (
-        "**Bounded ENTSO-E forecast summary-window** — Repo B mirrored Tier‑v1 ISO2 (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d; one HTTP POST; "
+        "**Bounded ENTSO-E forecast summary-window** — Repo B mirrored Tier‑v1 ISO2 (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** / ≤7 d; one HTTP POST; "
         "forecast load + wind/solar delivery-hour rollup (see validate tool). "
         f"Gate `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}` (**omit ⇒ full Tier‑1 mirror**); {_BASE_ENV}, {_SECRET_ENV}."

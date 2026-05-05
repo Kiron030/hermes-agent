@@ -124,7 +124,7 @@ def preflight_powerunits_entsoe_forecast_bounded_slice(
 PREFLIGHT_ENTSOE_FORECAST_SCHEMA = {
     "name": "preflight_powerunits_entsoe_forecast_bounded_slice",
     "description": (
-        "**Bounded ENTSO-E forecast preflight** — local Tier v1 mirror (**`DE`/`NL`/`BE`/`FR`**) **`v1`** / ≤7 d slice check only; no HTTP. "
+        "**Bounded ENTSO-E forecast preflight** — local Tier v1 mirror (**`DE`/`NL`/`BE`/`FR`/`AT`**) **`v1`** / ≤7 d slice check only; no HTTP. "
         f"Gate: `{ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV}` or `{_LEGACY_ENV}`; optional "
         f"`{ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV}`."
     ),
