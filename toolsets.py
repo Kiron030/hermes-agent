@@ -446,7 +446,7 @@ TOOLSETS = {
 
     "powerunits_entsoe_market_bounded_preflight": {
         "description": (
-            "Bounded ENTSO-E market sync **preflight** (Repo B Tier-1 ISO2 **DE/NL/BE/FR/AT** / v1 / ≤7d UTC): local slice check only; "
+            "Bounded ENTSO-E market sync **preflight** (Repo B Tier-1 ISO2 **DE/NL/BE/FR/AT/CZ/PL** / v1 / ≤7d UTC): local slice check only; "
             "bounded HTTP operator hint. **No** Powerunits HTTP. "
             "**Primary:** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` (optional "
             "`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`) — **or** legacy "
@@ -559,7 +559,7 @@ TOOLSETS = {
     "powerunits_entsoe_forecast_bounded_validate": {
         "description": (
             "Bounded ENTSO‑E **forecast validate-window** (**not** ENTSO‑E market-sync): read-only **`POST`** "
-            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (Repo B Tier-1 ISO2 **DE/NL/BE/FR/AT** / v1 / ≤7 d). "
+            "`/internal/hermes/bounded/v1/entsoe-forecast/validate-window` (Repo B Tier-1 ISO2 **DE/NL/BE/FR/AT/CZ/PL** / v1 / ≤7 d). "
             "Forecast-native tables **`market_entsoe_load_forecast_hourly`**, **`market_entsoe_wind_solar_forecast_hourly`** "
             "— **never** **`market_demand_hourly`** / **`market_prices_day_ahead`** / **`market_generation_by_type_hourly`** "
             "(those belong to **`…/entsoe-market-sync/validate-window`**). "

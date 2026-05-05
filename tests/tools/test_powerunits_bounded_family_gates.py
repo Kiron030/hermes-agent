@@ -142,9 +142,10 @@ def test_entsoe_requested_tier1_permitted_when_primary_allowlist_unset(monkeypat
     """Primary with **no** ALLOWED env ⇒ Hermes uses full Repo B Tier‑1 mirror for ENTSO‑E (mirrored frozenset; widens only when Repo B does), alongside unrelated DE‑only legacy bounded families."""
     monkeypatch.setenv(g.ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.delenv(g.ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
-    for cc in ("NL", "BE", "FR", "AT"):
+    for cc in ("NL", "BE", "FR", "AT", "CZ", "PL"):
         assert g.entsoe_market_bounded_request_country_permitted(cc) is True
-    assert g.entsoe_market_bounded_request_country_permitted("ES") is False
+    for cc in ("ES", "IT", "SE"):
+        assert g.entsoe_market_bounded_request_country_permitted(cc) is False
 
 
 def test_entsoe_explicit_core_four_allowlist_blocks_at(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -213,9 +214,10 @@ def test_entsoe_forecast_tier1_permitted_when_allowlist_env_unset(
 ) -> None:
     monkeypatch.setenv(g.ENTSOE_FORECAST_BOUNDED_PRIMARY_ENV, "1")
     monkeypatch.delenv(g.ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, raising=False)
-    for cc in ("NL", "BE", "FR", "AT"):
+    for cc in ("NL", "BE", "FR", "AT", "CZ", "PL"):
         assert g.entsoe_forecast_bounded_request_country_permitted(cc) is True
-    assert g.entsoe_forecast_bounded_request_country_permitted("IT") is False
+    for cc in ("ES", "IT", "SE"):
+        assert g.entsoe_forecast_bounded_request_country_permitted(cc) is False
 
 
 def test_entsoe_forecast_explicit_core_four_allowlist_blocks_at(monkeypatch: pytest.MonkeyPatch) -> None:

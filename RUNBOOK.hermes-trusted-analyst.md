@@ -44,7 +44,7 @@ Operator-facing checklist for the **internal Hermes service** running in the **P
 
 ## Bounded ENTSO‑E market + forecast (Hermes ↔ Repo B)
 
-- **Repo B Tier‑1 ISO2 (bounded v1, same HTTP routes):** **DE, NL, BE, FR, AT** for both **market** (`…/entsoe-market-sync/*`) and **forecast** (`…/entsoe-forecast/*`). **ES / IT** remain off the bounded v1 allowlist until a separate rollout.
+- **Repo B Tier‑1 ISO2 (bounded v1, same HTTP routes):** **DE, NL, BE, FR, AT, CZ, PL** for both **market** (`…/entsoe-market-sync/*`) and **forecast** (`…/entsoe-forecast/*`). **ES / IT / SE** remain off the bounded v1 allowlist until a separate rollout.
 - **Hermes narrowing:** optional **`HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`** / **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** — **unset** ⇒ Hermes permits the **full** Repo B mirrored Tier‑v1 frozenset (no implicit DE‑only narrowing); **explicit empty** ⇒ fail‑closed; a **non‑empty** comma list ⇒ intersection (e.g. **`DE,NL,BE,FR`** **without AT** intentionally blocks **AT** while primaries stay on).
 
 ## Bounded rollout governance CSV (read-only audit)
