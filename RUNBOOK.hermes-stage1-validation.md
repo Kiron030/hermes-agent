@@ -162,6 +162,7 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 
 ### Bounded ENTSO-E forecast (Hermes → Repo B; forecast family only)
 
+- **Hermes backlog ideas (proposal only — no Railway contract change here):** optional stronger **`pipeline_run_id`/`correlation_id` carry-over** execute→summary JSON; **`hermes_workspace/exports/` smoke bundle** helpers after bounded validates; sharper operator copy that **coverage-inventory gaps** are **not** the same signal as **`validate-window` failures**. Canonical multi-step rollout wording lives in Repo B **ADR 045**.
 - [ ] **Orthogonal:** This path is **`…/entsoe-forecast/*`** → **`entsoe_forecast_job`** only — **not** **`…/entsoe-market-sync/*`**, **not** `market_feature_job`, **not** `market_driver_feature_job`.
 - [ ] **Preflight — primary:** `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1` → `preflight_powerunits_entsoe_forecast_bounded_slice` (Tier **`DE`/`NL`/`BE`/`FR`/`AT`/`CZ`/`PL`** / **`v1`** / ≤7 d) → `syntactically_valid: true`, bounded hint names execute tool.
 - [ ] **Preflight — legacy:** primary off + `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_PREFLIGHT_ENABLED=1` → same behavior.
