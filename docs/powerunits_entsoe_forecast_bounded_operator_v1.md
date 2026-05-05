@@ -4,7 +4,9 @@ This family is **forecast ingest only**. It is **not** realized ENTSO‑E market
 
 ## Country / version
 
-**Repo B bounded v1:** Tier‑1 ISO2 **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**; **`version=v1`** — matches Repo B `entsoe_forecast_job` slice contract (**Hermes mirrors** the same allowlist for local preflight + **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** narrowing when primary is on).
+**Repo B bounded v1:** Tier‑1 ISO2 **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**, **`CZ`**, **`PL`**; **`version=v1`** — matches Repo B `entsoe_forecast_job` slice contract (**Hermes mirrors** the same allowlist for local preflight + **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** narrowing when primary is on).
+
+European expansion sequencing (paired with market; planning-only taxonomy) mirrors Repo B **ADR 045** and **`hermes_bounded_entsoe_candidate_readiness_matrix_v1`**.
 
 ## Live path (Hermes)
 
@@ -19,7 +21,7 @@ There is **no** bounded `readiness-window` for forecasts in v1 — validate/summ
 
 ## What was **executed** vs **not** executed
 
-**After execute:** Repo B runs **`entsoe_forecast_job.run`** only (bounded slice Repo B Tier‑1 ISO2 **`DE`/`NL`/`BE`/`FR`/`AT`**, **v1**, `[window_start_utc, window_end_utc)` exclusive end, **≤ 7 days** UTC).
+**After execute:** Repo B runs **`entsoe_forecast_job.run`** only (bounded slice Repo B Tier‑1 ISO2 **`DE`/`NL`/`BE`/`FR`/`AT`/`CZ`/`PL`**, **v1**, `[window_start_utc, window_end_utc)` exclusive end, **≤ 7 days** UTC).
 
 **Not executed** by this family (Hermes forwards **one POST** per step; **no hidden orchestration**):
 
@@ -40,7 +42,7 @@ Response bodies may echo **`downstream_not_auto_triggered`** and an **`operator_
 
 **Recommended:** **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED=1`**.
 
-Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma-separated ISO2). **Unset** ⇒ Hermes permits the **full mirrored Repo B Tier‑v1 bundle** (**`DE,NL,BE,FR,AT`**) per-request; **empty string** ⇒ **fail-closed** when primary is truthy. Set a comma subset only when deliberately **narrowing** outbound traffic beneath that mirror (never beyond Repo B).
+Optional **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** (comma-separated ISO2). **Unset** ⇒ Hermes permits the **full mirrored Repo B Tier‑v1 bundle** (**`DE,NL,BE,FR,AT,CZ,PL`**) per-request; **empty string** ⇒ **fail-closed** when primary is truthy. Set a comma subset only when deliberately **narrowing** outbound traffic beneath that mirror (never beyond Repo B).
 
 When primary is falsy/unset, per-step **legacy** flags still apply (no broadening vs pre-consolidation):
 
