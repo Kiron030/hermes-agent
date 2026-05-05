@@ -266,6 +266,23 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_tier4a_skill_draft_proposals": {
+        "description": (
+            "Tier 4A skill draft proposals (requires HERMES_POWERUNITS_CAPABILITY_TIER>=4): "
+            "write/list/read human-review draft artifacts only under "
+            "hermes_workspace/drafts/powerunits_skill_proposals — never live $HERMES_HOME/skills; "
+            "summarize tool emits draft volume + stale/churn caution flags."
+        ),
+        "tools": [
+            "manifest_powerunits_tier4a_skill_draft_scope",
+            "write_powerunits_skill_draft_proposal",
+            "list_powerunits_skill_draft_proposals",
+            "read_powerunits_skill_draft_proposal",
+            "summarize_powerunits_skill_draft_proposals",
+        ],
+        "includes": [],
+    },
+
     "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "
