@@ -4,7 +4,7 @@ This family is **forecast ingest only**. It is **not** realized ENTSO‑E market
 
 ## Country / version
 
-**Repo B bounded v1:** Tier‑1 ISO2 **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**, **`CZ`**, **`PL`**; **`version=v1`** — matches Repo B `entsoe_forecast_job` slice contract (**Hermes mirrors** the same allowlist for local preflight + **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** narrowing when primary is on).
+**Repo B bounded v1:** Tier‑1 ISO2 **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**, **`CZ`**, **`PL`**, **`FI`**; **`version=v1`** — matches Repo B `entsoe_forecast_job` slice contract (**Hermes mirrors** the same allowlist for local preflight + **`HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES`** narrowing when primary is on).
 
 European expansion sequencing (paired with market; planning-only taxonomy) mirrors Repo B **ADR 045** and **`hermes_bounded_entsoe_candidate_readiness_matrix_v1`**.
 
@@ -21,7 +21,7 @@ There is **no** bounded `readiness-window` for forecasts in v1 — validate/summ
 
 ## What was **executed** vs **not** executed
 
-**After execute:** Repo B runs **`entsoe_forecast_job.run`** only (bounded slice Repo B Tier‑1 ISO2 **`DE`/`NL`/`BE`/`FR`/`AT`/`CZ`/`PL`**, **v1**, `[window_start_utc, window_end_utc)` exclusive end, **≤ 7 days** UTC).
+**After execute:** Repo B runs **`entsoe_forecast_job.run`** only (bounded slice Repo B Tier‑1 ISO2 **`DE`/`NL`/`BE`/`FR`/`AT`/`CZ`/`PL`/`FI`**, **v1**, `[window_start_utc, window_end_utc)` exclusive end, **≤ 7 days** UTC).
 
 **Not executed** by this family (Hermes forwards **one POST** per step; **no hidden orchestration**):
 

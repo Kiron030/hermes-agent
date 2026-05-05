@@ -278,7 +278,7 @@ def test_preflight_valid_de_via_primary_only(monkeypatch: pytest.MonkeyPatch) ->
     assert "execute_powerunits_entsoe_market_bounded_slice" in out["bounded_http_operator_hint"]
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_preflight_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -297,7 +297,7 @@ def test_preflight_be_fr_via_primary_allowlist_unset(
     assert out.get("error_code") != "country_not_permitted"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_execute_http_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -340,7 +340,7 @@ def test_execute_http_be_fr_via_primary_allowlist_unset(
     assert out["success"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_execute_blocked_when_allowlist_de_nl_only(monkeypatch: pytest.MonkeyPatch, country: str) -> None:
     _clear_entso_bounded_core(monkeypatch)
     monkeypatch.setenv(ENTSOE_MARKET_BOUNDED_PRIMARY_ENV, "1")
@@ -367,7 +367,7 @@ def test_execute_blocked_when_allowlist_de_nl_only(monkeypatch: pytest.MonkeyPat
     assert out.get("error_code") == "country_not_permitted"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_validate_via_primary_be_fr_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -412,7 +412,7 @@ def test_validate_via_primary_be_fr_allowlist_unset(
     assert out["validation_attempted"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_summary_via_primary_be_fr_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -477,7 +477,7 @@ def test_execute_at_blocked_when_allowlist_core_four_only(monkeypatch: pytest.Mo
     assert out.get("error_code") == "country_not_permitted"
 
 
-def test_execute_blocked_when_allowlist_explicit_de_through_at_blocks_cz_pl(
+def test_execute_blocked_when_allowlist_explicit_de_through_at_blocks_cz_pl_fi(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_entso_bounded_core(monkeypatch)
@@ -486,7 +486,7 @@ def test_execute_blocked_when_allowlist_explicit_de_through_at_blocks_cz_pl(
     monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
     monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
 
-    for country in ("CZ", "PL"):
+    for country in ("CZ", "PL", "FI"):
         out = json.loads(
             exec_mod.execute_powerunits_entsoe_market_bounded_slice(
                 country=country,

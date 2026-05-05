@@ -7,11 +7,11 @@ Keep in sync with EU-PP-Database
 from __future__ import annotations
 
 ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1: frozenset[str] = frozenset(
-    {"DE", "NL", "BE", "FR", "AT", "CZ", "PL"}
+    {"DE", "NL", "BE", "FR", "AT", "CZ", "PL", "FI"}
 )
 
 BOUNDED_ENTSOE_MARKET_USER_FACING_ISO2_DOCUMENTATION_V1 = (
-    "Repo B bounded v1 ENTSO-E market ISO2: **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**, **`CZ`**, **`PL`** (expandable Tier; same "
+    "Repo B bounded v1 ENTSO-E market ISO2: **`DE`**, **`NL`**, **`BE`**, **`FR`**, **`AT`**, **`CZ`**, **`PL`**, **`FI`** (expandable Tier; same "
     "`entsoe_market_job` path). With primary `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED`, "
     "outbound requests also intersect `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES`; "
     "**omit env** ⇒ full Tier‑v1 Hermes mirror (matches Repo B frozenset; grows when Repo B expands); non‑empty ⇒ intersection; explicit **empty** ⇒ "

@@ -101,7 +101,7 @@ def test_execute_http_200_via_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["operator_statement"] == "forecast only"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_execute_http_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -146,7 +146,7 @@ def test_execute_http_be_fr_via_primary_allowlist_unset(
     assert out["success"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_preflight_be_fr_via_primary_allowlist_unset(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -411,7 +411,7 @@ def test_execute_blocked_when_allowlist_de_nl_only_forecast(
     assert out.get("error_code") == "country_not_permitted"
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_validate_via_primary_be_fr_allowlist_unset_forecast(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -459,7 +459,7 @@ def test_validate_via_primary_be_fr_allowlist_unset_forecast(
     assert out["validation_attempted"] is True
 
 
-@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL"])
+@pytest.mark.parametrize("country", ["BE", "FR", "AT", "CZ", "PL", "FI"])
 def test_summary_via_primary_be_fr_allowlist_unset_forecast(
     monkeypatch: pytest.MonkeyPatch, country: str
 ) -> None:
@@ -523,7 +523,7 @@ def test_execute_at_blocked_when_allowlist_core_four_only_forecast(monkeypatch: 
     assert out.get("error_code") == "country_not_permitted"
 
 
-def test_execute_forecast_blocked_when_allowlist_explicit_de_through_at_blocks_cz_pl(
+def test_execute_forecast_blocked_when_allowlist_explicit_de_through_at_blocks_cz_pl_fi(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_fcst_bounded_core(monkeypatch)
@@ -531,7 +531,7 @@ def test_execute_forecast_blocked_when_allowlist_explicit_de_through_at_blocks_c
     monkeypatch.setenv(ENTSOE_FORECAST_BOUNDED_ALLOWED_COUNTRIES_ENV, "DE,NL,BE,FR,AT")
     monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://powerunits-api.test")
     monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "secret")
-    for country in ("CZ", "PL"):
+    for country in ("CZ", "PL", "FI"):
         out = json.loads(
             exec_mod.execute_powerunits_entsoe_forecast_bounded_slice(
                 country=country,
