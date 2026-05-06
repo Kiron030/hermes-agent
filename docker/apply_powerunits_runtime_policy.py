@@ -5,21 +5,6 @@ Apply Powerunits first-deployment runtime safety policy.
 This is intentionally narrow:
 - keep Hermes install intact for future phases
 - enforce a fail-closed platform/tool surface for first Railway deployment
-- Hermes Agent **v0.12+**: ensure **Curator stays off by default** in ``config.yaml``
-  (`auxiliary.curator.enabled`) unless operators already set it — staging/prod posture
-  for Powerunits (**no autonomous skill maintenance on the gateway** until explicitly opted in).
-  Also align **global redaction default** with upstream v0.12 (**off**) when the key is
-  absent, to reduce patch/JSON mangling (**bounded tools keep their own URL redactors**).
-- **Phase 2A:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 1``, insert **``powerunits_tier1_analysis``**
-  on Telegram immediately after ``powerunits_workspace``.
-- **Phase 2B:** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 2``, append **``powerunits_tier2_allowlisted_read``**
-  immediately after Phase 2A overlays.
-- **Tier 3 (skills integration):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 3``, append **``powerunits_tier3_skills_integration``**
-  after Phase 2B; **tier below 3** strips that toolset (**lower tiers** unchanged in their own overlay rules).
-- **Tier 4A (skill draft proposals):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 4``, append **``powerunits_tier4a_skill_draft_proposals``**
-  after Tier 3; **tier below 4** strips it (**writes only** under **``hermes_workspace/drafts/powerunits_skill_proposals``**).
-- **Tier 4B (review + governance scaffolding):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 5``, append **``powerunits_tier4b_review_governance``**
-  after Tier 4A; **tier below 5** strips it (bounded ``hermes_workspace/governance/**`` + **Tier 4A draft frontmatter** review fields).
 """
 
 from __future__ import annotations
@@ -29,111 +14,15 @@ from pathlib import Path
 
 import yaml
 
+from powerunits_capability_tier import read_powerunits_capability_tier
+from powerunits_telegram_overlays import (
+    TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
+    merge_capability_overlays_into_telegram,
+)
 
 POLICY_ID = "first_safe_v1"
 
-ALLOWED_TELEGRAM_TOOLSETS = [
-    "memory",
-    "session_search",
-    "todo",
-    "powerunits_docs",
-    "powerunits_github_docs",
-    "powerunits_operator_posture",
-    "powerunits_workspace",
-    "powerunits_timescale_read",
-    "powerunits_repo_b_read",
-    "powerunits_option_d_preflight",
-    "powerunits_option_d_execute",
-    "powerunits_option_d_validate",
-    "powerunits_option_d_readiness",
-    "powerunits_option_d_summary",
-    "powerunits_market_features_bounded_de_execute",
-    "powerunits_market_features_bounded_de_validate",
-    "powerunits_market_features_bounded_de_readiness",
-    "powerunits_market_features_bounded_de_summary",
-    "powerunits_market_driver_features_bounded_de_execute",
-    "powerunits_market_driver_features_bounded_de_validate",
-    "powerunits_market_driver_features_bounded_de_readiness",
-    "powerunits_market_driver_features_bounded_de_summary",
-    "powerunits_entsoe_market_bounded_preflight",
-    "powerunits_entsoe_market_bounded_execute",
-    "powerunits_entsoe_market_bounded_validate",
-    "powerunits_entsoe_market_bounded_summary",
-    "powerunits_entsoe_market_bounded_campaign",
-    "powerunits_entsoe_market_bounded_coverage_scan",
-    "powerunits_entsoe_forecast_bounded_preflight",
-    "powerunits_entsoe_forecast_bounded_execute",
-    "powerunits_entsoe_forecast_bounded_validate",
-    "powerunits_entsoe_forecast_bounded_summary",
-    "powerunits_outage_awareness_bounded_validate",
-    "powerunits_outage_awareness_bounded_summary",
-    "powerunits_outage_repair_bounded_execute",
-    "powerunits_era5_weather_bounded_preflight",
-    "powerunits_era5_weather_bounded_execute",
-    "powerunits_era5_weather_bounded_validate",
-    "powerunits_era5_weather_bounded_summary",
-    "powerunits_era5_weather_bounded_campaign",
-    "powerunits_era5_weather_bounded_coverage_scan",
-    "powerunits_baseline_layer_preview",
-    "powerunits_de_stack_remediation_planner",
-    "powerunits_bounded_coverage_inventory",
-    "powerunits_bounded_rollout_governance",
-]
-
-POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM = (
-    "powerunits_tier1_analysis",
-    "powerunits_tier2_allowlisted_read",
-    "powerunits_tier3_skills_integration",
-    "powerunits_tier4a_skill_draft_proposals",
-    "powerunits_tier4b_review_governance",
-)
-
-
-def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[str]:
-    """Telegram toolset with progressive overlays after ``powerunits_workspace`` (incl. Tier 4B at 5)."""
-    tier = _read_powerunits_capability_tier()
-    tg = [x for x in base if x not in POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM]
-    try:
-        wi = tg.index("powerunits_workspace")
-    except ValueError:
-        if tier >= 1:
-            tg.append("powerunits_tier1_analysis")
-        if tier >= 2:
-            tg.append("powerunits_tier2_allowlisted_read")
-        if tier >= 3:
-            tg.append("powerunits_tier3_skills_integration")
-        if tier >= 4:
-            tg.append("powerunits_tier4a_skill_draft_proposals")
-        if tier >= 5:
-            tg.append("powerunits_tier4b_review_governance")
-        return tg
-    insert_pos = wi + 1
-    if tier >= 1:
-        tg.insert(insert_pos, "powerunits_tier1_analysis")
-        insert_pos += 1
-    if tier >= 2:
-        tg.insert(insert_pos, "powerunits_tier2_allowlisted_read")
-        insert_pos += 1
-    if tier >= 3:
-        tg.insert(insert_pos, "powerunits_tier3_skills_integration")
-        insert_pos += 1
-    if tier >= 4:
-        tg.insert(insert_pos, "powerunits_tier4a_skill_draft_proposals")
-        insert_pos += 1
-    if tier >= 5:
-        tg.insert(insert_pos, "powerunits_tier4b_review_governance")
-    return tg
-
-
-def _read_powerunits_capability_tier() -> int:
-    """Tier 0..5 from ``HERMES_POWERUNITS_CAPABILITY_TIER`` (same rules as ``powerunits_capability_tier.py``)."""
-    raw = os.environ.get("HERMES_POWERUNITS_CAPABILITY_TIER", "0").strip()
-    try:
-        v = int(raw, 10)
-    except ValueError:
-        return 0
-    return max(0, min(5, v))
-
+ALLOWED_TELEGRAM_TOOLSETS = list(TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1)
 
 DISABLED_PLATFORMS = [
     "discord",
@@ -210,8 +99,8 @@ def apply_policy(config_path: Path) -> None:
     platform_toolsets = cfg.get("platform_toolsets")
     if not isinstance(platform_toolsets, dict):
         platform_toolsets = {}
-    platform_toolsets["telegram"] = _telegram_allowlist_with_capability_phase_overlays(
-        list(ALLOWED_TELEGRAM_TOOLSETS),
+    platform_toolsets["telegram"] = merge_capability_overlays_into_telegram(
+        list(ALLOWED_TELEGRAM_TOOLSETS), read_powerunits_capability_tier()
     )
     for p in DISABLED_PLATFORMS:
         platform_toolsets[p] = []
@@ -258,8 +147,6 @@ def apply_policy(config_path: Path) -> None:
     powerunits["runtime_policy"] = runtime_policy
     cfg["powerunits"] = powerunits
 
-    # v0.12+ autonomous Curator runs on gateway cron unless disabled. Policy: default off
-    # for Powerunits staged/prod installs when the flag is omitted (preserve explicit true).
     auxiliary = cfg.get("auxiliary")
     if not isinstance(auxiliary, dict):
         auxiliary = {}
@@ -270,7 +157,6 @@ def apply_policy(config_path: Path) -> None:
     auxiliary["curator"] = curator
     cfg["auxiliary"] = auxiliary
 
-    # Align with upstream v0.12 default (off) when unset; avoids over-redacting payloads.
     redaction = cfg.get("redaction")
     if not isinstance(redaction, dict):
         redaction = {}

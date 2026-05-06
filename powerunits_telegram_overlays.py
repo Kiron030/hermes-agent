@@ -1,0 +1,113 @@
+"""
+Powerunits Telegram toolset ordering + capability-tier progressive overlays.
+
+Single source for:
+- ``docker/apply_powerunits_runtime_policy`` merged ``platform_toolsets.telegram``
+- ``model_tools.get_tool_definitions`` hard-cap allowlist sync
+- optional posture comparisons
+
+Overlays are inserted **immediately after** ``powerunits_workspace`` (Tier 1 … 4B).
+"""
+
+from __future__ import annotations
+
+TIER_OVERLAY_TOOLSETS_ORDERED: tuple[str, ...] = (
+    "powerunits_tier1_analysis",
+    "powerunits_tier2_allowlisted_read",
+    "powerunits_tier3_skills_integration",
+    "powerunits_tier4a_skill_draft_proposals",
+    "powerunits_tier4b_review_governance",
+)
+
+OVERLAY_NAMES: frozenset[str] = frozenset(TIER_OVERLAY_TOOLSETS_ORDERED)
+
+# Base Telegram toolsets for ``first_safe_v1`` **before** progressive tier inserts.
+# Keep ``powerunits_operator_posture`` before ``powerunits_workspace`` so tier
+# overlays remain at ``workspace_index + 1 … + 5`` (tests + docs rely on this).
+TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
+    "memory",
+    "session_search",
+    "todo",
+    "powerunits_docs",
+    "powerunits_github_docs",
+    "powerunits_operator_posture",
+    "powerunits_workspace",
+    "powerunits_timescale_read",
+    "powerunits_repo_b_read",
+    "powerunits_option_d_preflight",
+    "powerunits_option_d_execute",
+    "powerunits_option_d_validate",
+    "powerunits_option_d_readiness",
+    "powerunits_option_d_summary",
+    "powerunits_entsoe_market_bounded_preflight",
+    "powerunits_entsoe_market_bounded_execute",
+    "powerunits_entsoe_market_bounded_validate",
+    "powerunits_entsoe_market_bounded_summary",
+    "powerunits_era5_weather_bounded_preflight",
+    "powerunits_era5_weather_bounded_execute",
+    "powerunits_era5_weather_bounded_validate",
+    "powerunits_era5_weather_bounded_summary",
+)
+
+
+def merge_capability_overlays_into_telegram(telegram: list[str], tier: int) -> list[str]:
+    """Return a copy of *telegram* with tier overlays inserted after ``powerunits_workspace``."""
+
+    overlays: list[str] = []
+    if tier >= 1:
+        overlays.append("powerunits_tier1_analysis")
+    if tier >= 2:
+        overlays.append("powerunits_tier2_allowlisted_read")
+    if tier >= 3:
+        overlays.append("powerunits_tier3_skills_integration")
+    if tier >= 4:
+        overlays.append("powerunits_tier4a_skill_draft_proposals")
+    if tier >= 5:
+        overlays.append("powerunits_tier4b_review_governance")
+
+    cleaned = [x for x in telegram if x not in OVERLAY_NAMES]
+    try:
+        wi = cleaned.index("powerunits_workspace")
+    except ValueError:
+        return cleaned + overlays
+    return cleaned[: wi + 1] + overlays + cleaned[wi + 1 :]
+
+
+def expected_telegram_toolsets_first_safe(tier: int) -> list[str]:
+    """Canonical merged list (policy revision) for the given capability tier."""
+
+    return merge_capability_overlays_into_telegram(
+        list(TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1), tier
+    )
+
+
+def progressive_capability_overlays_aligned(telegram: list[str], tier: int) -> bool | None:
+    """
+    Return whether ``telegram`` has the progressive overlay toolsets in the canonical
+    positions (immediately after ``powerunits_workspace``).
+
+    ``None`` if ``powerunits_workspace`` is missing — caller cannot verify ordering
+    (abbreviated test configs / manual edits).
+    """
+
+    expected: list[str] = []
+    if tier >= 1:
+        expected.append("powerunits_tier1_analysis")
+    if tier >= 2:
+        expected.append("powerunits_tier2_allowlisted_read")
+    if tier >= 3:
+        expected.append("powerunits_tier3_skills_integration")
+    if tier >= 4:
+        expected.append("powerunits_tier4a_skill_draft_proposals")
+    if tier >= 5:
+        expected.append("powerunits_tier4b_review_governance")
+    if not expected:
+        return True
+    try:
+        wi = telegram.index("powerunits_workspace")
+    except ValueError:
+        return None
+    end = wi + 1 + len(expected)
+    if end > len(telegram):
+        return False
+    return telegram[wi + 1 : end] == expected

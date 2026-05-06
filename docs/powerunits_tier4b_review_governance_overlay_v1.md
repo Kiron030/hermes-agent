@@ -31,6 +31,8 @@
 
 **Preserved:** **`requires_human_review: true`**, **`not_auto_applied: true`**, **`powerunits_tier_4a_proposal: true`** on Tier 4A writes — do not strip.
 
+**Strict validation (stabilization):** Only the five values above are accepted. **`write_powerunits_skill_draft_proposal`** rejects custom frontmatter with any other **`review_status`**. **`set_powerunits_skill_draft_review_status`** and **`review_powerunits_tier4b_skill_drafts`** filters reject invalid literals. Legacy files with bad values are counted under **`invalid_review_status_in_draft_files_count`** and appear on the Tier 4B board as **`review_status_invalid_in_file: true`** with effective status **`new`**.
+
 ---
 
 ## Workspace: `hermes_workspace/governance/`

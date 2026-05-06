@@ -289,9 +289,12 @@ TOOLSETS = {
     
     "powerunits_tier4b_review_governance": {
         "description": (
-            "Tier 4B review + governance (requires HERMES_POWERUNITS_CAPABILITY_TIER>=5): "
-            "review_status workflow on Tier 4A drafts, bounded governance/* notes, summaries — "
-            "never live $HERMES_HOME/skills; rollback = tier 4."
+            "Tier 4B (tier>=5): governance/ + draft review_status only. Routing: "
+            "manifest_powerunits_tier4b_governance_scope (NOT Tier 4A manifest), "
+            "list_powerunits_governance_workspace (NOT list_hermes_workspace), "
+            "summarize_powerunits_tier4b_governance_lane (NOT ERA5/summary bounded tools), "
+            "append_powerunits_governance_note (NOT save_hermes_workspace_note). "
+            "Never live $HERMES_HOME/skills; rollback = tier 4."
         ),
         "tools": [
             "manifest_powerunits_tier4b_governance_scope",
@@ -306,7 +309,7 @@ TOOLSETS = {
         "includes": [],
     },
 
-"powerunits_timescale_read": {
+    "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "
             "(DATABASE_URL_TIMESCALE, feature-flagged); single view, fixed patterns."

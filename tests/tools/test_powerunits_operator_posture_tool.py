@@ -6,6 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
+
+from powerunits_telegram_overlays import expected_telegram_toolsets_first_safe
+
+
+def _config_with_telegram(telegram: list[str]) -> str:
+    return yaml.safe_dump({"platform_toolsets": {"telegram": telegram}}, sort_keys=False)
 
 
 @pytest.fixture
@@ -46,10 +53,8 @@ def test_posture_tier_ge_one_phase2a_drift(monkeypatch: pytest.MonkeyPatch, tmp_
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "1")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: [memory]\n",
-        encoding="utf-8",
-    )
+    tg_bad = [x for x in expected_telegram_toolsets_first_safe(1) if x != "powerunits_tier1_analysis"]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -64,7 +69,7 @@ def test_posture_tier_ge_one_phase2a_aligned(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "1")
     (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: [memory, powerunits_tier1_analysis]\n",
+        _config_with_telegram(expected_telegram_toolsets_first_safe(1)),
         encoding="utf-8",
     )
     from tools import powerunits_operator_posture_tool as m
@@ -78,10 +83,10 @@ def test_posture_tier_ge_two_phase2b_drift(monkeypatch: pytest.MonkeyPatch, tmp_
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "2")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: [memory, powerunits_tier1_analysis]\n",
-        encoding="utf-8",
-    )
+    tg_bad = [
+        x for x in expected_telegram_toolsets_first_safe(2) if x != "powerunits_tier2_allowlisted_read"
+    ]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -96,8 +101,7 @@ def test_posture_tier_ge_two_phase2b_aligned(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "2")
     (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: "
-        "[memory, powerunits_tier1_analysis, powerunits_tier2_allowlisted_read]\n",
+        _config_with_telegram(expected_telegram_toolsets_first_safe(2)),
         encoding="utf-8",
     )
     from tools import powerunits_operator_posture_tool as m
@@ -116,11 +120,10 @@ def test_posture_tier_three_tier3_drift(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: "
-        "[memory, powerunits_tier1_analysis, powerunits_tier2_allowlisted_read]\n",
-        encoding="utf-8",
-    )
+    tg_bad = [
+        x for x in expected_telegram_toolsets_first_safe(3) if x != "powerunits_tier3_skills_integration"
+    ]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -135,9 +138,7 @@ def test_posture_tier_three_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
     (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram: "
-        "[memory, powerunits_tier1_analysis, powerunits_tier2_allowlisted_read, "
-        "powerunits_tier3_skills_integration]\n",
+        _config_with_telegram(expected_telegram_toolsets_first_safe(3)),
         encoding="utf-8",
     )
     from tools import powerunits_operator_posture_tool as m
@@ -156,13 +157,11 @@ def test_posture_tier_three_curator_extra_caution(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "3")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram:\n"
-        "  - memory\n  - powerunits_tier1_analysis\n  - powerunits_tier2_allowlisted_read\n"
-        "  - powerunits_tier3_skills_integration\n"
-        "auxiliary:\n  curator:\n    enabled: true\n",
-        encoding="utf-8",
-    )
+    cfg = {
+        "platform_toolsets": {"telegram": expected_telegram_toolsets_first_safe(3)},
+        "auxiliary": {"curator": {"enabled": True}},
+    }
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -185,12 +184,12 @@ def test_posture_tier_four_tier4a_drift(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "4")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram:\n"
-        "  - memory\n  - powerunits_tier1_analysis\n"
-        "  - powerunits_tier2_allowlisted_read\n  - powerunits_tier3_skills_integration\n",
-        encoding="utf-8",
-    )
+    tg_bad = [
+        x
+        for x in expected_telegram_toolsets_first_safe(4)
+        if x != "powerunits_tier4a_skill_draft_proposals"
+    ]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -198,6 +197,7 @@ def test_posture_tier_four_tier4a_drift(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert p4["tier_gate_skill_draft_proposals"] is True
     assert p4["telegram_powerunits_tier4a_skill_draft_proposals_observed"] is False
     assert any("tier4a_skill_drafts_drift" in x for x in out["caution_flags"])
+    assert any("telegram_progressive_overlays_drift" in x for x in out["caution_flags"])
 
 
 def test_posture_tier_four_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -205,10 +205,7 @@ def test_posture_tier_four_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "4")
     (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram:\n"
-        "  - memory\n  - powerunits_tier1_analysis\n"
-        "  - powerunits_tier2_allowlisted_read\n  - powerunits_tier3_skills_integration\n"
-        "  - powerunits_tier4a_skill_draft_proposals\n",
+        _config_with_telegram(expected_telegram_toolsets_first_safe(4)),
         encoding="utf-8",
     )
     from tools import powerunits_operator_posture_tool as m
@@ -220,6 +217,7 @@ def test_posture_tier_four_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         ]
         is True
     )
+    assert out["telegram_toolsets_observation_read_only"]["telegram_progressive_overlays_aligned_with_tier"] is True
     assert not any(x.startswith("tier4a_skill_drafts_drift") for x in out["caution_flags"])
 
 
@@ -227,13 +225,10 @@ def test_posture_tier_five_tier4b_drift(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "5")
-    (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram:\n"
-        "  - memory\n  - powerunits_tier1_analysis\n"
-        "  - powerunits_tier2_allowlisted_read\n  - powerunits_tier3_skills_integration\n"
-        "  - powerunits_tier4a_skill_draft_proposals\n",
-        encoding="utf-8",
-    )
+    tg_bad = [
+        x for x in expected_telegram_toolsets_first_safe(5) if x != "powerunits_tier4b_review_governance"
+    ]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
     from tools import powerunits_operator_posture_tool as m
 
     out = json.loads(m.summarize_powerunits_operator_posture())
@@ -241,6 +236,7 @@ def test_posture_tier_five_tier4b_drift(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert p5["tier_gate_tier4b_governance"] is True
     assert p5["telegram_powerunits_tier4b_review_governance_observed"] is False
     assert any("tier4b_governance_drift" in x for x in out["caution_flags"])
+    assert any("telegram_progressive_overlays_drift" in x for x in out["caution_flags"])
 
 
 def test_posture_tier_five_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -248,11 +244,7 @@ def test_posture_tier_five_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "5")
     (tmp_path / "config.yaml").write_text(
-        "platform_toolsets:\n  telegram:\n"
-        "  - memory\n  - powerunits_tier1_analysis\n"
-        "  - powerunits_tier2_allowlisted_read\n  - powerunits_tier3_skills_integration\n"
-        "  - powerunits_tier4a_skill_draft_proposals\n"
-        "  - powerunits_tier4b_review_governance\n",
+        _config_with_telegram(expected_telegram_toolsets_first_safe(5)),
         encoding="utf-8",
     )
     from tools import powerunits_operator_posture_tool as m
@@ -264,7 +256,9 @@ def test_posture_tier_five_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         ]
         is True
     )
+    assert out["telegram_toolsets_observation_read_only"]["telegram_progressive_overlays_aligned_with_tier"] is True
     assert not any(x.startswith("tier4b_governance_drift") for x in out["caution_flags"])
+    assert not any(x.startswith("telegram_progressive_overlays_drift") for x in out["caution_flags"])
 
 
 def test_posture_curator_true_caution(posture_mod, tmp_path: Path) -> None:

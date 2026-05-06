@@ -89,3 +89,49 @@ def test_summarize_counts_statuses(t4b, tmp_path: Path, monkeypatch: pytest.Monk
 
     summ = json.loads(t4b.summarize_powerunits_tier4b_governance_lane())
     assert summ["proposal_review_status_counts"]["new"] >= 1
+
+
+def test_set_review_status_rejects_invalid(t4b, tmp_path: Path) -> None:
+    out = json.loads(
+        t4b.set_powerunits_skill_draft_review_status(
+            relative_file_path="missing.md",
+            review_status="approved_live_now",
+        )
+    )
+    assert out["error_code"] == "invalid_review_status"
+
+
+def test_review_board_marks_invalid_frontmatter_status(t4b, tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "5")
+    root = tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals"
+    root.mkdir(parents=True)
+    body = "---\nreview_status: approved_live_now\n---\n\n# x\n"
+    (root / "bad.md").write_text(body, encoding="utf-8")
+
+    board = json.loads(t4b.review_powerunits_tier4b_skill_drafts(max_entries=20))
+    entry = next(e for e in board["entries"] if e["relative_path"] == "bad.md")
+    assert entry["review_status"] == "new"
+    assert entry["review_status_invalid_in_file"] is True
+    assert entry["review_status_raw_in_file"] == "approved_live_now"
+
+    summ = json.loads(t4b.summarize_powerunits_tier4b_governance_lane())
+    assert summ.get("invalid_review_status_in_draft_files_count", 0) >= 1
+
+
+def test_tier4a_write_rejects_invalid_review_status_in_custom_frontmatter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "4")
+    from tools import powerunits_tier4a_skill_draft_proposals_tool as t4a
+
+    body = "---\nreview_status: approved_live_now\n---\n\n# x\n"
+    out = json.loads(
+        t4a.write_powerunits_skill_draft_proposal(
+            relative_file_path="nope.md",
+            body=body,
+            proposal_kind="skill_draft_md",
+            overwrite_mode="overwrite",
+        )
+    )
+    assert out["error_code"] == "invalid_review_status"
