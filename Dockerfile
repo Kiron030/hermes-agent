@@ -14,7 +14,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
 # that would otherwise accumulate when hermes runs as PID 1. See #15012.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential curl nodejs npm python3 ripgrep ffmpeg gcc python3-dev libffi-dev procps git openssh-client docker-cli tini && \
+        build-essential nodejs npm python3 ripgrep ffmpeg gcc python3-dev libffi-dev procps git openssh-client docker-cli tini && \
     rm -rf /var/lib/apt/lists/*
 
 # Non-root user for runtime; UID can be overridden via HERMES_UID at runtime
@@ -46,17 +46,13 @@ COPY --chown=hermes:hermes . .
 # - normalize CRLF -> LF (prevents "/bin/bash^M" / "No such file or directory")
 # - set executable bit independent of host git filemode
 RUN sed -i 's/\r$//' /opt/hermes/docker/entrypoint.sh && \
-    chmod 0755 /opt/hermes/docker/entrypoint.sh
+    sed -i 's/\r$//' /opt/hermes/docker/railway_gateway_with_dashboard.sh && \
+    chmod 0755 /opt/hermes/docker/entrypoint.sh && \
+    chmod 0755 /opt/hermes/docker/railway_gateway_with_dashboard.sh
 
 # Build browser dashboard and terminal UI assets.
 RUN cd web && npm run build && \
-    cd ../ui-tui && npm run build && \
-    rm -rf node_modules/@hermes/ink && \
-    rm -rf packages/hermes-ink/node_modules && \
-    cp -R packages/hermes-ink node_modules/@hermes/ink && \
-    npm install --omit=dev --prefer-offline --no-audit --prefix node_modules/@hermes/ink && \
-    rm -rf node_modules/@hermes/ink/node_modules/react && \
-    node --input-type=module -e "await import('@hermes/ink')"
+    cd ../ui-tui && npm run build
 
 # ---------- Permissions ----------
 # Make install dir world-readable so any HERMES_UID can read it at runtime.

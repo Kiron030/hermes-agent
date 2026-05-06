@@ -95,6 +95,23 @@ Railway-Kompatibilitaetshinweis:
 
 ---
 
+## Part D.1 - Oeffentliche Railway-Domain und 502 (`Application failed to respond`)
+
+**Ursache (Default-Deploy):** Das Image startet per [`Dockerfile`](../Dockerfile) **`CMD [ "gateway", "run" ]`** — also nur das **Messaging-Gateway** (z. B. Telegram **Long-Polling**). Es laeuft **kein** HTTP-Server auf der von Railway injizierten Umgebungsvariable **`PORT`**. Der Reverse-Proxy erreicht keinen Listener → **502 Bad Gateway**.
+
+**Dashboard:** Die Web-UI ist ein **separater** Befehl (`hermes dashboard` / [`hermes_cli/main.py`](../hermes_cli/main.py) → [`hermes_cli/web_server.py`](../hermes_cli/web_server.py)). Sie wird vom Default-CMD **nicht** gestartet. Zusaetzlich bindet das Dashboard standardmaessig **`127.0.0.1:9119`** — aus Sicht Railway unerreichbar; oeffentlich braucht es **`0.0.0.0`** und den **Railway-`PORT`** sowie **`--insecure`** (Upstream-Vorgabe fuer Nicht-Loopback-Binds).
+
+**Empfohlener Minimal-Schritt (ein Container, Gateway + Stage-1-Dashboard):**
+
+1. Railway **Start Command** (ersetzt nur das Docker-CMD, Entrypoint bleibt):  
+   `/opt/hermes/docker/railway_gateway_with_dashboard.sh`
+2. Env: `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, optional **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (sperrt mutierende `/api/*` HTTP-Calls).
+3. Sicherheit: Dashboard ist **keine** starke oeffentliche Auth; Zugriff absichern (VPN, Railway TCP-Proxy-Beschraenkung, organisatorisch).
+
+Siehe Skript: [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh).
+
+---
+
 ## Part D - Safety defaults (first internal rollout)
 
 Setze fuer den ersten Rollout folgende sicheren Defaults:
