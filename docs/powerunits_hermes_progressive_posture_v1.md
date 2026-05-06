@@ -26,6 +26,7 @@
 | Doc | Role |
 |-----|------|
 | [**`powerunits_runtime_v0_12_integration.md`**](powerunits_runtime_v0_12_integration.md) | Docker/`HERMES_HOME`, `first_safe_v1`, staged deploy, bounded smoke order. |
+| [**`powerunits_hermes_dashboard_skills_atlas_v1.md`**](powerunits_hermes_dashboard_skills_atlas_v1.md) | **Capability atlas (non-roadmap):** dashboard deploy lessons, `$HERMES_HOME` layout, bundled **skills** clusters, advisory tier hints — not a second roadmap. |
 | [**`hermes_v0_12_staged_upgrade_powerunits.md`**](hermes_v0_12_staged_upgrade_powerunits.md) | v0.12 Curator/self-improve posture; negative checklist. |
 | [**`powerunits_hermes_upgrade_playbook.md`**](powerunits_hermes_upgrade_playbook.md) | Branches, tags, staging-first merges. |
 | [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) | Executable bounded checks post-deploy. |
@@ -138,7 +139,7 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | **Phase 2A analytics (when `tier ≥ 1`)** | Sample **`summarize_powerunits_workspace_full`** after major operator sessions; escalating **`high_*`** or depth-skip totals → reconcile sprawl (**[`powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md`](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md)**). |
 | **Phase 2B allowlisted-local analytics (when `tier ≥ 2`)** | Sample **`summarize_powerunits_allowlisted_locals`** after **`powerunits_local_reference`** drops or **`*.json`/`*.yaml`** growth; **`tier2_locals_full_scan_cap`** → prune or **`subdir`** work ([**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md)). |
 | **Tier 3 skills observer (`tier = 3`)** | **`summarize_powerunits_skills_observer`** / **`diagnose_*`** / **`propose_*`** — duplicate/stale/proposal-volume signals; keep **`auxiliary.curator`** posture explicit ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)). |
-| **Tier 4A draft proposals (`tier = 4`)** | **`summarize_powerunits_skill_draft_proposals`** / posture **`tier4a_drafts_watch:*`** — draft volume/stale/churn; confirm no drift (**[`tier4a`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)**). |
+| **Tier 4A draft proposals (`tier = 4`)** | **`review_powerunits_skill_draft_proposals`** / **`summarize_powerunits_skill_draft_proposals`** / posture **`tier4a_drafts_watch:*`** — draft volume/stale/churn; confirm no drift (**[`tier4a`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)**). |
 | **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths; **Phase 1A:** run **`summarize_powerunits_workspace_exports`** after material export work and archive or delete stale files per [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
 | **Posture snapshot (env + exports subset)** | **`summarize_powerunits_operator_posture`** (Phase 1B) — quick JSON fingerprint before tier uplift; see [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
 | **Curator** | **`enabled: false`** for `tier0`; any deviation is **explicit** and documented (not drift). |
@@ -238,7 +239,7 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | Item | Contract |
 |------|----------|
 | **Gate** | **`HERMES_POWERUNITS_CAPABILITY_TIER = 4`** at policy apply + gateway boot. **`tier ≤ 3`** omits **`powerunits_tier4a_skill_draft_proposals`** from Telegram. |
-| **Toolset** | **`powerunits_tier4a_skill_draft_proposals`** — manifest, write/list/read bounded drafts, summarize (**[`detail`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)**). **Writes:** **only** the proposals subtree (not live **`skills/`**). |
+| **Toolset** | **`powerunits_tier4a_skill_draft_proposals`** — manifest, write/list/read/**review** bounded drafts, summarize (**[`detail`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)**). **Writes:** **only** the proposals subtree (not live **`skills/`**). |
 | **Observers** | Posture **`phase_tier4a_skill_drafts_read_only`**, **`tier4a_skill_drafts_drift*`**, embedded **`tier4a_draft_proposals_watch_read_only`** (**[`operator posture doc`](powerunits_operator_posture_diagnostics_v1.md)**). |
 | **Rollback** | Set **`HERMES_POWERUNITS_CAPABILITY_TIER=3`**; **`apply_policy`**, restart — **no** volume migrations; drafts remain as inert files. |
 

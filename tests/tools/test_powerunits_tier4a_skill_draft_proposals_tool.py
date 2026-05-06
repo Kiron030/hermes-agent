@@ -62,3 +62,86 @@ def test_path_traversal_rejected(t4) -> None:
         )
     )
     assert out["error_code"] == "invalid_path"
+
+
+def test_read_includes_frontmatter_and_preview(t4, tmp_path: Path) -> None:
+    rel = "2026-05-06/meta.md"
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path=rel,
+            body="# Body\n\nMore\n",
+            proposal_kind="skill_draft_md",
+            target_skill_name="z-target",
+        )
+    )
+    full = json.loads(t4.read_powerunits_skill_draft_proposal(relative_file_path=rel))
+    assert full.get("tier4a_marker_present") is True
+    assert full["frontmatter"].get("target_skill_name") == "z-target"
+    assert "Body" in full["markdown_body"]
+    prv = json.loads(
+        t4.read_powerunits_skill_draft_proposal(
+            relative_file_path=rel, max_body_preview_chars=4, include_frontmatter_meta=True
+        )
+    )
+    assert prv["body_preview"] == "# Bo"
+    assert prv["body_preview_truncated"] is True
+
+
+def test_list_sort_mtime_desc(t4, tmp_path: Path) -> None:
+    import os
+
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="batch/a.md", body="# a", proposal_kind="skill_draft_md"
+        )
+    )
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="batch/b.md", body="# b", proposal_kind="skill_draft_md"
+        )
+    )
+    # Ensure distinct mtimes even on coarse-resolution filesystems.
+    a_path = tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals" / "batch" / "a.md"
+    b_path = tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals" / "batch" / "b.md"
+    st_a = a_path.stat()
+    os.utime(b_path, (st_a.st_mtime + 2, st_a.st_mtime + 2))
+    lst = json.loads(
+        t4.list_powerunits_skill_draft_proposals(subpath_prefix="batch", sort_by="mtime_desc")
+    )
+    paths = [e["relative_path"] for e in lst["entries"]]
+    assert paths[0].endswith("b.md")
+
+
+def test_review_filters_and_rollups(t4, tmp_path: Path) -> None:
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="r/one.md",
+            body="# x",
+            proposal_kind="skill_draft_md",
+            target_skill_name="alpha-skill",
+        )
+    )
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="r/two.md",
+            body="# y",
+            proposal_kind="patch_style_diff_txt",
+            target_skill_name="beta-skill",
+        )
+    )
+    rev = json.loads(
+        t4.review_powerunits_skill_draft_proposals(
+            max_entries=10, target_skill_substring="alpha", proposal_kind_filter="skill_draft_md"
+        )
+    )
+    assert rev["review"]["matching_file_count"] == 1
+    assert rev["review"]["entries"][0]["relative_path"] == "r/one.md"
+    assert rev["rollup_counts"]["by_target_skill"].get("alpha-skill") == 1
+
+
+def test_summarize_missing_marker_probe(t4, tmp_path: Path) -> None:
+    root = tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals"
+    root.mkdir(parents=True)
+    (root / "note.md").write_text("# no frontmatter\n", encoding="utf-8")
+    s = json.loads(t4.summarize_powerunits_skill_draft_proposals())
+    assert any("tier4a_drafts_some_files_missing_marker" in x for x in s["caution_flags"])

@@ -27,7 +27,7 @@ Typical JSON top-level keys (see handler `summarize_powerunits_operator_posture`
 | `phase_2a_overlay_read_only` | Tier **≥ 1** gate + **2A** tool names + **`telegram_powerunits_tier1_analysis_observed`**. |
 | `phase_2b_overlay_read_only` | Tier **≥ 2** gate + **2B** tools + **`telegram_powerunits_tier2_allowlisted_read_observed`**. |
 | `phase_tier3_skills_observer_read_only` | Tier **≥ 3** gate + Tier 3 tools + **`telegram_powerunits_tier3_skills_integration_observed`** + **`curator_tier3_contract_read_only`**. |
-| `phase_tier4a_skill_drafts_read_only` | Tier **≥ 4** gate + Tier 4A manifest/write/list/read/summarize + **`telegram_powerunits_tier4a_skill_draft_proposals_observed`**. |
+| `phase_tier4a_skill_drafts_read_only` | Tier **≥ 4** gate + Tier 4A manifest/write/list/read/review/summarize + **`telegram_powerunits_tier4a_skill_draft_proposals_observed`**. |
 | `tier4a_draft_proposals_watch_read_only` | When **`tier ≥ 4`**, embedded **`summarize_powerunits_skill_draft_proposals`** subset + merged cautions. |
 | `phase_1a_exports_signals_read_only` | Phase **1A** export subset condensed. |
 | `bounded_assumptions_summary` | Roadmap-aligned bullets (non-enforcing). |

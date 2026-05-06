@@ -217,6 +217,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "summarize_powerunits_skills_observer",
                 "diagnose_powerunits_skills_signals",
                 "propose_powerunits_skill_integration_actions",
+                "browse_powerunits_skills_tree",
+                "resolve_powerunits_skill_slug",
                 "read_powerunits_skill_body_preview",
             ],
             "telegram_powerunits_tier3_skills_integration_observed": tg_has_t3,
@@ -244,6 +246,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "write_powerunits_skill_draft_proposal",
                 "list_powerunits_skill_draft_proposals",
                 "read_powerunits_skill_draft_proposal",
+                "review_powerunits_skill_draft_proposals",
                 "summarize_powerunits_skill_draft_proposals",
             ],
             "telegram_powerunits_tier4a_skill_draft_proposals_observed": tg_has_t4a,
@@ -336,7 +339,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
             "Before tier≥3: review Curator posture (keep default off); confirm Tier-2 stable.",
             "After enabling tier≥3: confirm phase_tier3_skills_observer_read_only.telegram_powerunits_tier3_skills_integration_observed is true; sample skills observer tools.",
             "Before tier≥4 / Tier 4A: confirm Tier-3 observer signals clean; snapshot volume; review summarize_powerunits_skill_draft_proposals thresholds in overlay doc.",
-            "After enabling tier≥4: confirm phase_tier4a_skill_drafts_read_only.telegram_powerunits_tier4a_skill_draft_proposals_observed is true; probe manifest + summarize draft tools.",
+            "After enabling tier≥4: confirm phase_tier4a_skill_drafts_read_only.telegram_powerunits_tier4a_skill_draft_proposals_observed is true; probe manifest + summarize + review draft tools.",
         ]
 
         return json.dumps(

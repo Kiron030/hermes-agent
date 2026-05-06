@@ -92,6 +92,7 @@ Hermes ≥ v0.12 adds **Curator** and stronger self-improve paths upstream. For 
 | [`powerunits_fork_sync_strategy_v1.md`](powerunits_fork_sync_strategy_v1.md) | **Ongoing** sync mechanics; prefers tags for major bumps (see playbook). |
 | [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md) | **Single main Hermes:** `tier0` baseline, placeholders `tier1`–`tier3`, **rollback/tag contract**, pre-tier watcher checklist (Phase 0). |
 | [`powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) § *Hermes Dashboard* | **Same-process** dashboard persistence matrix, boot reconcile vs drift, optional `HERMES_POWERUNITS_DASHBOARD_MODE=observe`. |
+| [`powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md) | **Capability atlas:** Railway 502/gateway+dashboard, `$HERMES_HOME` layout, bundled skills clusters, advisory tier hints (**not** a roadmap). |
 
 **Do not prune** the v0.12-specific docs; **cross-link** from here instead of repeating long checklists.
 

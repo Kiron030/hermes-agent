@@ -2,6 +2,8 @@
 
 **Canonical roadmap:** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md) — this file is operational detail only.
 
+**Bundled skills clusters (advisory planning):** [`powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md).
+
 **Gate:** **`HERMES_POWERUNITS_CAPABILITY_TIER = 4`** on the gateway process **and** merged Telegram **`platform_toolsets.telegram`** lists **`powerunits_tier4a_skill_draft_proposals`** (inserted **after** **`powerunits_tier3_skills_integration`** when policy runs).
 
 ---
@@ -33,8 +35,9 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 4`**.
 |------|------|
 | **`manifest_powerunits_tier4a_skill_draft_scope`** | Static JSON: resolved paths, caps, explicit **`not_auto_applied`** contract. |
 | **`write_powerunits_skill_draft_proposal`** | Create/overwrite (optional) **one** file under the proposals root; prepends YAML frontmatter with **`powerunits_tier_4a_proposal`** when the body does not already start with **`---`**. |
-| **`list_powerunits_skill_draft_proposals`** | Bounded listing with relative paths, sizes, mtimes (optional **`subpath_prefix`** filter). |
-| **`read_powerunits_skill_draft_proposal`** | Read back one draft for review. |
+| **`list_powerunits_skill_draft_proposals`** | Bounded listing with relative paths, sizes, mtimes; optional **`subpath_prefix`**; **`sort_by`:** **`path`** \| **`mtime_desc`**. |
+| **`read_powerunits_skill_draft_proposal`** | Read one draft; optional **`frontmatter`** + **`markdown_body`** parsing; optional **`max_body_preview_chars`** (preview of markdown after frontmatter). |
+| **`review_powerunits_skill_draft_proposals`** | **Read-only review board:** metadata + **`body_preview`** per file, **`rollup_counts`** (target skill / kind / age bucket), optional filters — **no** promotion. |
 | **`summarize_powerunits_skill_draft_proposals`** | **Watcher-style** aggregates: file count, bytes, **stale** age bucket, **24h touch** churn — soft **`caution_flags`** when thresholds are exceeded. |
 
 **Proposal kinds (`proposal_kind`):** **`skill_draft_md`** | **`patch_style_diff_txt`** (semantic hint for reviewers; both stored as normal files with the same safety header).
@@ -57,10 +60,20 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 4`**.
 | **`tier4a_many_stale_drafts`** | Many files older than **30** days → archive or delete stale drafts. |
 | **`tier4a_draft_churn_24h`** | Many files touched in **24h** → confirm intentional batch work. |
 | **`tier4a_proposals_list_truncated_at_*`** | Listing/summary hit internal caps → narrow prefix or prune. |
+| **`tier4a_draft_review_queue_large`** | Many draft files (review queue) → schedule triage or **`review_powerunits_skill_draft_proposals`** with filters. |
+| **`tier4a_drafts_some_files_missing_marker_in_head`** | Sampled files lack **`powerunits_tier_4a_proposal`** in the first bytes → confirm manual imports / non-Tier-4A text. |
+| **`tier4a_review_*`** (from **`review_powerunits_skill_draft_proposals`**) | Filter had no matches, queue truncated, many unspecified **`target_skill_name`**, or **review overload** heuristic — narrow filters or prune. |
 
 ---
 
-## Rollback (Tier 4A disable)
+## Review ergonomics (Tier 4A)
+
+1. **`summarize_powerunits_skill_draft_proposals`** — volume + watcher flags (also mirrored in posture as **`tier4a_drafts_watch:`**).
+2. **`list_powerunits_skill_draft_proposals`** with **`sort_by=mtime_desc`** — “newest first” triage list under a prefix.
+3. **`review_powerunits_skill_draft_proposals`** — grouped rollups + capped queue with **metadata** and short **previews**; optional **`target_skill_substring`**, **`proposal_kind_filter`**.
+4. **`read_powerunits_skill_draft_proposal`** — full file when needed; use **`max_body_preview_chars`** for a shorter Telegram-safe slice.
+
+**Still out of scope:** auto-promotion, live **`skills/`** writes, **`skill_manage`**, Curator apply without human review.
 
 1. Set **`HERMES_POWERUNITS_CAPABILITY_TIER=3`** (**or lower**) → `docker/apply_powerunits_runtime_policy.py` **drops** **`powerunits_tier4a_skill_draft_proposals`** from Telegram on the next merge.
 2. Restart gateway → posture **`tier4a_skill_drafts_drift`** clears once Telegram aligns.
