@@ -106,3 +106,17 @@ def test_propose_returns_flag(t3, tmp_path: Path) -> None:
     raw = t3.propose_powerunits_skill_integration_actions()
     obj = json.loads(raw)
     assert obj["explicitly_not_auto_applied"] is True
+
+
+def test_browse_and_resolve_nested(t3, tmp_path: Path) -> None:
+    cat = tmp_path / "skills" / "research"
+    sub = cat / "arxiv"
+    sub.mkdir(parents=True, exist_ok=True)
+    (sub / "SKILL.md").write_text("---\nname: arxiv\n---\n\n", encoding="utf-8")
+    br = json.loads(t3.browse_powerunits_skills_tree(path_prefix="research", max_depth=4))
+    assert br["preview_kind"] == "skills_tree_browse"
+    assert "research/arxiv" in br["skill_slugs_with_md"]
+    rs = json.loads(t3.resolve_powerunits_skill_slug(query="research/arxiv"))
+    assert rs["resolution"] == "exists_nested_dir_with_skill_md"
+    rleaf = json.loads(t3.resolve_powerunits_skill_slug(query="arxiv"))
+    assert rleaf["match_count"] == 1

@@ -34,6 +34,9 @@ _CAUTION_FILE_COUNT = 120
 _CAUTION_TOTAL_BYTES = 20 * 1024 * 1024
 _CAUTION_TOUCHED_24H = 28
 _CAUTION_STALE_FILES = 45
+_CAUTION_REVIEW_QUEUE_ENTRIES = 80
+_MAX_REVIEW_HEAD_BYTES = 24_000
+_MAX_REVIEW_ENTRIES_CAP = 400
 _TIER4A_POINTER_NAME = "README_POWERUNITS_TIER4A.txt"
 _TIER4A_POINTER_BODY = """Powerunits Hermes — Tier 4A skill draft proposals (operator pointer).
 
@@ -83,6 +86,35 @@ def _write_tier4a_pointer_if_missing(proposals_dir: Path) -> None:
         marker.write_text(_TIER4A_POINTER_BODY.strip() + "\n", encoding="utf-8")
     except (OSError, ValueError) as exc:
         logger.warning("Tier 4A pointer skipped: %s", exc)
+
+
+def _split_tier4a_frontmatter(body: str) -> tuple[dict[str, str], str]:
+    """Extract a leading ``---`` / ``---`` block into a flat dict (advisory parsing only)."""
+
+    meta: dict[str, str] = {}
+    raw = str(body or "")
+    if not raw.lstrip().startswith("---"):
+        return meta, raw
+    lines = raw.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return meta, raw
+    end_idx: int | None = None
+    for i in range(1, min(len(lines), 120)):
+        if lines[i].strip() == "---":
+            end_idx = i
+            break
+    if end_idx is None:
+        return meta, raw
+    for j in range(1, end_idx):
+        line = lines[j]
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        key = k.strip()
+        if key:
+            meta[key] = v.strip().strip("'\"")
+    rest = "\n".join(lines[end_idx + 1 :])
+    return meta, rest.lstrip("\n")
 
 
 def _normalize_rel(rel: str) -> str:
@@ -282,7 +314,7 @@ def write_powerunits_skill_draft_proposal(
 
 
 def list_powerunits_skill_draft_proposals(
-    subpath_prefix: str | None = None, **_: Any
+    subpath_prefix: str | None = None, *, sort_by: str | None = None, **_: Any
 ) -> str:
     """List draft files with sizes and mtimes (bounded)."""
 
@@ -303,6 +335,10 @@ def list_powerunits_skill_draft_proposals(
         base.relative_to(proposals)
     except ValueError:
         return tool_error("invalid subpath_prefix", error_code="invalid_prefix")
+
+    sort_key = str(sort_by or "path").strip().lower()
+    if sort_key not in {"path", "mtime_desc"}:
+        return tool_error("sort_by must be path or mtime_desc", error_code="invalid_sort")
 
     rows: list[dict[str, Any]] = []
     if base.is_dir():
@@ -325,12 +361,15 @@ def list_powerunits_skill_draft_proposals(
             )
             if len(rows) >= _LIST_CAP:
                 break
+    if sort_key == "mtime_desc":
+        rows.sort(key=lambda r: r["mtime_utc"], reverse=True)
 
     return json.dumps(
         {
             "read_only": True,
             "tier": "4a_skill_draft_proposals",
             "listing_truncated": len(rows) >= _LIST_CAP,
+            "sort_by": sort_key,
             "entries": rows,
             "doc_hint": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
         },
@@ -338,7 +377,17 @@ def list_powerunits_skill_draft_proposals(
     )
 
 
-def read_powerunits_skill_draft_proposal(relative_file_path: str, **_: Any) -> str:
+def _truthy_fm(val: str | None) -> bool:
+    return str(val or "").strip().lower() in ("true", "1", "yes", "on")
+
+
+def read_powerunits_skill_draft_proposal(
+    relative_file_path: str,
+    *,
+    max_body_preview_chars: int | None = None,
+    include_frontmatter_meta: bool = True,
+    **_: Any,
+) -> str:
     from tools.registry import tool_error
 
     if not check_powerunits_tier4a_skill_draft_proposals():
@@ -360,19 +409,41 @@ def read_powerunits_skill_draft_proposal(relative_file_path: str, **_: Any) -> s
     except OSError as exc:
         return tool_error(str(exc), error_code="read_failed")
 
-    return json.dumps(
-        {
-            "read_only": True,
-            "tier": "4a_skill_draft_proposals",
-            "requires_human_review": True,
-            "not_auto_applied": True,
-            "path_relative_to_proposals_root": target.relative_to(proposals).as_posix(),
-            "chars_returned": len(body),
-            "body": body,
-            "doc_hint": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
-        },
-        ensure_ascii=False,
-    )
+    payload: dict[str, Any] = {
+        "read_only": True,
+        "tier": "4a_skill_draft_proposals",
+        "requires_human_review": True,
+        "not_auto_applied": True,
+        "path_relative_to_proposals_root": target.relative_to(proposals).as_posix(),
+        "chars_returned": len(body),
+        "body": body,
+        "doc_hint": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
+    }
+    if include_frontmatter_meta:
+        fm, md_body = _split_tier4a_frontmatter(body)
+        payload["frontmatter"] = fm
+        payload["markdown_body"] = md_body
+        payload["markdown_body_chars"] = len(md_body)
+        payload["tier4a_marker_present"] = _truthy_fm(fm.get("powerunits_tier_4a_proposal"))
+    preview_cap: int | None = None
+    if max_body_preview_chars is not None:
+        try:
+            preview_cap = int(max_body_preview_chars)
+        except (TypeError, ValueError):
+            preview_cap = None
+    if preview_cap is not None and preview_cap >= 0 and include_frontmatter_meta:
+        _, md_body = _split_tier4a_frontmatter(body)
+        prev = md_body[:preview_cap] if preview_cap > 0 else ""
+        payload["body_preview"] = prev
+        payload["body_preview_truncated"] = len(md_body) > preview_cap
+        payload["body_preview_max_chars"] = preview_cap
+    elif preview_cap is not None and preview_cap >= 0:
+        prev = body[:preview_cap] if preview_cap > 0 else ""
+        payload["body_preview"] = prev
+        payload["body_preview_truncated"] = len(body) > preview_cap
+        payload["body_preview_max_chars"] = preview_cap
+
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def summarize_powerunits_skill_draft_proposals(**_: Any) -> str:
@@ -414,6 +485,27 @@ def summarize_powerunits_skill_draft_proposals(**_: Any) -> str:
 
     largest.sort(key=lambda x: -x[0])
     largest = largest[:12]
+
+    missing_marker_ct = 0
+    sample_cap = 320
+    if 0 < len(files) <= sample_cap:
+        for fp in files:
+            try:
+                head = fp.read_text(encoding="utf-8", errors="replace")[:4096]
+            except OSError:
+                continue
+            if "powerunits_tier_4a_proposal" not in head:
+                missing_marker_ct += 1
+        if missing_marker_ct:
+            caution.append(
+                f"tier4a_drafts_some_files_missing_marker_in_head:{missing_marker_ct}/"
+                f"{len(files)}_sampled_cap_{sample_cap}"
+            )
+
+    if len(files) >= _CAUTION_REVIEW_QUEUE_ENTRIES:
+        caution.append(
+            f"tier4a_draft_review_queue_large:{len(files)}>threshold_{_CAUTION_REVIEW_QUEUE_ENTRIES}"
+        )
 
     if len(files) >= _LIST_CAP:
         caution.append(f"tier4a_proposals_list_truncated_at_{_LIST_CAP}")
@@ -459,6 +551,168 @@ def summarize_powerunits_skill_draft_proposals(**_: Any) -> str:
     )
 
 
+def _age_bucket(mdt: datetime, now: datetime) -> str:
+    delta = now - mdt
+    if delta.days <= 7:
+        return "fresh_0_7d"
+    if delta.days <= 30:
+        return "aging_8_30d"
+    return "stale_gt_30d"
+
+
+def _read_head_text(fp: Path, max_chars: int) -> str:
+    try:
+        with fp.open("r", encoding="utf-8", errors="replace") as fh:
+            return fh.read(max_chars)
+    except OSError:
+        return ""
+
+
+def review_powerunits_skill_draft_proposals(
+    *,
+    max_entries: int = 120,
+    target_skill_substring: str | None = None,
+    proposal_kind_filter: str | None = None,
+    body_preview_chars: int = 420,
+    **_: Any,
+) -> str:
+    """Bounded, read-only review board: metadata + short body previews, with filters."""
+
+    from tools.registry import tool_error
+
+    if not check_powerunits_tier4a_skill_draft_proposals():
+        return tool_error(
+            "HERMES_POWERUNITS_CAPABILITY_TIER>=4 required for Tier 4A skill draft proposals overlay",
+            error_code="tier_gate",
+        )
+    try:
+        cap = int(max_entries)
+    except (TypeError, ValueError):
+        cap = 120
+    cap = max(1, min(cap, _MAX_REVIEW_ENTRIES_CAP))
+
+    pvw = int(body_preview_chars) if body_preview_chars is not None else 420
+    pvw = max(0, min(pvw, 8000))
+
+    tgt_sub = str(target_skill_substring or "").strip().casefold()
+    kind_f = str(proposal_kind_filter or "").strip()
+
+    proposals = _ensure_proposals_tree()
+    files = _iter_proposal_files(proposals, exclude_bootstrap_pointer=True)
+    now = datetime.now(timezone.utc)
+
+    enriched: list[dict[str, Any]] = []
+    for fp in files:
+        try:
+            st = fp.stat()
+        except OSError:
+            continue
+        rel = fp.relative_to(proposals).as_posix()
+        mdt = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+        head = _read_head_text(fp, _MAX_REVIEW_HEAD_BYTES)
+        fm, md_rest = _split_tier4a_frontmatter(head)
+        kind_meta = str(fm.get("proposal_kind") or "").strip()
+        tgt_meta = str(fm.get("target_skill_name") or "").strip().strip("'\"")
+
+        if tgt_sub and tgt_sub not in tgt_meta.casefold():
+            continue
+        if kind_f and kind_meta != kind_f:
+            continue
+
+        prv = md_rest[:pvw] if pvw else ""
+        enriched.append(
+            {
+                "relative_path": rel,
+                "size_bytes": st.st_size,
+                "mtime_utc": mdt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "_mtime_sort": st.st_mtime,
+                "age_bucket": _age_bucket(mdt, now),
+                "proposal_kind": kind_meta or None,
+                "target_skill_name": tgt_meta or None,
+                "tier4a_marker_present": _truthy_fm(fm.get("powerunits_tier_4a_proposal")),
+                "requires_human_review": fm.get("requires_human_review"),
+                "not_auto_applied": fm.get("not_auto_applied"),
+                "created_at_utc": fm.get("created_at_utc"),
+                "body_preview": prv,
+                "body_preview_truncated": len(md_rest) > pvw if pvw else False,
+                "head_parse_note": None
+                if len(head) < _MAX_REVIEW_HEAD_BYTES
+                else "head_truncated_for_parse",
+            }
+        )
+
+    enriched.sort(key=lambda r: r["_mtime_sort"], reverse=True)
+    for row in enriched:
+        row.pop("_mtime_sort", None)
+    total_matches = len(enriched)
+    queue = enriched[:cap]
+
+    by_skill: dict[str, int] = {}
+    by_kind: dict[str, int] = {}
+    by_age: dict[str, int] = {}
+    unknown_target = 0
+    missing_marker = 0
+    for row in enriched:
+        sk = row["target_skill_name"] or ""
+        if not sk:
+            unknown_target += 1
+        by_skill[sk or "(unspecified)"] = by_skill.get(sk or "(unspecified)", 0) + 1
+        k = row["proposal_kind"] or "(unset)"
+        by_kind[k] = by_kind.get(k, 0) + 1
+        ag = row["age_bucket"]
+        by_age[ag] = by_age.get(ag, 0) + 1
+        if not row["tier4a_marker_present"]:
+            missing_marker += 1
+
+    caution: list[str] = []
+    if total_matches > cap:
+        caution.append(
+            f"tier4a_review_queue_truncated:{total_matches}_matches>{cap}_max_entries"
+        )
+    if total_matches == 0 and (tgt_sub or kind_f):
+        caution.append("tier4a_review_filter_no_matches")
+    if total_matches >= 60 and cap >= 60:
+        caution.append(
+            f"tier4a_review_operator_overload:{total_matches}_matching_files"
+        )
+    if unknown_target * 3 >= max(1, total_matches * 2) and total_matches >= 5:
+        caution.append(
+            f"tier4a_review_target_skill_mostly_unspecified:{unknown_target}/{total_matches}"
+        )
+    if missing_marker >= max(3, total_matches // 4) and total_matches >= 4:
+        caution.append(
+            f"tier4a_review_many_missing_tier4a_marker:{missing_marker}/{total_matches}"
+        )
+
+    return json.dumps(
+        {
+            "read_only": True,
+            "tier": "4a_skill_draft_proposals",
+            "requires_human_review": True,
+            "not_auto_applied": True,
+            "review": {
+                "max_entries": cap,
+                "filters_applied": {
+                    "target_skill_substring": target_skill_substring or None,
+                    "proposal_kind": kind_f or None,
+                },
+                "matching_file_count": total_matches,
+                "queue_returned": len(queue),
+                "body_preview_chars": pvw,
+                "entries": queue,
+            },
+            "rollup_counts": {
+                "by_target_skill": dict(sorted(by_skill.items(), key=lambda x: (-x[1], x[0]))),
+                "by_proposal_kind": dict(sorted(by_kind.items(), key=lambda x: (-x[1], x[0]))),
+                "by_age_bucket": dict(sorted(by_age.items(), key=lambda x: (-x[1], x[0]))),
+            },
+            "caution_flags": sorted(set(caution)),
+            "doc_hint": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
+        },
+        ensure_ascii=False,
+    )
+
+
 MANIFEST_SCHEMA = {
     "name": "manifest_powerunits_tier4a_skill_draft_scope",
     "description": (
@@ -491,21 +745,49 @@ WRITE_SCHEMA = {
 
 LIST_SCHEMA = {
     "name": "list_powerunits_skill_draft_proposals",
-    "description": "Tier>=4: list draft proposal files (relative paths, sizes).",
+    "description": "Tier>=4: list draft proposal files (relative paths, sizes, mtimes).",
     "parameters": {
         "type": "object",
-        "properties": {"subpath_prefix": {"type": "string"}},
+        "properties": {
+            "subpath_prefix": {"type": "string"},
+            "sort_by": {"type": "string", "enum": ["path", "mtime_desc"]},
+        },
         "required": [],
     },
 }
 
 READ_SCHEMA = {
     "name": "read_powerunits_skill_draft_proposal",
-    "description": "Tier>=4: read one draft file from drafts/powerunits_skill_proposals.",
+    "description": (
+        "Tier>=4: read one draft file from drafts/powerunits_skill_proposals; "
+        "optional frontmatter parsing + markdown body preview."
+    ),
     "parameters": {
         "type": "object",
-        "properties": {"relative_file_path": {"type": "string"}},
+        "properties": {
+            "relative_file_path": {"type": "string"},
+            "max_body_preview_chars": {"type": "integer"},
+            "include_frontmatter_meta": {"type": "boolean"},
+        },
         "required": ["relative_file_path"],
+    },
+}
+
+REVIEW_SCHEMA = {
+    "name": "review_powerunits_skill_draft_proposals",
+    "description": (
+        "Tier>=4: read-only review board — proposal metadata, body previews, rollup counts, "
+        "optional filters (target_skill_substring, proposal_kind); no apply/promote."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "max_entries": {"type": "integer"},
+            "target_skill_substring": {"type": "string"},
+            "proposal_kind_filter": {"type": "string"},
+            "body_preview_chars": {"type": "integer"},
+        },
+        "required": [],
     },
 }
 
@@ -549,6 +831,7 @@ registry.register(
     schema=LIST_SCHEMA,
     handler=lambda args, **kw: list_powerunits_skill_draft_proposals(
         subpath_prefix=args.get("subpath_prefix"),
+        sort_by=args.get("sort_by"),
         **kw,
     ),
     check_fn=check_powerunits_tier4a_skill_draft_proposals,
@@ -561,10 +844,27 @@ registry.register(
     schema=READ_SCHEMA,
     handler=lambda args, **kw: read_powerunits_skill_draft_proposal(
         relative_file_path=str(args.get("relative_file_path", "")),
+        max_body_preview_chars=args.get("max_body_preview_chars"),
+        include_frontmatter_meta=bool(args.get("include_frontmatter_meta", True)),
         **kw,
     ),
     check_fn=check_powerunits_tier4a_skill_draft_proposals,
     emoji="📄",
+)
+
+registry.register(
+    name="review_powerunits_skill_draft_proposals",
+    toolset="powerunits_tier4a_skill_draft_proposals",
+    schema=REVIEW_SCHEMA,
+    handler=lambda args, **kw: review_powerunits_skill_draft_proposals(
+        max_entries=args.get("max_entries", 120),
+        target_skill_substring=args.get("target_skill_substring"),
+        proposal_kind_filter=args.get("proposal_kind_filter"),
+        body_preview_chars=args.get("body_preview_chars", 420),
+        **kw,
+    ),
+    check_fn=check_powerunits_tier4a_skill_draft_proposals,
+    emoji="🗂️",
 )
 
 registry.register(

@@ -2,6 +2,8 @@
 
 **Canonical roadmap:** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md) — this file is operational detail only.
 
+**Bundled skills capability map (advisory):** [`powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md) — clusters + tier hints; **not** a second roadmap.
+
 **Gate:** **`HERMES_POWERUNITS_CAPABILITY_TIER = 3`** on the gateway process **and** merged Telegram **`platform_toolsets.telegram`** lists **`powerunits_tier3_skills_integration`** (inserted **after** **`powerunits_tier2_allowlisted_read`** when policy runs).
 
 ---
@@ -23,7 +25,9 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 3`**.
 | **`summarize_powerunits_skills_observer`** | Inventory: provenance-ish buckets (**bundled manifest / hub lock / agent-eligible paths** heuristic), **`SKILL.md` scan cap**, `.usage.json` histogram, **`agent.curator.load_state`** slice (read-only). |
 | **`diagnose_powerunits_skills_signals`** | Duplicates (**same declared `name:`**), stale/archived agent usage rows, idle hints, heuristic “injection-like” head markers (**advisory**, not antivirus). |
 | **`propose_powerunits_skill_integration_actions`** | Consolidates diagnoses into **`proposal_items`** for **human merge** (`explicitly_not_auto_applied: true`). |
-| **`read_powerunits_skill_body_preview`** | Bounded **`SKILL.md`** read for a path under **`$HERMES_HOME/skills`**: flat slug or nested path (**`category/sub-skill`**); category folders with **`DESCRIPTION.md`** and no **`SKILL.md`** return a hub JSON (excerpt + **`nested_skill_slugs`**). |
+| **`browse_powerunits_skills_tree`** | Read-only **slug tree** under **`$HERMES_HOME/skills`**: lists paths with **`SKILL.md`** under a **`path_prefix`** (bounded depth/count) — use after a **category hub** preview. |
+| **`resolve_powerunits_skill_slug`** | Resolve a **short slug** or **path prefix** to candidate nested **`SKILL.md`** locations (bounded); disambiguates **leaf** names across categories. |
+| **`read_powerunits_skill_body_preview`** | Bounded **`SKILL.md`** read for a path under **`$HERMES_HOME/skills`**: flat slug or nested path (**`category/sub-skill`**); category folders with **`DESCRIPTION.md`** and no **`SKILL.md`** return a hub JSON (excerpt + **`nested_skill_slugs`** / **`nested_child_hub_paths`**). |
 
 **Scope boundaries:** Reads only under **`skills/`** (with the same **`SKILL.md` enumeration skips** as core Hermes: **`.hub`**, **`.archive`**, dot dirs). Does **not** read **`config.yaml`** secrets wholesale; **not** Repo B.
 
@@ -37,6 +41,19 @@ Quick consistency check (canonical numbers live in [`powerunits_hermes_progressi
 - **`docker/apply_powerunits_runtime_policy.py`** merges Telegram toolsets in that order after **`powerunits_workspace`**; **`model_tools.py`** / **`toolsets.py`** list the same bounded Powerunits toolset names.
 - **Curator**: policy default remains **`auxiliary.curator.enabled: false`**; Tier 3 stays **observe / propose-only** (no tool-level merges).
 - **Tier 4A**: writes only under **`hermes_workspace/drafts/powerunits_skill_proposals/`** — snapshot via **`summarize_powerunits_operator_posture`** / Tier 4A summarize when enabled.
+
+---
+
+## Nested discovery helpers (Tier 3)
+
+| Step | Tool | Notes |
+|------|------|-------|
+| 1 | **`read_powerunits_skill_body_preview`** with **`research`** (hub) | Confirms category layout; follow **`hint`** when only sub-hubs exist. |
+| 2 | **`browse_powerunits_skills_tree`** with **`path_prefix=research`**, small **`max_depth`** | Lists concrete **`SKILL.md`** paths (e.g. **`research/arxiv`**). |
+| 3 | **`resolve_powerunits_skill_slug`** with **`arxiv`** or **`research/arxiv`** | Collapses ambiguity when multiple leaves share a short name. |
+| 4 | **`read_powerunits_skill_body_preview`** with the **full nested path** | Bounded body preview — **read-only**, no **`skill_manage`**. |
+
+**Watchers (soft):** hub JSON may include **`caution_flags`** such as **`tier3_skill_preview_ambiguous`**, **`tier3_skill_category_no_skill_md`**, **`tier3_skill_category_empty`** — triage before proposing merges.
 
 ---
 

@@ -80,6 +80,8 @@ The dashboard is served by the **same** Hermes process as the gateway when opera
 
 Set **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (aliases: `observability`, `readonly`, `read_only`, `read-only`, `stage1`, `stage_1`) **together with** `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`. The dashboard REST API then returns **403** for mutating HTTP methods under `/api/` (POST/PUT/PATCH/DELETE); **GET** (sessions list, logs, config read, toolset listing, analytics, etc.) stays available. **WebSockets** used for embedded chat/event bridges are **not** gated by this flag — restrict by network exposure if you require an end-to-end read-only surface.
 
+**Bundled skills + volume layout + advisory tier clustering** (capability atlas, not a roadmap): [`powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md).
+
 ### Stage 1 / risky / off-limits (operator matrix)
 
 | Scope | Use |

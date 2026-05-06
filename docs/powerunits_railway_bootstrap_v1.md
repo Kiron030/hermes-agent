@@ -108,7 +108,8 @@ Railway-Kompatibilitaetshinweis:
 2. Env: `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, optional **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (sperrt mutierende `/api/*` HTTP-Calls).
 3. Sicherheit: Dashboard ist **keine** starke oeffentliche Auth; Zugriff absichern (VPN, Railway TCP-Proxy-Beschraenkung, organisatorisch).
 
-Siehe Skript: [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh).
+Siehe Skript: [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh).  
+Erweiterte Lessons (**Dashboard + `HERMES_HOME` + bundled skills** als Capability-Atlas): [`docs/powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md).
 
 ---
 
