@@ -1997,3 +1997,45 @@ class TestPtyWebSocket:
             ):
                 pass
         assert exc.value.code == 4400
+
+
+class TestWebServerPowerunitsObserveMode:
+    """HERMES_POWERUNITS_DASHBOARD_MODE + first_safe_v1 mutating API guard."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, monkeypatch, _isolate_hermes_home):
+        pytest.importorskip("fastapi")
+        try:
+            from starlette.testclient import TestClient
+        except ImportError:
+            pytest.skip("starlette not installed")
+
+        import hermes_state
+        from hermes_constants import get_hermes_home
+        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+
+        monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+        monkeypatch.setenv("HERMES_POWERUNITS_DASHBOARD_MODE", "observe")
+        monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+
+        self.client = TestClient(app)
+        self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
+
+    def test_observe_mode_blocks_config_raw_put(self):
+        resp = self.client.put("/api/config/raw", json={"yaml_text": "noop: true\n"})
+        assert resp.status_code == 403
+        assert "observe mode" in resp.json().get("detail", "").lower()
+
+    def test_observe_mode_allows_config_get(self):
+        resp = self.client.get("/api/config")
+        assert resp.status_code == 200
+
+    def test_observe_mode_blocks_env_reveal_post(self):
+        from hermes_cli.config import save_env_value
+
+        save_env_value("TEST_OBSERVE_REVEAL", "secret")
+        resp = self.client.post(
+            "/api/env/reveal",
+            json={"key": "TEST_OBSERVE_REVEAL"},
+        )
+        assert resp.status_code == 403

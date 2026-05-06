@@ -112,6 +112,9 @@ Ergaenzung fuer ersten Live-Rollout:
 
 - tiered runtime policy aktivieren/halten (`HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`),
   damit die Telegram-Tooloberflaeche fail-closed eingeschraenkt bleibt.
+- optional **Dashboard Stufe 1 (HTTP read-only):** `HERMES_POWERUNITS_DASHBOARD_MODE=observe`
+  **zusaetzlich** zu `first_safe_v1` — blockiert mutierende REST-Aufrufe unter `/api/` (Details:
+  [`powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) § *Hermes Dashboard*).
 
 ---
 

@@ -52,6 +52,7 @@
 - [ ] Logs: **no** repeating HTTP **400** on the LLM route; **no** raw secrets (`DATABASE_URL`, internal execute secret, bearer tokens).
 - [ ] **`$HERMES_HOME/config.yaml`:** bounded Telegram toolsets; **`auxiliary.curator.enabled`** still **false** unless you **intentionally** test Curator ([`hermes_v0_12_staged_upgrade_powerunits.md`](hermes_v0_12_staged_upgrade_powerunits.md)).
 - [ ] Bounded smokes passed (governance, inventory, ENTSO‑E market **and** forecast, ERA5, Repo B reads as applicable).
+- [ ] **Hermes Dashboard (optional Stage 1):** prefer observability-only; for HTTP-level hardening set `HERMES_POWERUNITS_DASHBOARD_MODE=observe` alongside `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1` — see [`powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) § *Hermes Dashboard*.
 
 ---
 
@@ -90,6 +91,7 @@ Hermes ≥ v0.12 adds **Curator** and stronger self-improve paths upstream. For 
 | [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) | **Executable** checks post-deploy + v0.12 cutover subsection. |
 | [`powerunits_fork_sync_strategy_v1.md`](powerunits_fork_sync_strategy_v1.md) | **Ongoing** sync mechanics; prefers tags for major bumps (see playbook). |
 | [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md) | **Single main Hermes:** `tier0` baseline, placeholders `tier1`–`tier3`, **rollback/tag contract**, pre-tier watcher checklist (Phase 0). |
+| [`powerunits_runtime_v0_12_integration.md`](powerunits_runtime_v0_12_integration.md) § *Hermes Dashboard* | **Same-process** dashboard persistence matrix, boot reconcile vs drift, optional `HERMES_POWERUNITS_DASHBOARD_MODE=observe`. |
 
 **Do not prune** the v0.12-specific docs; **cross-link** from here instead of repeating long checklists.
 
