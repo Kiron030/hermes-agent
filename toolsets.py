@@ -309,6 +309,27 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_tier5a_bounded_workflow_scaffolding": {
+        "description": (
+            "Tier 5A (tier>=6): bounded operator workflow scaffolding under "
+            "operator_bounded_workflows/ (run records, checkpoints, logs, escalation/experiment notes). "
+            "Routing: manifest_powerunits_tier5a_bounded_workflow_scope (NOT Tier 4B manifest), "
+            "summarize_powerunits_tier5a_bounded_workflow_lane (NOT Option D / bounded HTTP summaries). "
+            "No bounded HTTP execution from these tools; rollback = tier 5."
+        ),
+        "tools": [
+            "manifest_powerunits_tier5a_bounded_workflow_scope",
+            "ensure_powerunits_bounded_workflow_workspace",
+            "upsert_powerunits_bounded_workflow_run",
+            "read_powerunits_bounded_workflow_run",
+            "list_powerunits_bounded_workflow_workspace",
+            "append_powerunits_bounded_workflow_note",
+            "summarize_powerunits_tier5a_bounded_workflow_lane",
+            "review_powerunits_bounded_workflow_runs",
+        ],
+        "includes": [],
+    },
+
     "powerunits_timescale_read": {
         "description": (
             "Staged operator-only bounded read against Timescale "

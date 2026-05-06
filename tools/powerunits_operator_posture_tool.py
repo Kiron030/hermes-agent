@@ -105,6 +105,7 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
         "powerunits_tier3_skills_integration_listed": None,
         "powerunits_tier4a_skill_draft_proposals_listed": None,
         "powerunits_tier4b_review_governance_listed": None,
+        "powerunits_tier5a_bounded_workflow_scaffolding_listed": None,
         "telegram_progressive_overlays_aligned_with_tier": None,
         "parse_error": False,
     }
@@ -139,6 +140,9 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
                 snap["powerunits_tier4b_review_governance_listed"] = (
                     "powerunits_tier4b_review_governance" in tg
                 )
+                snap["powerunits_tier5a_bounded_workflow_scaffolding_listed"] = (
+                    "powerunits_tier5a_bounded_workflow_scaffolding" in tg
+                )
                 snap["telegram_progressive_overlays_aligned_with_tier"] = (
                     progressive_capability_overlays_aligned(tg, tier_effective)
                 )
@@ -148,7 +152,7 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
 
 
 def summarize_powerunits_operator_posture(**_: Any) -> str:
-    """Return JSON: tier env, bounded posture, overlays 2A/2B + Tier 3 + Tier 4A + Tier 4B."""
+    """Return JSON: tier env, bounded posture, overlays 2A/2B + Tier 3 + Tier 4A + Tier 4B + Tier 5A."""
 
     try:
         from powerunits_capability_tier import read_powerunits_capability_tier
@@ -305,6 +309,34 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "tier4b_governance_drift:tier>=5_but_powerunits_tier4b_review_governance_missing_from_telegram"
             )
 
+        overlay_t5a = tier_effective >= 6
+        tg_has_t5a = telegram_obs.get("powerunits_tier5a_bounded_workflow_scaffolding_listed")
+
+        phase_tier5a_workflow_readout = {
+            "tier_gate_tier5a_bounded_workflow_scaffolding": overlay_t5a,
+            "workflow_root_relative": "operator_bounded_workflows",
+            "tools": [
+                "manifest_powerunits_tier5a_bounded_workflow_scope",
+                "ensure_powerunits_bounded_workflow_workspace",
+                "upsert_powerunits_bounded_workflow_run",
+                "read_powerunits_bounded_workflow_run",
+                "list_powerunits_bounded_workflow_workspace",
+                "append_powerunits_bounded_workflow_note",
+                "summarize_powerunits_tier5a_bounded_workflow_lane",
+                "review_powerunits_bounded_workflow_runs",
+            ],
+            "telegram_powerunits_tier5a_bounded_workflow_scaffolding_observed": tg_has_t5a,
+            "overlay_detail_doc": "docs/powerunits_tier5a_bounded_workflow_scaffolding_overlay_v1.md",
+            "tier5a_bounded_http_from_tools": False,
+            "repo_b_truth_canonical_contract": True,
+        }
+
+        if overlay_t5a and tg_has_t5a is False:
+            caution.append(
+                "tier5a_workflow_scaffolding_drift:tier>=6_but_"
+                "powerunits_tier5a_bounded_workflow_scaffolding_missing_from_telegram"
+            )
+
         if not policy:
             caution.append(
                 "runtime_policy_unset:expect HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1 for bounded Powerunits"
@@ -399,14 +431,49 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                     f"tier4b_governance_watch_summary_failed:{str(exc)[:120]}"
                 )
 
+        tier5a_watch: dict[str, Any] = {"summarize_attempted": False, "skipped_not_tier5a": True}
+        if overlay_t5a:
+            tier5a_watch["skipped_not_tier5a"] = False
+            try:
+                from tools.powerunits_tier5a_bounded_workflow_tool import (
+                    summarize_powerunits_tier5a_bounded_workflow_lane,
+                )
+
+                raw_5 = summarize_powerunits_tier5a_bounded_workflow_lane()
+                w5 = json.loads(raw_5)
+                if isinstance(w5, dict) and not w5.get("error_code"):
+                    wflags = w5.get("caution_flags") or []
+                    tier5a_watch.update(
+                        {
+                            "summarize_attempted": True,
+                            "run_record_files_scanned": w5.get("run_record_files_scanned"),
+                            "workflow_status_counts": w5.get("workflow_status_counts"),
+                            "validate_pending_count": w5.get("validate_pending_count"),
+                            "summary_pending_count": w5.get("summary_pending_count"),
+                            "stuck_running_estimate": w5.get("stuck_running_estimate"),
+                            "caution_flags": wflags,
+                        }
+                    )
+                    for fl in wflags:
+                        caution.append(f"tier5a_workflow_watch:{fl}")
+                elif isinstance(w5, dict):
+                    tier5a_watch["summarize_attempted"] = True
+                    tier5a_watch["summarize_error"] = w5.get("error")
+            except Exception as exc:
+                tier5a_watch["summarize_error"] = str(exc)[:240]
+                caution.append(
+                    f"tier5a_workflow_watch_summary_failed:{str(exc)[:120]}"
+                )
+
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
-            "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3) / Tier 4A (tier>=4) / Tier 4B (tier>=5).",
+            "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3) / Tier 4A (tier>=4) / Tier 4B (tier>=5) / Tier 5A (tier>=6).",
             "Workspace writes stay under hermes_workspace allowlisted dirs; exports Phase 1A uses summarize_powerunits_workspace_exports for hygiene hints.",
             "Hermes-derived CSV/files under exports are never authoritative over Repo B JSON.",
             "Phase 2A/2B tools are read-only; Tier 3 skills tools are observe/diagnose/propose-only (no auto merge).",
             "Tier 4A writes only under hermes_workspace/drafts/powerunits_skill_proposals with explicit review metadata — never live $HERMES_HOME/skills.",
-            "Tier 5 (4B) adds governance/ notes + review_status patches on drafts only — still no live skill mutation.",
+            "Tier 4B adds governance/ notes + review_status patches on drafts only — still no live skill mutation.",
+            "Tier 5A adds operator_bounded_workflows/ run records + notes only — Hermes does not execute bounded HTTP from those tools; Repo B stays canonical.",
             "auxiliary.curator.enabled defaults false in policy; autonomous Curator paths require explicit ops review.",
         ]
 
@@ -423,6 +490,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
             "After enabling tier≥4: confirm phase_tier4a_skill_drafts_read_only.telegram_powerunits_tier4a_skill_draft_proposals_observed is true; probe manifest + summarize + review draft tools.",
             "Before tier≥5 / Tier 4B: confirm Tier-4A draft posture clean; agree review_state conventions (roadmap § Tier 4B).",
             "After enabling tier≥5: confirm phase_tier4b_governance_read_only.telegram_powerunits_tier4b_review_governance_observed is true; probe summarize_powerunits_tier4b_governance_lane + ensure scaffold.",
+            "Before tier≥6 / Tier 5A: confirm Tier-4B governance lane acceptable; agree bounded workflow_status/state conventions (roadmap § Tier 5A).",
+            "After enabling tier≥6: confirm phase_tier5a_workflow_read_only.telegram_powerunits_tier5a_bounded_workflow_scaffolding_observed is true; probe summarize_powerunits_tier5a_bounded_workflow_lane + ensure scaffold.",
         ]
 
         return json.dumps(
@@ -446,8 +515,10 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "phase_tier3_skills_observer_read_only": phase_tier3_skills_readout,
                 "phase_tier4a_skill_drafts_read_only": phase_tier4a_skill_drafts_readout,
                 "phase_tier4b_governance_read_only": phase_tier4b_governance_readout,
+                "phase_tier5a_workflow_read_only": phase_tier5a_workflow_readout,
                 "tier4a_draft_proposals_watch_read_only": tier4a_watch,
                 "tier4b_governance_watch_read_only": tier4b_watch,
+                "tier5a_workflow_watch_read_only": tier5a_watch,
                 "phase_1a_exports_signals_read_only": exports_signals,
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
@@ -470,7 +541,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
 POSTURE_SUMMARY_SCHEMA = {
     "name": "summarize_powerunits_operator_posture",
     "description": (
-        "Phase 1B posture tool + overlays 2A/2B/Tier 3/Tier 4A/Tier 4B Telegram alignment; Curator tier≥3 cautions when applicable; "
+        "Phase 1B posture tool + overlays 2A/2B/Tier 3/Tier 4A/Tier 4B/Tier 5A Telegram alignment; Curator tier≥3 cautions when applicable; "
         "Phase 1A export signals. Canonical roadmap: docs/powerunits_hermes_progressive_posture_v1.md"
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},
