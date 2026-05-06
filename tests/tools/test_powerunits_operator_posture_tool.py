@@ -47,6 +47,10 @@ def test_posture_read_only_happy(posture_mod) -> None:
     assert p5["tier_gate_tier4b_governance"] is False
     assert p5["telegram_powerunits_tier4b_review_governance_observed"] is None
     assert out["tier4b_governance_watch_read_only"]["skipped_not_tier4b"] is True
+    p5a = out["phase_tier5a_workflow_read_only"]
+    assert p5a["tier_gate_tier5a_bounded_workflow_scaffolding"] is False
+    assert p5a["telegram_powerunits_tier5a_bounded_workflow_scaffolding_observed"] is None
+    assert out["tier5a_workflow_watch_read_only"]["skipped_not_tier5a"] is True
 
 
 def test_posture_tier_ge_one_phase2a_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -258,6 +262,48 @@ def test_posture_tier_five_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     )
     assert out["telegram_toolsets_observation_read_only"]["telegram_progressive_overlays_aligned_with_tier"] is True
     assert not any(x.startswith("tier4b_governance_drift") for x in out["caution_flags"])
+    assert not any(x.startswith("telegram_progressive_overlays_drift") for x in out["caution_flags"])
+
+
+def test_posture_tier_six_tier5a_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "6")
+    tg_bad = [
+        x
+        for x in expected_telegram_toolsets_first_safe(6)
+        if x != "powerunits_tier5a_bounded_workflow_scaffolding"
+    ]
+    (tmp_path / "config.yaml").write_text(_config_with_telegram(tg_bad), encoding="utf-8")
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    p6 = out["phase_tier5a_workflow_read_only"]
+    assert p6["tier_gate_tier5a_bounded_workflow_scaffolding"] is True
+    assert p6["telegram_powerunits_tier5a_bounded_workflow_scaffolding_observed"] is False
+    assert any("tier5a_workflow_scaffolding_drift" in x for x in out["caution_flags"])
+    assert any("telegram_progressive_overlays_drift" in x for x in out["caution_flags"])
+
+
+def test_posture_tier_six_aligned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "6")
+    (tmp_path / "config.yaml").write_text(
+        _config_with_telegram(expected_telegram_toolsets_first_safe(6)),
+        encoding="utf-8",
+    )
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    assert (
+        out["phase_tier5a_workflow_read_only"][
+            "telegram_powerunits_tier5a_bounded_workflow_scaffolding_observed"
+        ]
+        is True
+    )
+    assert out["telegram_toolsets_observation_read_only"]["telegram_progressive_overlays_aligned_with_tier"] is True
+    assert not any(x.startswith("tier5a_workflow_scaffolding_drift") for x in out["caution_flags"])
     assert not any(x.startswith("telegram_progressive_overlays_drift") for x in out["caution_flags"])
 
 

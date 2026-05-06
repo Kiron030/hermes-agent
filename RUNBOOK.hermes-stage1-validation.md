@@ -29,7 +29,8 @@
 | `docs/powerunits_tier3_skills_integration_overlay_v1.md` | **Tier 3** **`powerunits_tier3_skills_integration`** (**`HERMES_POWERUNITS_CAPABILITY_TIER=3`** + policy). |
 | `docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md` | **Tier 4A** **`powerunits_tier4a_skill_draft_proposals`** (**`HERMES_POWERUNITS_CAPABILITY_TIER=4`** + policy). |
 | `docs/powerunits_tier4b_review_governance_overlay_v1.md` | Tier **4B** review-state + governance workspace (**`HERMES_POWERUNITS_CAPABILITY_TIER=5`**); rollback = set tier **4**. |
-| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, **2A / 2B / Tier 3 / Tier 4A / Tier 4B** Telegram drift flags). |
+| `docs/powerunits_tier5a_bounded_workflow_scaffolding_overlay_v1.md` | Tier **5A** bounded operator workflow scaffolding (**`HERMES_POWERUNITS_CAPABILITY_TIER=6`**); rollback = set tier **5**. |
+| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, **2A / 2B / Tier 3 / Tier 4A / Tier 4B / Tier 5A** Telegram drift flags). |
 | `docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md` | Phase 2A Tier-1 **`powerunits_tier1_analysis`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥1`** + policy merge). |
 | `docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md` | Phase **2B** **`powerunits_tier2_allowlisted_read`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥2`** + policy merge). |
 | `docs/powerunits_hermes_upgrade_playbook.md` | **All Hermes bumps:** branch hygiene, staging-first, tag vs `main`, Railway verification, Curator posture, `think`/`extra_body` lesson (cross-links v0.12 docs). |
@@ -255,6 +256,17 @@ Only when Tier **4A** skill drafts are already enabled and operators want the **
 - [ ] **`summarize_powerunits_tier4b_governance_lane`** / posture **`tier4b_governance_watch_read_only`** — soft cautions only (unresolved queue, stale reviews, governance clutter); **no** auto-apply.
 
 **Rollback (Tier 4B only):** set **`HERMES_POWERUNITS_CAPABILITY_TIER=4`** so policy drops **`powerunits_tier4b_review_governance`**; **4A** stays enabled. No migration; artifacts remain on disk.
+
+---
+
+## Tier 5A bounded workflow scaffolding (optional smoke; `HERMES_POWERUNITS_CAPABILITY_TIER >= 6`)
+
+- [ ] Telegram merged toolsets include **`powerunits_tier5a_bounded_workflow_scaffolding`** **after** **`powerunits_tier4b_review_governance`**.
+- [ ] **`manifest_powerunits_tier5a_bounded_workflow_scope`** returns JSON with **`operator_bounded_workflows`** roots (**no** bounded HTTP from Tier 5A tools).
+- [ ] **`ensure_powerunits_bounded_workflow_workspace`** + **`upsert_powerunits_bounded_workflow_run`** create only **`run_records/*.md`** under the bounded subtree; invalid **`workflow_status`** rejected.
+- [ ] **`summarize_powerunits_tier5a_bounded_workflow_lane`** / posture **`tier5a_workflow_watch_read_only`** — soft cautions only (stuck running, retries, escalation signals).
+
+**Rollback (Tier 5A only):** set **`HERMES_POWERUNITS_CAPABILITY_TIER=5`**; **4B** stays enabled. Artifacts remain on disk.
 
 ## Rollback basics
 

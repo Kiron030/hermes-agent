@@ -6,7 +6,7 @@ Single source for:
 - ``model_tools.get_tool_definitions`` hard-cap allowlist sync
 - optional posture comparisons
 
-Overlays are inserted **immediately after** ``powerunits_workspace`` (Tier 1 … 4B).
+Overlays are inserted **immediately after** ``powerunits_workspace`` (Tier 1 … 5A).
 """
 
 from __future__ import annotations
@@ -17,13 +17,14 @@ TIER_OVERLAY_TOOLSETS_ORDERED: tuple[str, ...] = (
     "powerunits_tier3_skills_integration",
     "powerunits_tier4a_skill_draft_proposals",
     "powerunits_tier4b_review_governance",
+    "powerunits_tier5a_bounded_workflow_scaffolding",
 )
 
 OVERLAY_NAMES: frozenset[str] = frozenset(TIER_OVERLAY_TOOLSETS_ORDERED)
 
 # Base Telegram toolsets for ``first_safe_v1`` **before** progressive tier inserts.
 # Keep ``powerunits_operator_posture`` before ``powerunits_workspace`` so tier
-# overlays remain at ``workspace_index + 1 … + 5`` (tests + docs rely on this).
+# overlays remain at ``workspace_index + 1 … + 6`` (tests + docs rely on this).
 TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "memory",
     "session_search",
@@ -64,6 +65,8 @@ def merge_capability_overlays_into_telegram(telegram: list[str], tier: int) -> l
         overlays.append("powerunits_tier4a_skill_draft_proposals")
     if tier >= 5:
         overlays.append("powerunits_tier4b_review_governance")
+    if tier >= 6:
+        overlays.append("powerunits_tier5a_bounded_workflow_scaffolding")
 
     cleaned = [x for x in telegram if x not in OVERLAY_NAMES]
     try:
@@ -101,6 +104,8 @@ def progressive_capability_overlays_aligned(telegram: list[str], tier: int) -> b
         expected.append("powerunits_tier4a_skill_draft_proposals")
     if tier >= 5:
         expected.append("powerunits_tier4b_review_governance")
+    if tier >= 6:
+        expected.append("powerunits_tier5a_bounded_workflow_scaffolding")
     if not expected:
         return True
     try:

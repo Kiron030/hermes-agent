@@ -352,6 +352,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_tier3_skills_integration_tool",
             "tools.powerunits_tier4a_skill_draft_proposals_tool",
             "tools.powerunits_tier4b_review_governance_tool",
+            "tools.powerunits_tier5a_bounded_workflow_tool",
             "tools.powerunits_timescale_read_tool",
             "tools.powerunits_workspace_tool",
             "tools.rl_training_tool",

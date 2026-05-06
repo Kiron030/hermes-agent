@@ -32,7 +32,7 @@ from toolsets import resolve_toolset, validate_toolset
 
 logger = logging.getLogger(__name__)
 # See ``powerunits_telegram_overlays.expected_telegram_toolsets_first_safe`` for the
-# progressive Tier 1–4B Telegram merge used when this policy is active.
+# progressive Tier 1–5A Telegram merge used when this policy is active.
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
 
 
