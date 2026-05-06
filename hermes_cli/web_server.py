@@ -136,6 +136,34 @@ def _require_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _powerunits_dashboard_observe_mode_active() -> bool:
+    """Optional Stage-1 HTTP hardening for Powerunits (same process as gateway).
+
+    When ``HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`` and
+    ``HERMES_POWERUNITS_DASHBOARD_MODE`` is an *observe* alias, reject mutating
+    HTTP methods under ``/api/`` so config/env/cron/skills changes go through
+    git/Railway/env or a deliberate policy choice instead of accidental UI drift.
+
+    Aliases are case-insensitive. WebSocket endpoints (embedded chat/event
+    bridges) are **not** covered — restrict exposure via network policy if
+    the dashboard must stay read-only end-to-end.
+
+    See ``docs/powerunits_runtime_v0_12_integration.md`` (Hermes Dashboard).
+    """
+    if os.environ.get("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() != "first_safe_v1":
+        return False
+    mode = os.environ.get("HERMES_POWERUNITS_DASHBOARD_MODE", "").strip().lower()
+    return mode in (
+        "observe",
+        "observability",
+        "readonly",
+        "read_only",
+        "read-only",
+        "stage1",
+        "stage_1",
+    )
+
+
 # Accepted Host header values for loopback binds. DNS rebinding attacks
 # point a victim browser at an attacker-controlled hostname (evil.test)
 # which resolves to 127.0.0.1 after a TTL flip — bypassing same-origin
@@ -230,6 +258,20 @@ async def auth_middleware(request: Request, call_next):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Unauthorized"},
+            )
+    if _powerunits_dashboard_observe_mode_active() and path.startswith("/api/"):
+        method = request.method.upper()
+        if method not in ("GET", "HEAD", "OPTIONS"):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": (
+                        "Powerunits dashboard observe mode: mutating HTTP API disabled "
+                        "(HERMES_POWERUNITS_DASHBOARD_MODE + "
+                        "HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1). "
+                        "See docs/powerunits_runtime_v0_12_integration.md § Hermes Dashboard."
+                    ),
+                },
             )
     return await call_next(request)
 

@@ -48,10 +48,45 @@ Already in this integration track:
 
 ## `HERMES_HOME` / `config.yaml` assumptions
 
-- **Single writable config:** `$HERMES_HOME/config.yaml` — edited by policy script on **every** gateway start when `first_safe_v1` is set (idempotent merge; preserves unknown top-level keys Hermes still reads).
-- **Curator:** Hermes v0.12 may add new defaults in templates; **policy** forces **off** when the key was never set — **Curator is still not “enabled in production” by policy**.
+- **Writable config:** `$HERMES_HOME/config.yaml` — when `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, [`docker/entrypoint.sh`](../docker/entrypoint.sh) runs [`apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py) on **every container start** and **rewrites policy-owned sections** (model/provider routing, `platform_toolsets`, `platforms`, `approvals`, `agent.reasoning_effort`, `command_allowlist`, `powerunits.runtime_policy`, `auxiliary.curator` / `redaction` defaults). **Other top-level keys** present in the file remain unless Hermes or the dashboard overwrites them separately.
+- **Curator:** Hermes v0.12 may add new defaults in templates; **policy** uses `setdefault` so **omitted** curator flag → **disabled**; an explicit `enabled: true` in `config.yaml` is **preserved** — do not set that via dashboard for Powerunits staging/production unless deliberately testing Curator.
 - **First-start / migration risks (v0.12):** session/store migrations (e.g. SQLite / FTS) may run on **first** gateway start after upgrade — allow a **longer health window** on staging; watch logs for migration errors, not only “listening”.
 - **Bounded tools:** unchanged contract — still gated by `gateway/run.py` + `first_safe_v1` toolsets and Repo B HTTP; runtime upgrade must not replace those files with narrower allowlists without explicit review.
+
+---
+
+## Hermes Dashboard (Powerunits) — persistence, boot reconcile, Stage 1
+
+The dashboard is served by the **same** Hermes process as the gateway when operators run `hermes dashboard` / the web UI stack; it is **not** a second agent runtime. Risk is **accidental persistence** under `$HERMES_HOME` that **outlives** what `first_safe_v1` rewrites on boot, or **in-process** drift until the next restart.
+
+### Paths the dashboard/API can persist to (typical)
+
+| Location | What writes there | Boot `apply_powerunits_runtime_policy` |
+|----------|-------------------|----------------------------------------|
+| `$HERMES_HOME/config.yaml` | `PUT /api/config`, `PUT /api/config/raw`, `POST /api/model/set`, `PUT /api/dashboard/theme`, `PUT /api/skills/toggle` (skills disabled list), setup/CLI | **Rewrites** policy-owned sections listed above; **does not** remove arbitrary keys. **Does not** reset `skills.*` disabled lists, plugins, or other untouched sections. |
+| `$HERMES_HOME/.env` | `PUT`/`DELETE` `/api/env` | **Not** modified by policy script — survives restarts; treat as operational truth alongside Railway env. |
+| `$HERMES_HOME/state.db` | gateway/sessions; `DELETE /api/sessions/...` | **Not** touched by policy — session/analytics data persists. |
+| `$HERMES_HOME/cron/jobs.json` (+ `cron/output/`) | `/api/cron/*` | **Not** touched — cron definitions can drift until manually removed. |
+| `$HERMES_HOME/logs/*` | runtime logging; log viewer is read-only | N/A |
+| `$HERMES_HOME/skills/` | skill install/sync flows (not the bounded Tier 4A draft tree) | Policy does not delete skills; entrypoint **skips** bundled skills sync when `first_safe_v1` is set. |
+
+### Post-boot reconciliation (what drifts vs what resets)
+
+- **After each container start with `first_safe_v1`:** Telegram **platform_toolsets** (including tier overlays from `HERMES_POWERUNITS_CAPABILITY_TIER`), model pin, disabled platforms, approvals/cron mode, curator/redaction defaults (via `setdefault`), and related fields match **policy**.
+- **Can still diverge across restarts until fixed:** `skills.disabled` or related skill toggles, `.env` contents from dashboard edits, `cron/jobs.json`, contents of `state.db`, and **any** `config.yaml` keys the policy script does not set (e.g. plugins) — plus **temporary** in-process changes (e.g. model pick) until the next restart reconciles policy-owned blocks.
+- **Explicit curator enablement** in YAML survives policy (`setdefault` only).
+
+### Optional HTTP observe mode (Stage 1 hardening)
+
+Set **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (aliases: `observability`, `readonly`, `read_only`, `read-only`, `stage1`, `stage_1`) **together with** `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`. The dashboard REST API then returns **403** for mutating HTTP methods under `/api/` (POST/PUT/PATCH/DELETE); **GET** (sessions list, logs, config read, toolset listing, analytics, etc.) stays available. **WebSockets** used for embedded chat/event bridges are **not** gated by this flag — restrict by network exposure if you require an end-to-end read-only surface.
+
+### Stage 1 / risky / off-limits (operator matrix)
+
+| Scope | Use |
+|--------|-----|
+| **Stage 1 (observability-first)** | Status/log/session **read** paths, analytics **read**, `GET` toolset listing, `GET` config/schema (for inspection), optional `HERMES_POWERUNITS_DASHBOARD_MODE=observe`. |
+| **Risky — only with discipline + runbook + eventual git/env sync** | Full settings UI, raw YAML editor, model picker, env editor, skill toggles, cron UI, gateway restart / `hermes update` from UI — each can cause **drift** or operational surprise relative to Repo B posture. |
+| **Off-limits for bounded Powerunits posture** | Enabling **Curator** or other **autonomous** maintainer paths, widening platforms/tooling beyond policy, pasting **production-write** or infra secrets into UI fields, relying on dashboard-only state as **canonical** policy (Repo B +Railway env + this repo remain truth). |
 
 ---
 
