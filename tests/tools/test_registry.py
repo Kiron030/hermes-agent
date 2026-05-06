@@ -1,4 +1,4 @@
-"""Tests for the central tool registry."""
+﻿"""Tests for the central tool registry."""
 
 import json
 import threading
@@ -351,6 +351,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_tier2_allowlisted_locals_tool",
             "tools.powerunits_tier3_skills_integration_tool",
             "tools.powerunits_tier4a_skill_draft_proposals_tool",
+            "tools.powerunits_tier4b_review_governance_tool",
             "tools.powerunits_timescale_read_tool",
             "tools.powerunits_workspace_tool",
             "tools.rl_training_tool",
@@ -415,17 +416,17 @@ class TestEmojiMetadata:
         reg = ToolRegistry()
         reg.register(
             name="t", toolset="s", schema=_make_schema(),
-            handler=_dummy_handler, emoji="🔥",
+            handler=_dummy_handler, emoji="ðŸ”¥",
         )
-        assert reg._tools["t"].emoji == "🔥"
+        assert reg._tools["t"].emoji == "ðŸ”¥"
 
     def test_get_emoji_returns_registered(self):
         reg = ToolRegistry()
         reg.register(
             name="t", toolset="s", schema=_make_schema(),
-            handler=_dummy_handler, emoji="🎯",
+            handler=_dummy_handler, emoji="ðŸŽ¯",
         )
-        assert reg.get_emoji("t") == "🎯"
+        assert reg.get_emoji("t") == "ðŸŽ¯"
 
     def test_get_emoji_returns_default_when_unset(self):
         reg = ToolRegistry()
@@ -433,13 +434,13 @@ class TestEmojiMetadata:
             name="t", toolset="s", schema=_make_schema(),
             handler=_dummy_handler,
         )
-        assert reg.get_emoji("t") == "⚡"
-        assert reg.get_emoji("t", default="🔧") == "🔧"
+        assert reg.get_emoji("t") == "âš¡"
+        assert reg.get_emoji("t", default="ðŸ”§") == "ðŸ”§"
 
     def test_get_emoji_returns_default_for_unknown_tool(self):
         reg = ToolRegistry()
-        assert reg.get_emoji("nonexistent") == "⚡"
-        assert reg.get_emoji("nonexistent", default="❓") == "❓"
+        assert reg.get_emoji("nonexistent") == "âš¡"
+        assert reg.get_emoji("nonexistent", default="â“") == "â“"
 
     def test_emoji_empty_string_treated_as_unset(self):
         reg = ToolRegistry()
@@ -447,7 +448,7 @@ class TestEmojiMetadata:
             name="t", toolset="s", schema=_make_schema(),
             handler=_dummy_handler, emoji="",
         )
-        assert reg.get_emoji("t") == "⚡"
+        assert reg.get_emoji("t") == "âš¡"
 
 
 class TestEntryLookup:

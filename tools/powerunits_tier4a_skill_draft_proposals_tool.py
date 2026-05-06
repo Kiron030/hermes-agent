@@ -274,6 +274,7 @@ def write_powerunits_skill_draft_proposal(
         "powerunits_tier_4a_proposal: true",
         "requires_human_review: true",
         "not_auto_applied: true",
+        "review_status: new",
         f"proposal_kind: {kind}",
         f"created_at_utc: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
         f"hermes_capability_tier_env_raw: {tier_raw!r}",

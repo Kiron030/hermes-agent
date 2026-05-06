@@ -3,9 +3,9 @@
 **Audience:** operators of the **internal Powerunits** Hermes (Repo A: `hermes-agent`).  
 **Canonical product truth:** **Repo B** — unchanged by this posture model.
 
-**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper operational docs: workspace exports **1A**, operator diagnostics **1B**, Tier-1 workspace **2A**, Tier-2 allowlisted locals **2B**, **Tier 3** skills integration (**capability env `3`**), **Tier 4A** skill draft proposals (**capability env `4`**) — cross-linked below.
+**This file is the single canonical roadmap** for staged Hermes capability expansion. Deeper operational docs: workspace exports **1A**, operator diagnostics **1B**, Tier-1 workspace **2A**, Tier-2 allowlisted locals **2B**, **Tier 3** skills integration (**capability env `3`**), **Tier 4A** skill draft proposals (**capability env `4`**), **Tier 4B** review-state + governance scaffolding (**capability env `5`**) — cross-linked below.
 
-**Phase 0 (established):** **rollback/tag contract**, **watcher checklist**, **`HERMES_POWERUNITS_CAPABILITY_TIER`** (**`0`** … **`4`** — **`≥ 1`** **2A**, **`≥ 2`** **2B**, **`≥ 3`** **Tier 3 skills overlay**, **`= 4`** **Tier 4A draft proposals** — see **`powerunits_capability_tier.py`**).
+**Phase 0 (established):** **rollback/tag contract**, **watcher checklist**, **`HERMES_POWERUNITS_CAPABILITY_TIER`** (**`0`** … **`5`** — **`≥ 1`** **2A**, **`≥ 2`** **2B**, **`≥ 3`** **Tier 3 skills overlay**, **`= 4`** **Tier 4A draft proposals**, **`= 5`** **Tier 4B governance/review-state** — see **`powerunits_capability_tier.py`**).
 
 **Phase 1A:** structured **`exports/`** posture + read-only summaries — § Phase 1A below.
 
@@ -18,6 +18,8 @@
 **Tier 3 — skills integration (capability env `3`):** **`powerunits_tier3_skills_integration`** — bounded observe/diagnose/propose-only tooling over **`SKILL.md`** inventory — § Tier 3 below; detail [**`powerunits_tier3_skills_integration_overlay_v1.md`**](powerunits_tier3_skills_integration_overlay_v1.md).
 
 **Tier 4A — skill draft proposals (capability env `4`):** **`powerunits_tier4a_skill_draft_proposals`** — bounded **workspace-only** writes of reviewable skill **draft** artifacts (never live **`skills/`**) — § Tier 4A below; detail [**`powerunits_tier4a_skill_draft_proposals_overlay_v1.md`**](powerunits_tier4a_skill_draft_proposals_overlay_v1.md).
+
+**Tier 4B — review-state + governance scaffolding (capability env `5`):** **`powerunits_tier4b_review_governance`** — bounded **review lifecycle** on Tier 4A drafts (`review_status` frontmatter) + **`hermes_workspace/governance/`** operator notes — § Tier 4B below; detail [**`powerunits_tier4b_review_governance_overlay_v1.md`**](powerunits_tier4b_review_governance_overlay_v1.md).
 
 ---
 
@@ -37,8 +39,9 @@
 | [**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md) | **Phase 2B** Tier-2 allowlisted locals — thresholds/watchers/rollback only. |
 | [**`powerunits_tier3_skills_integration_overlay_v1.md`**](powerunits_tier3_skills_integration_overlay_v1.md) | **Tier 3** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 3`**) bounded skills observer + proposal JSON — Curator posture, rollback. |
 | [**`powerunits_tier4a_skill_draft_proposals_overlay_v1.md`**](powerunits_tier4a_skill_draft_proposals_overlay_v1.md) | **Tier 4A** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 4`**) bounded workspace skill **draft** artifacts — watch signals, rollback. |
+| [**`powerunits_tier4b_review_governance_overlay_v1.md`**](powerunits_tier4b_review_governance_overlay_v1.md) | **Tier 4B** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 5`**) review-state workflow + **`governance/`** scaffolding — rollback = tier 4. |
 
-**Capability-tier env (**`HERMES_POWERUNITS_CAPABILITY_TIER`):** **`0`**–**`4`**. Policy merge (after **`powerunits_workspace`**): strip overlay toolsets not implied by tier; **`≥ 1`** inserts **2A**; **`≥ 2`** inserts **2B** after **2A**; **`≥ 3`** inserts **Tier 3** **`powerunits_tier3_skills_integration`** after **2B**; **`= 4`** inserts **Tier 4A** **`powerunits_tier4a_skill_draft_proposals`** after **Tier 3**. Tool **`check_fn`** gates align. **`powerunits_capability_tier.py`**.
+**Capability-tier env (**`HERMES_POWERUNITS_CAPABILITY_TIER`):** **`0`**–**`5`**. Policy merge (after **`powerunits_workspace`**): strip overlay toolsets not implied by tier; **`≥ 1`** inserts **2A**; **`≥ 2`** inserts **2B** after **2A**; **`≥ 3`** inserts **Tier 3** **`powerunits_tier3_skills_integration`** after **2B**; **`≥ 4`** inserts **Tier 4A** **`powerunits_tier4a_skill_draft_proposals`** after **Tier 3**; **`= 5`** inserts **Tier 4B** **`powerunits_tier4b_review_governance`** immediately after **Tier 4A**. Tool **`check_fn`** gates align. **`powerunits_capability_tier.py`**.
 
 **Naming:** **Capability env `3`** (Tier 3 skills tools) is **not** the same as the **conceptual** roadmap bucket **`tier3`** below (historic “curator product era” phrasing) — see § distinction there.
 
@@ -60,6 +63,7 @@
 - **Phase 2B (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER ≥ 2`):** **`powerunits_tier2_allowlisted_read`** — allowlisted locals read/summarize/search + extended workspace text types [**detail**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md). **`tier → 1`** drops **2B** only; **`tier → 0`** drops **2A+2B** (and Tier 3 cannot apply).
 - **Tier 3 skills integration (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER = 3`):** **`powerunits_tier3_skills_integration`** — observe/diagnose/propose JSON + bounded **`SKILL.md`** preview; **no** tool-level merges [**detail**](powerunits_tier3_skills_integration_overlay_v1.md). **`tier → 2`** drops **Tier 3** only.
 - **Tier 4A skill draft proposals (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER = 4`):** **`powerunits_tier4a_skill_draft_proposals`** — materialize **review-only** draft files **only** under **`hermes_workspace/drafts/powerunits_skill_proposals`**; **no** live **`$HERMES_HOME/skills`** writes [**detail**](powerunits_tier4a_skill_draft_proposals_overlay_v1.md). **`tier → 3`** drops **Tier 4A** only (Tier 3 observer remains).
+- **Tier 4B review + governance (live experiment; `HERMES_POWERUNITS_CAPABILITY_TIER = 5`):** **`powerunits_tier4b_review_governance`** — **`review_status`** lifecycle on Tier 4A drafts + bounded **`hermes_workspace/governance/**`** notes; **no** live skill writes, **no** auto-promotion [**detail**](powerunits_tier4b_review_governance_overlay_v1.md). **`tier → 4`** drops **Tier 4B** only (Tier 4A drafts tools remain).
 - **Still deferred:** Unbounded skill hub exposure on Telegram, silent merge agents, Repo B–authoritative skill truth, any overlay **without** watcher bullets in **this** file.
 - **Must not:** Weaken Repo B as source of truth; enable Curator writes; widen bounded family semantics without Repo B governance.
 
@@ -140,13 +144,14 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | **Phase 2B allowlisted-local analytics (when `tier ≥ 2`)** | Sample **`summarize_powerunits_allowlisted_locals`** after **`powerunits_local_reference`** drops or **`*.json`/`*.yaml`** growth; **`tier2_locals_full_scan_cap`** → prune or **`subdir`** work ([**`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`**](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md)). |
 | **Tier 3 skills observer (`tier = 3`)** | **`summarize_powerunits_skills_observer`** / **`diagnose_*`** / **`propose_*`** — duplicate/stale/proposal-volume signals; keep **`auxiliary.curator`** posture explicit ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)). |
 | **Tier 4A draft proposals (`tier = 4`)** | **`review_powerunits_skill_draft_proposals`** / **`summarize_powerunits_skill_draft_proposals`** / posture **`tier4a_drafts_watch:*`** — draft volume/stale/churn; confirm no drift (**[`tier4a`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)**). |
+| **Tier 4B governance lane (`tier = 5`)** | **`summarize_powerunits_tier4b_governance_lane`** / **`review_powerunits_tier4b_skill_drafts`** — **`review_status`** rollup, unresolved/stale hints, governance clutter (**[`tier4b`](powerunits_tier4b_review_governance_overlay_v1.md)**). |
 | **Workspace / export hygiene** | Disk under `HERMES_HOME` / `hermes_workspace/exports` not growing without cause; no unexpected world-writable paths; **Phase 1A:** run **`summarize_powerunits_workspace_exports`** after material export work and archive or delete stale files per [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md). |
 | **Posture snapshot (env + exports subset)** | **`summarize_powerunits_operator_posture`** (Phase 1B) — quick JSON fingerprint before tier uplift; see [**`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md). |
 | **Curator** | **`enabled: false`** for `tier0`; any deviation is **explicit** and documented (not drift). |
 
 **Caution triggers:** Passing smoke regressions, new HTTP 400/422 patterns on LLM routes, unexplained Telegram tool errors, curator directories appearing when supposed off.
 
-**Phase 1B posture rollup:** Non-empty **`caution_flags`** → reconcile env, curator, Telegram overlays (**`phase_2a_*`**, **`phase_2b_*`**, **`tier3_skills_drift*`** / **`tier3_curator_*`**, **`tier4a_*`**) (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)).
+**Phase 1B posture rollup:** Non-empty **`caution_flags`** → reconcile env, curator, Telegram overlays (**`phase_2a_*`**, **`phase_2b_*`**, **`tier3_skills_drift*`** / **`tier3_curator_*`**, **`tier4a_*`**, **`tier4b_*`**) (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)).
 
 **Phase 2A rollback triggers:** Repeated **`workspace_full_scan_cap`** failures, unintended multi-gigabyte text drops into **`hermes_workspace`**, or unexplained spikes in **`search_powerunits_workspace_text`** scan caps → **set tier to `0`, restart gateway, re-run policy** (see [**Phase 2A detail**](powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md)).
 
@@ -155,6 +160,8 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 **Tier 3 rollback triggers:** recurring **`tier3_skills_drift*`**, runaway **`proposal_count`** churn without human triage, or **`tier3_curator_autonomous_path_enabled`** without staffed review → **`HERMES_POWERUNITS_CAPABILITY_TIER≤2`**, policy + restart ([**Tier 3 detail**](powerunits_tier3_skills_integration_overlay_v1.md)).
 
 **Tier 4A rollback triggers:** recurring **`tier4a_skill_drafts_drift*`**, runaway **`tier4a_drafts_watch:*`** churn, or unintended **live-`skills/`** edits (should **never** occur via Tier 4A tools — investigate) → **`HERMES_POWERUNITS_CAPABILITY_TIER=3`**, policy + restart ([**Tier 4A detail**](powerunits_tier4a_skill_draft_proposals_overlay_v1.md)).
+
+**Tier 4B rollback triggers:** recurring **`tier4b_governance_drift*`**, runaway **`tier4b_governance_watch:*`**, or confusion between **accepted_for_promotion** drafts and live skills → **`HERMES_POWERUNITS_CAPABILITY_TIER=4`**, policy + restart (**[`Tier 4B detail`](powerunits_tier4b_review_governance_overlay_v1.md)**) — **no** migration; governance files remain on disk.
 
 **Phase 1A export sprawl (lightweight):** use summary tool **`caution`** hints (file count / total bytes / large single file). **Suspicious** = growth with no correlated operator task, many tiny CSVs from retries, or disk pressure on the Railway volume — see [**`powerunits_workspace_phase1_exports_v1.md`**](powerunits_workspace_phase1_exports_v1.md) § Watcher.
 
@@ -182,8 +189,8 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 | Item | Contract |
 |------|----------|
 | **Tool** | **`summarize_powerunits_operator_posture`** (`toolset` **`powerunits_operator_posture`**, Telegram allowlist aligned with **`first_safe_v1`** alongside other bounded toolsets). |
-| **Reads** | Env + **`auxiliary.curator.enabled`** + Telegram observation (**2A/2B/Tier 3/Tier 4A** drift) + Phase **1A** export subset + Tier **4A** draft watch rollup when **`tier ≥ 4`**. |
-| **Watchers** | JSON **`caution_flags`** including **`tier3_*`** when **`tier ≥ 3`**, **`tier4a_*`** when **`tier ≥ 4`**, and Curator cautions when **`auxiliary.curator.enabled`** is **true** (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)). |
+| **Reads** | Env + **`auxiliary.curator.enabled`** + Telegram observation (**2A/2B/Tier 3/Tier 4A/Tier 4B** drift) + Phase **1A** export subset + Tier **4A** draft watch when **`tier ≥ 4`** + Tier **4B** governance lane when **`tier ≥ 5`**. |
+| **Watchers** | JSON **`caution_flags`** including **`tier3_*`** when **`tier ≥ 3`**, **`tier4a_*`** when **`tier ≥ 4`**, **`tier4b_*`** when **`tier ≥ 5`**, and Curator cautions when **`auxiliary.curator.enabled`** is **true** (**[`powerunits_operator_posture_diagnostics_v1.md`**](powerunits_operator_posture_diagnostics_v1.md)). |
 | **Rollback** | Remove tool via Repo A revert; **no persistent side effects** from invoking the tool itself. |
 
 **Frozen in Phase 1B:** No bounded family widen; no curator or self-improvement **writes**; no Repo B authority shift.
@@ -245,13 +252,28 @@ Keep this **manual or log-based** in Phase 0; automation can come later.
 
 ---
 
+## Tier 4B — review-state + governance scaffolding (capability env `5`)
+
+**Intent:** Move from **“drafts exist”** to **“drafts carry explicit review state + operator governance workspace structure”** — still **no** live **`skills/`** mutation, **no** silent promotion. **Tier 5** adds only the **`powerunits_tier4b_review_governance`** toolset **after** Tier 4A.
+
+| Item | Contract |
+|------|----------|
+| **Gate** | **`HERMES_POWERUNITS_CAPABILITY_TIER = 5`** at policy apply + gateway boot. **`tier ≤ 4`** omits **`powerunits_tier4b_review_governance`** from Telegram. |
+| **Review states** | Frontmatter **`review_status`**: **`new`**, **`under_review`**, **`needs_revision`**, **`accepted_for_promotion`**, **`rejected`** (default **`new`** on Tier 4A writes Tier ≥ 4; missing/invalid read as **`new`** in Tier 4B summaries). |
+| **Writes** | **`set_powerunits_skill_draft_review_status`** patches **YAML frontmatter** on existing proposal files only; **`append_powerunits_governance_note`** / **`ensure_powerunits_governance_workspace`** under **`hermes_workspace/governance/`** (allowlisted subdirs — see detail doc). |
+| **Toolset** | **`powerunits_tier4b_review_governance`** — manifest, ensure scaffold, set status, governance list/read/append, summarize lane, filtered review board (**[`detail`](powerunits_tier4b_review_governance_overlay_v1.md)**). |
+| **Observers** | Posture **`phase_tier4b_governance_read_only`**, **`tier4b_governance_drift*`**, **`tier4b_governance_watch_read_only`** (soft flags — **[`operator posture doc`](powerunits_operator_posture_diagnostics_v1.md)**). |
+| **Rollback** | Set **`HERMES_POWERUNITS_CAPABILITY_TIER=4`**; **`apply_policy`**, restart — Tier 4A remains; **no** state migration required. |
+
+---
+
 ## Phase 0 outcome summary
 
 Phase 0 **establishes:** tier vocabulary + placeholders (now **tier1** has first concrete slice), rollback/tag contract, watchlist, and **`HERMES_POWERUNITS_CAPABILITY_TIER`** log label.
 
 Phase 1A **adds:** export posture documentation + non-invasive read-only summarization + pointer file (bounded-safe).
 
-**Phase 1B adds:** read-only posture diagnostics + drift signals (**2A / 2B / Tier 3 / Tier 4A** Telegram alignment + Curator posture signals).
+**Phase 1B adds:** read-only posture diagnostics + drift signals (**2A / 2B / Tier 3 / Tier 4A / Tier 4B** Telegram alignment + Curator posture signals).
 
 **Phase 2A adds:** gated **`powerunits_tier1_analysis`** read-heavy workspace summary + substring search (**no writes**, **no Repo B widen**).
 
@@ -261,12 +283,14 @@ Phase 1A **adds:** export posture documentation + non-invasive read-only summari
 
 **Tier 4A adds:** gated **`powerunits_tier4a_skill_draft_proposals`** — workspace-only draft file materialization for human review (**no live skill tree writes**).
 
-**Fallback ladder:** **`4 → 3`** drops Tier 4A only; **`3 → 2`** drops Tier 3 only; **`2 → 1`** drops **2B**; **`1 → 0`** drops **2A** (**policy re-apply + restart**).
+**Tier 4B adds:** gated **`powerunits_tier4b_review_governance`** — review-state workflow on drafts + **`governance/`** scaffolding (**no** auto-promotion).
 
-## Next roadmap steps (after Tier 4A draft proposals)
+**Fallback ladder:** **`5 → 4`** drops Tier 4B only; **`4 → 3`** drops Tier 4A only; **`3 → 2`** drops Tier 3 only; **`2 → 1`** drops **2B**; **`1 → 0`** drops **2A** (**policy re-apply + restart**).
 
-- **Later:** tighter integration with **`skill_manage`** behind **explicit** approvals (not Tier 3/4A); broader skill hub tooling only with roadmap bullets here.
+## Next roadmap steps (after Tier 4B governance lane)
+
+- **Later:** scripted promotion helpers **behind explicit human gates** (not silent merge); integration with **`skill_manage`** only with separate sign-off.
 - **Conceptual LLM routing (`tier2`)** remains **deferred**.
-- **Full autonomous skill product / silent merge narratives** remain **explicitly out of scope** for Powerunits staged Hermes absent separate governance.
+- **Full workflow engine / multi-agent control plane** remains **deferred** — Tier 4B is **scaffolding + review support** only.
 
 **Intentionally unchanged:** Repo B canonicality, **`gateway/run.py`** bounded lockdown ethos, **`first_safe_v1`** default **Curator off** on fresh policy merges absent deliberate override.

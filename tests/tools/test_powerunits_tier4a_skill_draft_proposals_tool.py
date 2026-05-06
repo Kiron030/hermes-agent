@@ -45,6 +45,7 @@ def test_write_list_read_roundtrip(t4, tmp_path: Path) -> None:
     body = json.loads(t4.read_powerunits_skill_draft_proposal(relative_file_path=rel))
     assert "# Draft skill" in body["body"]
     assert "powerunits_tier_4a_proposal" in body["body"]
+    assert "review_status: new" in body["body"]
 
 
 def test_summarize_empty(t4) -> None:
