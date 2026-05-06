@@ -28,7 +28,8 @@
 | `docs/powerunits_workspace_phase1_exports_v1.md` | Phase 1A **exports** conventions, thresholds, read-only **`summarize_powerunits_workspace_exports`**. |
 | `docs/powerunits_tier3_skills_integration_overlay_v1.md` | **Tier 3** **`powerunits_tier3_skills_integration`** (**`HERMES_POWERUNITS_CAPABILITY_TIER=3`** + policy). |
 | `docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md` | **Tier 4A** **`powerunits_tier4a_skill_draft_proposals`** (**`HERMES_POWERUNITS_CAPABILITY_TIER=4`** + policy). |
-| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, **2A / 2B / Tier 3 / Tier 4A** Telegram drift flags). |
+| `docs/powerunits_tier4b_review_governance_overlay_v1.md` | Tier **4B** review-state + governance workspace (**`HERMES_POWERUNITS_CAPABILITY_TIER=5`**); rollback = set tier **4**. |
+| `docs/powerunits_operator_posture_diagnostics_v1.md` | Phase 1B read-only **`summarize_powerunits_operator_posture`** (JSON semantics, watcher rollup, **2A / 2B / Tier 3 / Tier 4A / Tier 4B** Telegram drift flags). |
 | `docs/powerunits_phase2a_tier1_workspace_analysis_overlay_v1.md` | Phase 2A Tier-1 **`powerunits_tier1_analysis`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥1`** + policy merge). |
 | `docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md` | Phase **2B** **`powerunits_tier2_allowlisted_read`** (requires **`HERMES_POWERUNITS_CAPABILITY_TIER≥2`** + policy merge). |
 | `docs/powerunits_hermes_upgrade_playbook.md` | **All Hermes bumps:** branch hygiene, staging-first, tag vs `main`, Railway verification, Curator posture, `think`/`extra_body` lesson (cross-links v0.12 docs). |
@@ -237,6 +238,23 @@ Use **`read_powerunits_repo_b_allowlisted`** (not `read_powerunits_doc`). Doc ma
 - [ ] **Repo B read:** unknown key and disabled gate — covered in **Bounded Repo B read** above (avoid duplicating full matrix here).
 
 ---
+
+
+
+---
+
+## Tier 4B review governance (optional smoke; `HERMES_POWERUNITS_CAPABILITY_TIER >= 5`)
+
+Only when Tier **4A** skill drafts are already enabled and operators want the **4B** review-state + governance scaffolding layer:
+
+- [ ] **`HERMES_POWERUNITS_CAPABILITY_TIER=5`** (or the roadmap max tier) on the gateway process.
+- [ ] Telegram merged toolsets include **`powerunits_tier4b_review_governance`** **after** **`powerunits_tier4a_skill_draft_proposals`** (policy: `docker/apply_powerunits_runtime_policy.py`).
+- [ ] Positive: **`manifest_powerunits_tier4b_governance_scope`** returns JSON with bounded paths and safety flags (**no** live **`skills/`** writes).
+- [ ] **`ensure_powerunits_governance_workspace`** creates only documented **`hermes_workspace/governance/*`** subtrees (see Tier 4B overlay doc).
+- [ ] **`review_powerunits_tier4b_skill_drafts`** shows **`review_status`** rollups; **`set_powerunits_skill_draft_review_status`** updates **frontmatter only** on Tier 4A proposal files.
+- [ ] **`summarize_powerunits_tier4b_governance_lane`** / posture **`tier4b_governance_watch_read_only`** — soft cautions only (unresolved queue, stale reviews, governance clutter); **no** auto-apply.
+
+**Rollback (Tier 4B only):** set **`HERMES_POWERUNITS_CAPABILITY_TIER=4`** so policy drops **`powerunits_tier4b_review_governance`**; **4A** stays enabled. No migration; artifacts remain on disk.
 
 ## Rollback basics
 

@@ -18,6 +18,8 @@ This is intentionally narrow:
   after Phase 2B; **tier below 3** strips that toolset (**lower tiers** unchanged in their own overlay rules).
 - **Tier 4A (skill draft proposals):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 4``, append **``powerunits_tier4a_skill_draft_proposals``**
   after Tier 3; **tier below 4** strips it (**writes only** under **``hermes_workspace/drafts/powerunits_skill_proposals``**).
+- **Tier 4B (review + governance scaffolding):** when ``HERMES_POWERUNITS_CAPABILITY_TIER >= 5``, append **``powerunits_tier4b_review_governance``**
+  after Tier 4A; **tier below 5** strips it (bounded ``hermes_workspace/governance/**`` + **Tier 4A draft frontmatter** review fields).
 """
 
 from __future__ import annotations
@@ -83,11 +85,12 @@ POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM = (
     "powerunits_tier2_allowlisted_read",
     "powerunits_tier3_skills_integration",
     "powerunits_tier4a_skill_draft_proposals",
+    "powerunits_tier4b_review_governance",
 )
 
 
 def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[str]:
-    """Telegram toolset list with Phase 2A/2B/Tier-3/Tier-4A overlays inserted after ``powerunits_workspace`` per tier."""
+    """Telegram toolset with progressive overlays after ``powerunits_workspace`` (incl. Tier 4B at 5)."""
     tier = _read_powerunits_capability_tier()
     tg = [x for x in base if x not in POWERUNITS_PHASE_OVERLAY_TOOLSETS_TELEGRAM]
     try:
@@ -101,6 +104,8 @@ def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[
             tg.append("powerunits_tier3_skills_integration")
         if tier >= 4:
             tg.append("powerunits_tier4a_skill_draft_proposals")
+        if tier >= 5:
+            tg.append("powerunits_tier4b_review_governance")
         return tg
     insert_pos = wi + 1
     if tier >= 1:
@@ -114,17 +119,20 @@ def _telegram_allowlist_with_capability_phase_overlays(base: list[str]) -> list[
         insert_pos += 1
     if tier >= 4:
         tg.insert(insert_pos, "powerunits_tier4a_skill_draft_proposals")
+        insert_pos += 1
+    if tier >= 5:
+        tg.insert(insert_pos, "powerunits_tier4b_review_governance")
     return tg
 
 
 def _read_powerunits_capability_tier() -> int:
-    """Tier 0..4 from ``HERMES_POWERUNITS_CAPABILITY_TIER`` (same rules as ``powerunits_capability_tier.py``)."""
+    """Tier 0..5 from ``HERMES_POWERUNITS_CAPABILITY_TIER`` (same rules as ``powerunits_capability_tier.py``)."""
     raw = os.environ.get("HERMES_POWERUNITS_CAPABILITY_TIER", "0").strip()
     try:
         v = int(raw, 10)
     except ValueError:
         return 0
-    return max(0, min(4, v))
+    return max(0, min(5, v))
 
 
 DISABLED_PLATFORMS = [
