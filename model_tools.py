@@ -31,61 +31,9 @@ from tools.registry import discover_builtin_tools, registry
 from toolsets import resolve_toolset, validate_toolset
 
 logger = logging.getLogger(__name__)
+# See ``powerunits_telegram_overlays.expected_telegram_toolsets_first_safe`` for the
+# progressive Tier 1–4B Telegram merge used when this policy is active.
 _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
-# Clarify is omitted: gateway Telegram has no interactive clarify callback, which
-# caused models to loop on failed clarify calls instead of using safe tools.
-_POWERUNITS_ALLOWED_TOOLSETS = (
-    "memory",
-    "session_search",
-    "todo",
-    "powerunits_docs",
-    "powerunits_github_docs",
-    "powerunits_operator_posture",
-    "powerunits_workspace",
-    "powerunits_tier1_analysis",
-    "powerunits_tier2_allowlisted_read",
-    "powerunits_tier3_skills_integration",
-    "powerunits_tier4a_skill_draft_proposals",
-    "powerunits_tier4b_review_governance",
-    "powerunits_timescale_read",
-    "powerunits_repo_b_read",
-    "powerunits_option_d_preflight",
-    "powerunits_option_d_execute",
-    "powerunits_option_d_validate",
-    "powerunits_option_d_readiness",
-    "powerunits_option_d_summary",
-    "powerunits_market_features_bounded_de_execute",
-    "powerunits_market_features_bounded_de_validate",
-    "powerunits_market_features_bounded_de_readiness",
-    "powerunits_market_features_bounded_de_summary",
-    "powerunits_market_driver_features_bounded_de_execute",
-    "powerunits_market_driver_features_bounded_de_validate",
-    "powerunits_market_driver_features_bounded_de_readiness",
-    "powerunits_market_driver_features_bounded_de_summary",
-    "powerunits_entsoe_market_bounded_preflight",
-    "powerunits_entsoe_market_bounded_execute",
-    "powerunits_entsoe_market_bounded_validate",
-    "powerunits_entsoe_market_bounded_summary",
-    "powerunits_entsoe_market_bounded_campaign",
-    "powerunits_entsoe_market_bounded_coverage_scan",
-    "powerunits_entsoe_forecast_bounded_preflight",
-    "powerunits_entsoe_forecast_bounded_execute",
-    "powerunits_entsoe_forecast_bounded_validate",
-    "powerunits_entsoe_forecast_bounded_summary",
-    "powerunits_outage_awareness_bounded_validate",
-    "powerunits_outage_awareness_bounded_summary",
-    "powerunits_outage_repair_bounded_execute",
-    "powerunits_era5_weather_bounded_preflight",
-    "powerunits_era5_weather_bounded_execute",
-    "powerunits_era5_weather_bounded_validate",
-    "powerunits_era5_weather_bounded_summary",
-    "powerunits_era5_weather_bounded_campaign",
-    "powerunits_era5_weather_bounded_coverage_scan",
-    "powerunits_bounded_coverage_inventory",
-    "powerunits_bounded_rollout_governance",
-    "powerunits_baseline_layer_preview",
-    "powerunits_de_stack_remediation_planner",
-)
 
 
 # =============================================================================
@@ -313,8 +261,11 @@ def get_tool_definitions(
     # Powerunits first-safe runtime lockdown: hard-cap the final callable
     # tool surface regardless of upstream defaults or caller-provided toolsets.
     if os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip() == _POWERUNITS_FIRST_SAFE_POLICY:
+        from powerunits_capability_tier import read_powerunits_capability_tier
+        from powerunits_telegram_overlays import expected_telegram_toolsets_first_safe
+
         allowed_tools: set[str] = set()
-        for ts_name in _POWERUNITS_ALLOWED_TOOLSETS:
+        for ts_name in expected_telegram_toolsets_first_safe(read_powerunits_capability_tier()):
             allowed_tools.update(resolve_toolset(ts_name))
         tools_to_include.intersection_update(allowed_tools)
 

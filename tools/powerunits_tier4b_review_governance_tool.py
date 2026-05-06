@@ -24,6 +24,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from powerunits_skill_draft_review_contract import (
+    REVIEW_STATUSES,
+    REVIEW_STATUS_VALUES,
+    validate_review_status,
+)
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -43,9 +48,6 @@ _GOVERNANCE_SUBDIRS = (
     "skill_integration_tests",
 )
 _UNRESOLVED_STATUSES = frozenset({"new", "under_review", "needs_revision"})
-_REVIEW_STATUSES = frozenset(
-    {"new", "under_review", "needs_revision", "accepted_for_promotion", "rejected"}
-)
 _STALE_UNRESOLVED_DAYS = 14
 _CAUTION_GOVERNANCE_FILES = 180
 _CAUTION_UNRESOLVED = 35
@@ -196,12 +198,18 @@ def manifest_powerunits_tier4b_governance_scope(**_: Any) -> str:
         {
             "read_only": True,
             "tier": "4b_review_governance",
+            "tool_surface": "manifest_tier4b_governance_not_tier4a_drafts",
+            "distinct_from": [
+                "manifest_powerunits_tier4a_skill_draft_scope",
+                "summarize_powerunits_era5_weather_bounded_window",
+                "list_hermes_workspace",
+            ],
             "governance_root_relative": "governance",
             "governance_root_resolved": str(gov),
             "governance_subdirs": list(_GOVERNANCE_SUBDIRS),
             "proposals_root_for_status_patches_relative": "drafts/powerunits_skill_proposals",
             "proposals_root_resolved": str(proposals),
-            "review_status_values": sorted(_REVIEW_STATUSES),
+            "review_status_values": sorted(REVIEW_STATUSES),
             "live_skills_directory_never_written": str(
                 (Path(os.getenv("HERMES_HOME", "/opt/data")) / "skills").resolve()
             ),
@@ -269,11 +277,15 @@ def set_powerunits_skill_draft_review_status(
             error_code="tier_gate",
         )
     st = str(review_status or "").strip()
-    if st not in _REVIEW_STATUSES:
+    normalized, err = validate_review_status(st)
+    if err:
+        return tool_error(err, error_code="invalid_review_status")
+    if not normalized:
         return tool_error(
-            f"review_status must be one of:{sorted(_REVIEW_STATUSES)}",
+            "review_status required (see review_status_values on Tier 4B manifest)",
             error_code="invalid_review_status",
         )
+    st = normalized
     note = str(operator_note_one_line or "").strip().replace("\r", "").replace("\n", " ")
     if len(note) > 500:
         return tool_error("operator_note_one_line too long (max 500)", error_code="limit_exceeded")
@@ -386,6 +398,10 @@ def append_powerunits_governance_note(
             "read_only": False,
             "tier": "4b_review_governance",
             "path_relative_to_governance": target.relative_to(gov).as_posix(),
+            "governance_note_convention": (
+                "Notes live under hermes_workspace/governance/... "
+                "(see manifest_powerunits_tier4b_governance_scope)."
+            ),
             "bytes_appended": len(block.encode("utf-8")),
             "doc_hint": "docs/powerunits_tier4b_review_governance_overlay_v1.md",
         },
@@ -475,8 +491,15 @@ def list_powerunits_governance_workspace(
         {
             "read_only": True,
             "tier": "4b_review_governance",
+            "governance_root_relative": "governance",
+            "governance_root_resolved": str(gov),
             "listing_truncated": len(rows) >= _GOV_LIST_CAP,
             "entries": rows,
+            "operator_note": (
+                "Paths are relative to hermes_workspace/governance/. "
+                "Use review_decisions/, incidents/, automation_logs/, experiments/, "
+                "skill_integration_tests/ — not list_hermes_workspace."
+            ),
             "doc_hint": "docs/powerunits_tier4b_review_governance_overlay_v1.md",
         },
         ensure_ascii=False,
@@ -502,10 +525,11 @@ def summarize_powerunits_tier4b_governance_lane(**_: Any) -> str:
     proposals = _ensure_proposals_tree()
     gov = _governance_root()
 
-    status_counts: dict[str, int] = {s: 0 for s in _REVIEW_STATUSES}
+    status_counts: dict[str, int] = {s: 0 for s in REVIEW_STATUSES}
     unresolved = 0
     stale_unresolved = 0
     contradictory = 0
+    invalid_review_status_files = 0
     now = datetime.now(timezone.utc)
 
     files = _iter_proposal_files(proposals, exclude_bootstrap_pointer=True)
@@ -518,7 +542,10 @@ def summarize_powerunits_tier4b_governance_lane(**_: Any) -> str:
             continue
         fm, _md = _split_tier4a_frontmatter(raw)
         rs_raw = str(fm.get("review_status") or "").strip()
-        if not rs_raw or rs_raw not in _REVIEW_STATUSES:
+        if not rs_raw:
+            rs = "new"
+        elif rs_raw not in REVIEW_STATUSES:
+            invalid_review_status_files += 1
             rs = "new"
         else:
             rs = rs_raw
@@ -563,6 +590,8 @@ def summarize_powerunits_tier4b_governance_lane(**_: Any) -> str:
                     break
 
     caution: list[str] = []
+    if invalid_review_status_files:
+        caution.append(f"tier4b_invalid_review_status_in_draft_files:{invalid_review_status_files}")
     if unresolved >= _CAUTION_UNRESOLVED:
         caution.append(f"tier4b_unresolved_draft_count_high:{unresolved}>={_CAUTION_UNRESOLVED}")
     if stale_unresolved >= _CAUTION_STALE_UNRESOLVED:
@@ -580,7 +609,9 @@ def summarize_powerunits_tier4b_governance_lane(**_: Any) -> str:
         {
             "read_only": True,
             "tier": "4b_review_governance",
+            "tool_surface": "tier4b_governance_lane_summary_not_weather_not_roadmap",
             "proposal_review_status_counts": dict(sorted(status_counts.items())),
+            "invalid_review_status_in_draft_files_count": invalid_review_status_files,
             "proposals_unresolved_active_count": unresolved,
             "proposals_unresolved_stale_est_count": stale_unresolved,
             "stale_unresolved_days_threshold": _STALE_UNRESOLVED_DAYS,
@@ -624,8 +655,11 @@ def review_powerunits_tier4b_skill_drafts(
         cap = 100
 
     rs_f = str(review_status_filter or "").strip()
-    if rs_f and rs_f not in _REVIEW_STATUSES:
-        return tool_error("invalid review_status_filter", error_code="invalid_filter")
+    if rs_f:
+        nfilter, ferr = validate_review_status(rs_f)
+        if ferr or not nfilter:
+            return tool_error(ferr or "invalid review_status_filter", error_code="invalid_filter")
+        rs_f = nfilter
     tgt_sub = str(target_skill_substring or "").strip().casefold()
     kind_f = str(proposal_kind_filter or "").strip()
 
@@ -641,8 +675,17 @@ def review_powerunits_tier4b_skill_drafts(
             continue
         head = _read_head_text(fp, _MAX_REVIEW_HEAD_BYTES)
         fm, md_rest = _split_tier4a_frontmatter(head)
-        rs = str(fm.get("review_status") or "").strip() or "new"
-        if rs_f and rs != rs_f:
+        rs_raw = str(fm.get("review_status") or "").strip()
+        if not rs_raw:
+            rs_effective = "new"
+            rs_invalid = False
+        elif rs_raw in REVIEW_STATUSES:
+            rs_effective = rs_raw
+            rs_invalid = False
+        else:
+            rs_effective = "new"
+            rs_invalid = True
+        if rs_f and rs_effective != rs_f:
             continue
         kind_meta = str(fm.get("proposal_kind") or "").strip()
         tgt_meta = str(fm.get("target_skill_name") or "").strip()
@@ -655,7 +698,9 @@ def review_powerunits_tier4b_skill_drafts(
             {
                 "relative_path": fp.relative_to(proposals).as_posix(),
                 "mtime_utc": mdt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "review_status": rs,
+                "review_status": rs_effective,
+                "review_status_raw_in_file": rs_raw or None,
+                "review_status_invalid_in_file": rs_invalid,
                 "review_status_updated_at_utc": fm.get("review_status_updated_at_utc"),
                 "proposal_kind": kind_meta or None,
                 "target_skill_name": tgt_meta or None,
@@ -695,7 +740,11 @@ def review_powerunits_tier4b_skill_drafts(
 
 MANIFEST_SCHEMA = {
     "name": "manifest_powerunits_tier4b_governance_scope",
-    "description": "Tier>=5: bounded Tier 4B roots, review statuses, caps.",
+    "description": (
+        "Tier 4B ONLY (tier>=5). Returns JSON with tier 4b_review_governance + governance/ roots — "
+        "do NOT call manifest_powerunits_tier4a_skill_draft_scope for this. "
+        "Distinct from ERA5/weather summaries and generic workspace listing."
+    ),
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
 ENSURE_SCHEMA = {
@@ -706,14 +755,18 @@ ENSURE_SCHEMA = {
 SET_STATUS_SCHEMA = {
     "name": "set_powerunits_skill_draft_review_status",
     "description": (
-        "Tier>=5: patch review_status (+ timestamp, optional note) on one Tier 4A draft; "
-        "never touches live skills."
+        "Tier 4B (tier>=5): set review_status on ONE Tier 4A draft under "
+        "drafts/powerunits_skill_proposals/** (frontmatter only). "
+        "Allowed statuses are enum-only; invalid values are rejected. Never writes live skills/."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "relative_file_path": {"type": "string"},
-            "review_status": {"type": "string"},
+            "relative_file_path": {
+                "type": "string",
+                "description": "Path relative to drafts/powerunits_skill_proposals (Tier 4A tree).",
+            },
+            "review_status": {"type": "string", "enum": list(REVIEW_STATUS_VALUES)},
             "operator_note_one_line": {"type": "string"},
         },
         "required": ["relative_file_path", "review_status"],
@@ -721,7 +774,10 @@ SET_STATUS_SCHEMA = {
 }
 APPEND_NOTE_SCHEMA = {
     "name": "append_powerunits_governance_note",
-    "description": "Tier>=5: append/create bounded note under governance/* allowlisted tree.",
+    "description": (
+        "Tier 4B: append or create a bounded note under governance/* (e.g. review_decisions/foo.md). "
+        "NOT save_hermes_workspace_note. relative_file_path must start with an allowlisted governance subdir."
+    ),
     "parameters": {
         "type": "object",
         "properties": {
@@ -734,7 +790,9 @@ APPEND_NOTE_SCHEMA = {
 }
 READ_GOV_SCHEMA = {
     "name": "read_powerunits_governance_note",
-    "description": "Tier>=5: read one governance note file.",
+    "description": (
+        "Tier 4B: read one file under governance/** (paired with append_powerunits_governance_note)."
+    ),
     "parameters": {
         "type": "object",
         "properties": {"relative_file_path": {"type": "string"}},
@@ -743,7 +801,10 @@ READ_GOV_SCHEMA = {
 }
 LIST_GOV_SCHEMA = {
     "name": "list_powerunits_governance_workspace",
-    "description": "Tier>=5: list governance subtree (bounded).",
+    "description": (
+        "Tier 4B governance file listing under hermes_workspace/governance/** only — "
+        "NOT list_hermes_workspace (whole workspace). Optional subpath_prefix inside governance/."
+    ),
     "parameters": {
         "type": "object",
         "properties": {"subpath_prefix": {"type": "string"}},
@@ -752,19 +813,27 @@ LIST_GOV_SCHEMA = {
 }
 SUMMARY_SCHEMA = {
     "name": "summarize_powerunits_tier4b_governance_lane",
-    "description": "Tier>=5: review_status rollups + governance volume + caution flags.",
+    "description": (
+        "Tier 4B governance lane: draft review_status histogram + governance/ volume + soft flags — "
+        "NOT summarize_powerunits_era5_weather_bounded_window or other bounded weather tools."
+    ),
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
 REVIEW_DRAFTS_SCHEMA = {
     "name": "review_powerunits_tier4b_skill_drafts",
     "description": (
-        "Tier>=5: list proposal drafts with review_status / filters / previews (read-only board)."
+        "Tier 4B review board for Tier 4A proposal drafts (filtered preview). "
+        "NOT review_powerunits_skill_draft_proposals (Tier 4A tool) if you need Tier 4B review_status "
+        "invalid flags — prefer this tool when tier>=5."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "max_entries": {"type": "integer"},
-            "review_status_filter": {"type": "string"},
+            "review_status_filter": {
+                "type": "string",
+                "enum": list(REVIEW_STATUS_VALUES),
+            },
             "target_skill_substring": {"type": "string"},
             "proposal_kind_filter": {"type": "string"},
         },

@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from powerunits_skill_draft_review_contract import validate_review_status
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -210,6 +211,8 @@ def manifest_powerunits_tier4a_skill_draft_scope(**_: Any) -> str:
         {
             "read_only": True,
             "tier": "4a_skill_draft_proposals",
+            "tool_surface": "manifest_tier4a_drafts_not_tier4b_governance",
+            "distinct_from": ["manifest_powerunits_tier4b_governance_scope"],
             "proposals_root_relative": "drafts/powerunits_skill_proposals",
             "proposals_root_resolved": str(proposals),
             "live_skills_directory_never_written": str(
@@ -288,6 +291,12 @@ def write_powerunits_skill_draft_proposal(
 
     stripped = text.lstrip()
     if stripped.startswith("---"):
+        fm, _rest = _split_tier4a_frontmatter(text)
+        rs_val = str(fm.get("review_status") or "").strip()
+        if rs_val:
+            _, rs_err = validate_review_status(rs_val)
+            if rs_err:
+                return tool_error(rs_err, error_code="invalid_review_status")
         payload = text
     else:
         payload = "\n".join(meta_lines) + "\n\n" + text
@@ -717,7 +726,8 @@ def review_powerunits_skill_draft_proposals(
 MANIFEST_SCHEMA = {
     "name": "manifest_powerunits_tier4a_skill_draft_scope",
     "description": (
-        "Tier>=4: show bounded proposals/drafts root under hermes_workspace (never live skills)."
+        "Tier 4A ONLY (tier>=4): proposals under drafts/powerunits_skill_proposals — "
+        "NOT manifest_powerunits_tier4b_governance_scope (governance/ + review lane)."
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},
 }

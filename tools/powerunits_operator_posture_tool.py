@@ -21,6 +21,8 @@ except ImportError:  # pragma: no cover
 
 from tools.registry import registry
 
+from powerunits_telegram_overlays import progressive_capability_overlays_aligned
+
 
 def check_powerunits_operator_posture_requirements() -> bool:
     return True
@@ -93,15 +95,17 @@ def _exports_phase1_signals(hermes_home: Path) -> dict[str, Any]:
     return brief
 
 
-def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
+def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dict[str, Any]:
     snap: dict[str, Any] = {
         "config_yaml_present": False,
         "telegram_toolsets_count": None,
+        "telegram_toolsets_list_read_only": None,
         "powerunits_tier1_analysis_listed": None,
         "powerunits_tier2_allowlisted_read_listed": None,
         "powerunits_tier3_skills_integration_listed": None,
         "powerunits_tier4a_skill_draft_proposals_listed": None,
         "powerunits_tier4b_review_governance_listed": None,
+        "telegram_progressive_overlays_aligned_with_tier": None,
         "parse_error": False,
     }
     cfg_path = hermes_home / "config.yaml"
@@ -121,6 +125,7 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
             tg = pt.get("telegram")
             if isinstance(tg, list):
                 snap["telegram_toolsets_count"] = len(tg)
+                snap["telegram_toolsets_list_read_only"] = list(tg)
                 snap["powerunits_tier1_analysis_listed"] = "powerunits_tier1_analysis" in tg
                 snap["powerunits_tier2_allowlisted_read_listed"] = (
                     "powerunits_tier2_allowlisted_read" in tg
@@ -133,6 +138,9 @@ def _telegram_toolset_observation(hermes_home: Path) -> dict[str, Any]:
                 )
                 snap["powerunits_tier4b_review_governance_listed"] = (
                     "powerunits_tier4b_review_governance" in tg
+                )
+                snap["telegram_progressive_overlays_aligned_with_tier"] = (
+                    progressive_capability_overlays_aligned(tg, tier_effective)
                 )
     except Exception:
         snap["parse_error"] = True
@@ -154,10 +162,16 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
         policy = os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip()
 
         curator = _safe_curator_snapshot(hermes_home.resolve())
-        telegram_obs = _telegram_toolset_observation(hermes_home.resolve())
+        telegram_obs = _telegram_toolset_observation(hermes_home.resolve(), tier_effective)
         exports_signals = _exports_phase1_signals(hermes_home)
 
         caution: list[str] = []
+
+        if telegram_obs.get("telegram_progressive_overlays_aligned_with_tier") is False:
+            caution.append(
+                "telegram_progressive_overlays_drift:overlays_after_powerunits_workspace_"
+                "do_not_match_HERMES_POWERUNITS_CAPABILITY_TIER_reapply_policy_restart"
+            )
 
         overlay_expected = tier_effective >= 1
         tg_has_analysis = telegram_obs.get("powerunits_tier1_analysis_listed")
