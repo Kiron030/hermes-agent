@@ -321,6 +321,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_entsoe_market_bounded_campaign_tool",
             "tools.powerunits_entsoe_market_bounded_coverage_scan_tool",
             "tools.powerunits_entsoe_bzn_price_readiness_tool",
+            "tools.powerunits_entsoe_bzn_prices_tool",
             "tools.powerunits_entsoe_market_bounded_execute_tool",
             "tools.powerunits_entsoe_market_bounded_preflight_tool",
             "tools.powerunits_entsoe_market_bounded_summary_tool",

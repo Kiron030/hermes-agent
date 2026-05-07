@@ -586,6 +586,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_entsoe_bzn_prices": {
+        "description": (
+            "Read-only Repo B **POST …/entsoe-bzn-prices/read** — hourly EUR/MWh BZN (bidding-zone) day-ahead price rows "
+            "from Repo B **`market_prices_day_ahead_bzn_v1`** (Hermes performs **no** Timescale reads). "
+            "**No** jobs, ingestion, writes, or Tier-1 national bounded market promotion from this tool. "
+            "Gate **HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED** plus "
+            "**POWERUNITS_INTERNAL_EXECUTE_BASE_URL**, **POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET** "
+            "(optional **POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S**)."
+        ),
+        "tools": ["read_powerunits_entsoe_bzn_prices_v1"],
+        "includes": [],
+    },
+
     "powerunits_entsoe_forecast_bounded_preflight": {
         "description": (
             "Bounded ENTSO-E **forecast** sync **preflight** (Repo B Tier‑v1 mirrored **`DE`/`NL`/`BE`/`FR`/`AT`** / **`v1`** / ≤7 d UTC): local slice check; "
