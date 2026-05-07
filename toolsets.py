@@ -573,6 +573,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+
+    "powerunits_entsoe_bzn_price_readiness": {
+        "description": (
+            "Read-only Repo B **POST …/entsoe-bzn-price-readiness/read** (advisory DK/NO/SE/IT/IE BZN slice + matrix metadata). "
+            "**No** jobs, ingestion, writes, or Tier-1 national bounded market promotion. "
+            "Gate **HERMES_POWERUNITS_ENTSOE_BZN_PRICE_READINESS_READ_ENABLED** plus "
+            "POWERUNITS_INTERNAL_EXECUTE_BASE_URL, POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET "
+            "(optional POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S)."
+        ),
+        "tools": ["read_powerunits_entsoe_bzn_price_readiness_v1"],
+        "includes": [],
+    },
+
     "powerunits_entsoe_forecast_bounded_preflight": {
         "description": (
             "Bounded ENTSO-E **forecast** sync **preflight** (Repo B Tier‑v1 mirrored **`DE`/`NL`/`BE`/`FR`/`AT`** / **`v1`** / ≤7 d UTC): local slice check; "
