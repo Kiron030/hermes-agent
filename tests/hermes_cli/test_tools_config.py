@@ -79,6 +79,52 @@ def test_get_platform_tools_default_telegram_includes_messaging():
     assert "messaging" in enabled
 
 
+def test_telegram_first_safe_merges_bzn_readiness_toolset(monkeypatch):
+    """Leaf Powerunits toolsets must be merged for Telegram under first_safe_v1."""
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_price_readiness" in enabled
+
+
+def test_telegram_first_safe_bzn_respects_agent_disabled_toolsets(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    config = {"agent": {"disabled_toolsets": ["powerunits_entsoe_bzn_price_readiness"]}}
+    enabled = _get_platform_tools(config, "telegram")
+    assert "powerunits_entsoe_bzn_price_readiness" not in enabled
+
+
+def test_telegram_first_safe_resolves_bzn_tool_in_get_tool_definitions(monkeypatch):
+    """Gateway-style tool list: merged toolset + gate + internal creds → schema."""
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICE_READINESS_READ_ENABLED", "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://pu.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "sek")
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_price_readiness" in enabled
+
+    from model_tools import get_tool_definitions
+
+    defs = get_tool_definitions(enabled_toolsets=sorted(enabled), quiet_mode=True)
+    names = {d["function"]["name"] for d in defs}
+    assert "read_powerunits_entsoe_bzn_price_readiness_v1" in names
+
+
+def test_telegram_first_safe_bzn_not_in_schema_when_gate_off(monkeypatch):
+    """Toolset key is merged; registry check_fn hides the tool without creds/FF."""
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICE_READINESS_READ_ENABLED", raising=False)
+    monkeypatch.delenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", raising=False)
+    monkeypatch.delenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", raising=False)
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_price_readiness" in enabled
+
+    from model_tools import get_tool_definitions
+
+    defs = get_tool_definitions(enabled_toolsets=sorted(enabled), quiet_mode=True)
+    names = {d["function"]["name"] for d in defs}
+    assert "read_powerunits_entsoe_bzn_price_readiness_v1" not in names
+
+
 def test_get_platform_tools_homeassistant_platform_keeps_homeassistant_toolset():
     enabled = _get_platform_tools({}, "homeassistant")
 
