@@ -80,6 +80,10 @@ CONFIGURABLE_TOOLSETS = [
 # but the setup checklist won't pre-select them for first-time users.
 _DEFAULT_OFF_TOOLSETS = {"moa", "homeassistant", "rl", "spotify", "discord", "discord_admin"}
 
+# Must stay aligned with ``model_tools._POWERUNITS_FIRST_SAFE_POLICY`` —
+# used to merge canonical Powerunits Telegram toolsets at runtime.
+_POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
+
 # Platform-scoped toolsets: only appear in the `hermes tools` checklist for
 # these platforms, and only resolve/save for these platforms.  A toolset
 # absent from this map is available on every platform (current behaviour).
@@ -967,6 +971,27 @@ def _get_platform_tools(
             enabled_toolsets.update(enabled_mcp_servers)
     else:
         enabled_toolsets.update(explicit_mcp_servers)
+
+    # Powerunits Telegram first_safe_v1: merge the canonical toolset keys from
+    # ``powerunits_telegram_overlays.expected_telegram_toolsets_first_safe``.
+    # Non-configurable Powerunits leaf toolsets (for example
+    # ``powerunits_entsoe_bzn_price_readiness``) are not inferable from the
+    # ``hermes-telegram`` composite via subset recovery alone, so without this
+    # merge they stay absent from ``enabled_toolsets`` unless every deploy
+    # hand-edits ``platform_toolsets.telegram``.
+    if (
+        platform == "telegram"
+        and os.getenv("HERMES_POWERUNITS_RUNTIME_POLICY", "").strip()
+        == _POWERUNITS_FIRST_SAFE_POLICY
+    ):
+        from powerunits_capability_tier import read_powerunits_capability_tier
+        from powerunits_telegram_overlays import expected_telegram_toolsets_first_safe
+
+        for ts_name in expected_telegram_toolsets_first_safe(
+            read_powerunits_capability_tier()
+        ):
+            if _toolset_allowed_for_platform(ts_name, platform):
+                enabled_toolsets.add(ts_name)
 
     # Honor agent.disabled_toolsets from config.yaml — allows users to
     # globally suppress specific toolsets (e.g. "memory") across all
