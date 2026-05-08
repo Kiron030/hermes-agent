@@ -31,6 +31,16 @@
 | **Repo B direct git writes from Hermes** | Forbidden | Product changes go through human/CI workflows, not agent. |
 | **Infra mutation (Railway, DNS, secrets in git)** | Forbidden | Operators use consoles; agents document only. |
 
+### Operator note — verified Telegram smoke (`read_powerunits_entsoe_bzn_prices_v1`)
+
+A **successful** Telegram run used tool **`read_powerunits_entsoe_bzn_prices_v1`** (actual **EUR/MWh** day-ahead **rows** per BZN timestamp from Repo B **`POST …/internal/hermes/bounded/v1/entsoe-bzn-prices/read`**). That path is **read-only**, runs **no** jobs, triggers **no** ingestion, and **does not** represent national Tier‑v1 bounded market promotion (**`promotes_tier1: false`** on the bounded contract).
+
+**Distinction:** **`read_powerunits_entsoe_bzn_price_readiness_v1`** hits **`…/entsoe-bzn-price-readiness/read`** (coverage/readiness aggregate). The prices tool is **not** that route and **not** `read_powerunits_timescale_dataset`.
+
+Recorded parameters: `window_start_utc=2024-01-01T00:00:00Z`, `window_end_utc=2024-01-02T00:00:00Z`, `table_version=bzn_advisory_v1`, `country_codes=["DK","NO","SE"]`, **`limit=20`**. Observed: `success=true`, `bounded_internal_statement=bzn_prices_read_only`, `prices_contract=bounded_entsoe_bzn_prices_read_v1`, `summary.total_row_count=264`, `summary.distinct_timestamps=24`, `truncated=true`, `http_status_from_repo_b=200`.
+
+**Interpretation:** `total_row_count=264` matches **11 bidding zones × 24 hourly buckets** for that window under the selected countries (**DK1/DK2**, **NO1–NO5**, **SE1–SE4**). **`limit`** applies to the returned **detail** price rows only; **`summary`** still reflects aggregates for the **full** requested zone/window (**truncated** flags when detail payload is shortened). Full checklist copy: **`RUNBOOK.hermes-stage1-validation.md`** (ENTSO-E BZN prices subsection).
+
 ## Stage 1 documentation map
 
 | File | Use |

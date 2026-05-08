@@ -115,6 +115,25 @@ Tool: **`read_powerunits_entsoe_bzn_prices_v1`** — **one** bounded **`POST …
 - [ ] **Smoke:** call with a short UTC window (`window_start_utc` / `window_end_utc`), default or explicit **`country_codes` DK/NO/SE** (and optional zone labels) → JSON includes Repo B contract fields (`success`, `bounded_internal_statement`, pricing rows / summary as returned) plus Hermes fields `read_attempted`, `http_status_from_repo_b`, `hermes_operator_note_v1`.
 - [ ] **Rollback:** set gate to falsy or unset — tool drops from definitions; no Repo B mutation.
 
+#### Recorded Telegram smoke (production-style; evidence)
+
+Hermes surfaced **`read_powerunits_entsoe_bzn_prices_v1`** in Telegram (**not** **`read_powerunits_entsoe_bzn_price_readiness_v1`**; **not** Timescale **`read_powerunits_timescale_dataset`**).
+
+| Field | Recorded |
+|-------|----------|
+| Tool | **`read_powerunits_entsoe_bzn_prices_v1`** |
+| `window_start_utc` | `2024-01-01T00:00:00Z` |
+| `window_end_utc` | `2024-01-02T00:00:00Z` (exclusive end → one calendar day) |
+| `table_version` | `bzn_advisory_v1` |
+| `country_codes` | `["DK","NO","SE"]` |
+| `limit` | `20` |
+
+Observed payload highlights: **`success=true`**, **`bounded_internal_statement=bzn_prices_read_only`**, **`prices_contract=bounded_entsoe_bzn_prices_read_v1`**, **`summary.total_row_count=264`**, **`summary.distinct_timestamps=24`**, **`truncated=true`**, **`http_status_from_repo_b=200`**.
+
+**Semantics for operators:** This is **timestamped BZN day-ahead price data** (EUR/MWh) from Repo B’s bounded read — **read-only**, **no** job execution, **no** ingestion side effects, **no** national Tier‑v1 promotion implied. Count **`total_row_count=264`** = **11 zones × 24 hours** for the window with these countries (**DK1/DK2**, **NO1–NO5**, **SE1–SE4**). The small **`limit`** affected **detail** rows returned in the tool/HTTP payload; **`summary`** remained a **full-window / full-zone** aggregate, hence **`truncated=true`** with a full-count summary.
+
+**Cross-ref (Repo B API contract):** `docs/runbook.md` → *Internal Hermes bounded ENTSO‑E BZN day-ahead **prices***; `docs/operations/ACCESS_MATRIX.md` (ENTSO‑E BZN **prices** row).
+
 ### Rollback (Repo B read only)
 
 - [ ] Set `HERMES_POWERUNITS_REPO_B_READ_ENABLED` to **falsy** or remove it; redeploy or restart if your platform caches env — tool should disappear or return disabled without touching Repo B or GitHub.
