@@ -975,7 +975,8 @@ def _get_platform_tools(
     # Powerunits Telegram first_safe_v1: merge the canonical toolset keys from
     # ``powerunits_telegram_overlays.expected_telegram_toolsets_first_safe``.
     # Non-configurable Powerunits leaf toolsets (for example
-    # ``powerunits_entsoe_bzn_price_readiness``) are not inferable from the
+    # ``powerunits_entsoe_bzn_price_readiness`` **and**
+    # ``powerunits_entsoe_bzn_prices``) are not inferable from the
     # ``hermes-telegram`` composite via subset recovery alone, so without this
     # merge they stay absent from ``enabled_toolsets`` unless every deploy
     # hand-edits ``platform_toolsets.telegram``.

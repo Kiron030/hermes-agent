@@ -15,9 +15,11 @@ Import chain (circular-import safe):
 """
 
 import ast
+import hashlib
 import importlib
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -380,6 +382,24 @@ class ToolRegistry:
     def get_all_tool_names(self) -> List[str]:
         """Return sorted list of all registered tool names."""
         return sorted(entry.name for entry in self._snapshot_entries())
+
+    def requires_env_binding_fingerprint(self) -> str:
+        """SHA-256 of sorted ``requires_env`` variable names × current OS values.
+
+        The gateway caches frozen ``AIAgent`` tool lists; the cache signature
+        included ``enabled_toolsets`` but historically did **not**
+        reflect env-gated tool availability flips when the toolset keys
+        were unchanged—``get_tool_definitions`` filters by ``check_fn`` only at
+        construction time. Including this digest busts cache when bounded
+        Powerunits gates toggles flip (or other ``requires_env`` credentials
+        rotate) without a registry-generation bump.
+        """
+        names: Set[str] = set()
+        for entry in self._snapshot_entries():
+            names.update(entry.requires_env or ())
+        blob = [(n, os.environ.get(n, "") or "") for n in sorted(names)]
+        raw = json.dumps(blob, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
 
     def get_schema(self, name: str) -> Optional[dict]:
         """Return a tool's raw schema dict, bypassing check_fn filtering.

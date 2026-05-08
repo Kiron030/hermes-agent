@@ -125,6 +125,83 @@ def test_telegram_first_safe_bzn_not_in_schema_when_gate_off(monkeypatch):
     assert "read_powerunits_entsoe_bzn_price_readiness_v1" not in names
 
 
+def test_telegram_first_safe_merges_bzn_prices_toolset(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_prices" in enabled
+
+
+def test_telegram_first_safe_bzn_prices_respects_agent_disabled_toolsets(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    config = {"agent": {"disabled_toolsets": ["powerunits_entsoe_bzn_prices"]}}
+    enabled = _get_platform_tools(config, "telegram")
+    assert "powerunits_entsoe_bzn_prices" not in enabled
+
+
+def test_telegram_first_safe_resolves_bzn_prices_tool_in_get_tool_definitions(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED", "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://pu.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "sek")
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_prices" in enabled
+
+    from model_tools import get_tool_definitions
+
+    defs = get_tool_definitions(enabled_toolsets=sorted(enabled), quiet_mode=True)
+    names = {d["function"]["name"] for d in defs}
+    assert "read_powerunits_entsoe_bzn_prices_v1" in names
+
+
+def test_telegram_first_safe_bzn_prices_not_in_schema_when_gate_off(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED", raising=False)
+    monkeypatch.delenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", raising=False)
+    monkeypatch.delenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", raising=False)
+    enabled = _get_platform_tools({}, "telegram")
+    assert "powerunits_entsoe_bzn_prices" in enabled
+
+    from model_tools import get_tool_definitions
+
+    defs = get_tool_definitions(enabled_toolsets=sorted(enabled), quiet_mode=True)
+    names = {d["function"]["name"] for d in defs}
+    assert "read_powerunits_entsoe_bzn_prices_v1" not in names
+
+
+def test_telegram_first_safe_exposes_both_bzn_tools_when_gates_on(monkeypatch):
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICE_READINESS_READ_ENABLED", "1")
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED", "1")
+    monkeypatch.setenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL", "https://pu.test")
+    monkeypatch.setenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET", "sek")
+
+    enabled = _get_platform_tools({}, "telegram")
+    assert {"powerunits_entsoe_bzn_price_readiness", "powerunits_entsoe_bzn_prices"} <= enabled
+
+    from model_tools import get_tool_definitions
+
+    names = {
+        d["function"]["name"]
+        for d in get_tool_definitions(enabled_toolsets=sorted(enabled), quiet_mode=True)
+    }
+    assert "read_powerunits_entsoe_bzn_price_readiness_v1" in names
+    assert "read_powerunits_entsoe_bzn_prices_v1" in names
+
+
+def test_telegram_first_safe_saved_policy_list_retains_bzn_leaf_toolsets(monkeypatch):
+    """Simulate docker/apply merged ``platform_toolsets.telegram`` plus TUI-style keys."""
+    from powerunits_telegram_overlays import expected_telegram_toolsets_first_safe
+
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    telegram = expected_telegram_toolsets_first_safe(0)
+    cfg = {"platform_toolsets": {"telegram": telegram}}
+
+    enabled = _get_platform_tools(cfg, "telegram")
+    assert "memory" in enabled
+    assert "powerunits_entsoe_bzn_price_readiness" in enabled
+    assert "powerunits_entsoe_bzn_prices" in enabled
+
+
 def test_get_platform_tools_homeassistant_platform_keeps_homeassistant_toolset():
     enabled = _get_platform_tools({}, "homeassistant")
 
