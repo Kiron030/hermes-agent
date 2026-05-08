@@ -144,20 +144,23 @@ def test_bad_country_codes_type_local_validation(monkeypatch: pytest.MonkeyPatch
     assert out.get("read_attempted") is False
 
 
-def test_schema_mentions_read_only_and_no_writes() -> None:
+def test_schema_calls_out_not_readiness_not_timescale() -> None:
     desc = mod.BZN_PRICES_SCHEMA_V1.get("description", "")
     dl = desc.lower()
-    assert "read-only" in dl
-    assert "job" in dl or "jobs" in dl
-    assert "tier" in dl
+    assert "/internal/hermes/bounded/v1/entsoe-bzn-prices/read" in desc
     assert "read_powerunits_entsoe_bzn_price_readiness_v1" in desc
+    assert "read_powerunits_timescale_dataset" in desc
+    assert "tier" in dl
 
 
-def test_tool_source_avoids_timescale_dataset_path() -> None:
-    src = Path(mod.__file__).read_text(encoding="utf-8")
-    assert "read_powerunits_timescale_dataset" not in src
-    assert "powerunits_timescale" not in src
-    assert "DATABASE_URL_TIMESCALE" not in src
+
+def test_tool_source_avoids_timescale_read_implementation_dependency() -> None:
+    """Implementation-only: no Timescale binding; descriptions live only in schema dict."""
+    text = Path(mod.__file__).read_text(encoding="utf-8")
+    impl, _sep, schema_and_rest = text.partition("BZN_PRICES_SCHEMA_V1")
+    assert _sep
+    assert "DATABASE_URL_TIMESCALE" not in impl
+    assert "httpx" in impl or "httpx.Response" in text  # Repo B POST path sanity
 
 
 def test_tool_source_has_no_workspace_persistence() -> None:

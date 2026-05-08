@@ -106,6 +106,29 @@ def test_apply_policy_excludes_phase2a_toolset_when_capability_tier_zero(
         ]
 
 
+def test_apply_policy_telegram_always_includes_entsoe_bzn_readiness_and_prices_leaf_toolsets() -> (
+    None
+):
+    """Docker/Railway bootstrap must persist both BZN Telegram leaf keys (gates are env-time)."""
+
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        tg = yaml.safe_load(p.read_text(encoding="utf-8"))["platform_toolsets"]["telegram"]
+
+    assert "powerunits_entsoe_bzn_price_readiness" in tg
+    assert "powerunits_entsoe_bzn_prices" in tg
+    assert tg.index("powerunits_entsoe_bzn_prices") == tg.index(
+        "powerunits_entsoe_bzn_price_readiness"
+    ) + 1
+
+
 def test_apply_policy_includes_phase2b_toolset_when_capability_tier_ge_two(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

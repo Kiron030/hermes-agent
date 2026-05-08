@@ -327,15 +327,18 @@ def read_powerunits_entsoe_bzn_prices_v1(
 BZN_PRICES_SCHEMA_V1 = {
     "name": "read_powerunits_entsoe_bzn_prices_v1",
     "description": (
-        "**ENTSO-E BZN concrete day-ahead prices (time series):** Read-only Repo B **`POST …/entsoe-bzn-prices/read`** — persisted **hourly EUR/MWh** rows with "
-        "**`timestamp_utc`**, **`price_eur_per_mwh`**, **`countries[].zones[].rows[]`**, coverage summary, Repo B **`prices_contract`**, **`bounded_entsoe_bzn_prices_read_v1`** semantics field when present — **not** a national price index.\n\n"
-        "**Different tool:** **`read_powerunits_entsoe_bzn_price_readiness_v1`** only returns **coverage / readiness metadata** (**`bzn_price` vs unresolved paths**) — choose **readiness** for matrix/gaps and **this tool** whenever the caller asked for numeric prices, timelines, **`prices_contract`**, EUR/MWh, or explicit price rows.\n\n"
-        "Does **not** run jobs, ingestion, writes, Hermes-side Timescale reads, or Tier-1 national bounded market promotion. "
-        "IT/IE may appear as partial/unresolved — treat Repo B payloads as authoritative. Gate **`HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED`** plus "
-        "**`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`**, **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**; optional **`POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S`**."
-        "\nDefaults when omitted: **country_codes DK, NO, SE**; **price_area_labels DK1/DK2, NO1–NO5, SE1–SE4**; "
-        "**limit 500**; **table_version bzn_advisory_v1**. "
-        "**price_area_eics** is omitted unless explicitly provided."
+        "**Concrete BZN ENTSO‑E day-ahead prices — not readiness, not Timescale.** "
+        "Read-only **single** Repo B **`POST /internal/hermes/bounded/v1/entsoe-bzn-prices/read`**: "
+        "**timestamped hourly EUR/MWh** bidding-zone (**BZN**) day-ahead **price rows** "
+        "(e.g. `timestamp_utc`, `price_eur_per_mwh` in `countries[].zones[].rows[]`) plus Repo B summary/metadata "
+        "(e.g. `prices_contract`, `bounded_internal_statement`). "
+        "**This is not** **`read_powerunits_entsoe_bzn_price_readiness_v1`** (readiness/metadata only). "
+        "**This is not** **`read_powerunits_timescale_dataset`** — Hermes does **no** generic Timescale read here. "
+        "**Does not** assert national Tier‑v1 bounded market promotion.\n\n"
+        "**Different tool:** **`read_powerunits_entsoe_bzn_price_readiness_v1`** only returns readiness/coverage matrices — "
+        "use **this tool** whenever the operator asked for numeric prices, timelines, Repo B **`prices_contract`**, EUR/MWh, or actual rows.\n\n"
+        "**No** Hermes-side jobs, ingestion, writes. Gate **`HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED`** plus **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`**, **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**; optional **`POWERUNITS_INTERNAL_EXECUTE_TIMEOUT_S`**.\n\n"
+        "Defaults when omitted: **country_codes DK, NO, SE**; **price_area_labels** DK1/DK2, NO1–NO5, SE1–SE4; **limit** 500; **table_version** bzn_advisory_v1; **price_area_eics** omitted unless set."
     ),
     "parameters": {
         "type": "object",
