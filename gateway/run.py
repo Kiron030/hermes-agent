@@ -9870,6 +9870,12 @@ class GatewayRunner:
         changing config.yaml.  Cached AIAgent instances freeze their tool
         schemas at construction time, so a registry generation change must
         rebuild the agent before the next turn.
+
+        ``tools.requires_env_binding`` fingerprints every env var name referenced
+        via tool ``requires_env`` declarations.  Flipping a bounded gate (e.g.
+        ``HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED``) does not change the
+        merged Telegram toolset list nor ``registry._generation``; without this
+        digest a cached agent would keep a stale ``valid_tool_names`` set.
         """
         out: Dict[str, Any] = {}
         cfg = user_config if isinstance(user_config, dict) else {}
@@ -9883,8 +9889,10 @@ class GatewayRunner:
             from tools.registry import registry
 
             out["tools.registry_generation"] = getattr(registry, "_generation", None)
+            out["tools.requires_env_binding"] = registry.requires_env_binding_fingerprint()
         except Exception:
             out["tools.registry_generation"] = None
+            out["tools.requires_env_binding"] = None
         return out
 
     @staticmethod

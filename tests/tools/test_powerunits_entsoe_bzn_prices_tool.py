@@ -150,6 +150,7 @@ def test_schema_mentions_read_only_and_no_writes() -> None:
     assert "read-only" in dl
     assert "job" in dl or "jobs" in dl
     assert "tier" in dl
+    assert "read_powerunits_entsoe_bzn_price_readiness_v1" in desc
 
 
 def test_tool_source_avoids_timescale_dataset_path() -> None:

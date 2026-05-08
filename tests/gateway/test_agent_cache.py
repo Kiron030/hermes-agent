@@ -186,6 +186,32 @@ class TestAgentConfigSignature:
 
         assert sig_before != sig_after
 
+    def test_bzn_prices_gate_flip_busts_cache_signature(self, monkeypatch):
+        """Gated tools can appear due to env flips without changing toolset keys or registry_generation."""
+        from gateway.run import GatewayRunner
+
+        runtime = {"api_key": "k", "base_url": "u", "provider": "p"}
+        toolsets = ["memory", "powerunits_entsoe_bzn_prices"]
+        monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED", "0")
+        keys_off = GatewayRunner._extract_cache_busting_config({})
+        monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED", "1")
+        keys_on = GatewayRunner._extract_cache_busting_config({})
+        sig_off = GatewayRunner._agent_config_signature(
+            "m",
+            runtime,
+            toolsets,
+            "",
+            cache_keys=keys_off,
+        )
+        sig_on = GatewayRunner._agent_config_signature(
+            "m",
+            runtime,
+            toolsets,
+            "",
+            cache_keys=keys_on,
+        )
+        assert sig_off != sig_on
+
 
 class TestExtractCacheBustingConfig:
     """Verify _extract_cache_busting_config pulls the documented subset of
@@ -227,6 +253,9 @@ class TestExtractCacheBustingConfig:
         for section, key in GatewayRunner._CACHE_BUSTING_CONFIG_KEYS:
             assert f"{section}.{key}" in out
             assert out[f"{section}.{key}"] is None
+        assert "tools.requires_env_binding" in out
+        fp = out["tools.requires_env_binding"]
+        assert isinstance(fp, str) and len(fp) == 64
 
     def test_non_dict_section_treated_as_missing(self):
         from gateway.run import GatewayRunner
@@ -246,6 +275,8 @@ class TestExtractCacheBustingConfig:
         for section, key in GatewayRunner._CACHE_BUSTING_CONFIG_KEYS:
             assert out[f"{section}.{key}"] is None
         assert "tools.registry_generation" in out
+        fp = out.get("tools.requires_env_binding")
+        assert isinstance(fp, str) and len(fp) == 64
 
     def test_extract_includes_live_tool_registry_generation(self, monkeypatch):
         from gateway.run import GatewayRunner
@@ -256,6 +287,9 @@ class TestExtractCacheBustingConfig:
         out = GatewayRunner._extract_cache_busting_config({})
 
         assert out["tools.registry_generation"] == 12345
+        assert "tools.requires_env_binding" in out
+        fp = out["tools.requires_env_binding"]
+        assert isinstance(fp, str) and len(fp) == 64
 
     def test_full_round_trip_busts_cache_on_real_edit(self):
         """End-to-end: simulate a config edit on main and verify the

@@ -290,6 +290,9 @@ class TestCheckFnExceptionHandling:
 
 class TestBuiltinDiscovery:
     def test_matches_previous_manual_builtin_tool_set(self):
+        # Snapshot of ``tools/*.py`` that contain a module-level ``registry.register`` call.
+        # Intentionally explicit: add new builtins here when merging tool PRs —
+        # do not widen discovery to hide regressions.
         expected = {
             "tools.browser_cdp_tool",
             "tools.browser_dialog_tool",
@@ -306,30 +309,30 @@ class TestBuiltinDiscovery:
             "tools.image_generation_tool",
             "tools.memory_tool",
             "tools.mixture_of_agents_tool",
-            "tools.process_registry",
-            "tools.powerunits_docs_tool",
-            "tools.powerunits_era5_weather_bounded_campaign_tool",
-            "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
             "tools.powerunits_baseline_layer_preview_tool",
             "tools.powerunits_bounded_coverage_inventory_tool",
             "tools.powerunits_bounded_rollout_governance_tool",
             "tools.powerunits_de_stack_remediation_planner_tool",
-            "tools.powerunits_era5_weather_bounded_execute_tool",
-            "tools.powerunits_era5_weather_bounded_preflight_tool",
-            "tools.powerunits_era5_weather_bounded_summary_tool",
-            "tools.powerunits_era5_weather_bounded_validate_tool",
-            "tools.powerunits_entsoe_market_bounded_campaign_tool",
-            "tools.powerunits_entsoe_market_bounded_coverage_scan_tool",
+            "tools.powerunits_docs_tool",
             "tools.powerunits_entsoe_bzn_price_readiness_tool",
             "tools.powerunits_entsoe_bzn_prices_tool",
-            "tools.powerunits_entsoe_market_bounded_execute_tool",
-            "tools.powerunits_entsoe_market_bounded_preflight_tool",
-            "tools.powerunits_entsoe_market_bounded_summary_tool",
-            "tools.powerunits_entsoe_market_bounded_validate_tool",
             "tools.powerunits_entsoe_forecast_bounded_execute_tool",
             "tools.powerunits_entsoe_forecast_bounded_preflight_tool",
             "tools.powerunits_entsoe_forecast_bounded_summary_tool",
             "tools.powerunits_entsoe_forecast_bounded_validate_tool",
+            "tools.powerunits_entsoe_market_bounded_campaign_tool",
+            "tools.powerunits_entsoe_market_bounded_coverage_scan_tool",
+            "tools.powerunits_entsoe_market_bounded_execute_tool",
+            "tools.powerunits_entsoe_market_bounded_preflight_tool",
+            "tools.powerunits_entsoe_market_bounded_summary_tool",
+            "tools.powerunits_entsoe_market_bounded_validate_tool",
+            "tools.powerunits_era5_weather_bounded_campaign_tool",
+            "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
+            "tools.powerunits_era5_weather_bounded_execute_tool",
+            "tools.powerunits_era5_weather_bounded_preflight_tool",
+            "tools.powerunits_era5_weather_bounded_summary_tool",
+            "tools.powerunits_era5_weather_bounded_validate_tool",
+            "tools.powerunits_github_docs_tool",
             "tools.powerunits_market_driver_features_bounded_de_execute_tool",
             "tools.powerunits_market_driver_features_bounded_de_readiness_tool",
             "tools.powerunits_market_driver_features_bounded_de_summary_tool",
@@ -338,7 +341,6 @@ class TestBuiltinDiscovery:
             "tools.powerunits_market_features_bounded_de_readiness_tool",
             "tools.powerunits_market_features_bounded_de_summary_tool",
             "tools.powerunits_market_features_bounded_de_validate_tool",
-            "tools.powerunits_github_docs_tool",
             "tools.powerunits_operator_posture_tool",
             "tools.powerunits_option_d_execute_tool",
             "tools.powerunits_option_d_preflight_tool",
@@ -357,6 +359,7 @@ class TestBuiltinDiscovery:
             "tools.powerunits_tier5a_bounded_workflow_tool",
             "tools.powerunits_timescale_read_tool",
             "tools.powerunits_workspace_tool",
+            "tools.process_registry",
             "tools.rl_training_tool",
             "tools.send_message_tool",
             "tools.session_search_tool",
@@ -616,3 +619,36 @@ class TestThreadSafety:
         toolsets = result_holder["value"]
         assert "gated" in toolsets
         assert toolsets["gated"]["available"] is True
+
+
+class TestRequiresEnvBindingFingerprint:
+    def test_digest_changes_when_registered_requires_env_variable_flips(self):
+        import os
+
+        key = "__HERMES_REQUIRES_ENV_BINDING_TEST_KEY__"
+
+        backup = os.environ.get(key)
+        try:
+            reg = ToolRegistry()
+            reg.register(
+                name="__env_fp_tool__",
+                toolset="__env_fp_ts__",
+                schema=_make_schema("__env_fp_tool__"),
+                handler=_dummy_handler,
+                requires_env=[key],
+            )
+            if key in os.environ:
+                del os.environ[key]
+            fp_missing = reg.requires_env_binding_fingerprint()
+
+            os.environ[key] = "truthy_gate_value_y"
+            fp_present = reg.requires_env_binding_fingerprint()
+
+            assert len(fp_missing) == 64
+            assert len(fp_present) == 64
+            assert fp_missing != fp_present
+        finally:
+            if backup is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = backup
