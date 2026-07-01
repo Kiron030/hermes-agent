@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-07-01 — Hotfix: v0.12.0-Merge-Regression in model_tools.py restauriert
+
+**Kontext:** Beim ersten (abgebrochenen) v0.13.0-Merge-Versuch fiel per Symbol-Diff-Check (siehe vorheriger Eintrag) auf, dass `model_tools.py` bereits **beim ursprünglichen v0.12.0-Merge** stillschweigend regressiert wurde — ohne jeden Konfliktmarker. `git diff v2026.4.30 powerunits-internal-setup -- model_tools.py` zeigte: unser Fork-Stand hatte 602 Zeilen, die reine Upstream-v0.12.0-Baseline 811 Zeilen.
+
+**Verlorene/rueckgaengig gemachte Upstream-v0.12.0-Fixes (jetzt restauriert):**
+
+- **MCP-Tool-Discovery:** Der blockierende Modul-Level-Call `discover_mcp_tools()` war wieder aktiv — genau der Bug, den Upstream fuer Issue #16856 behoben hatte (blockiert bis zu 120s Discord/Telegram-Gateway-Heartbeats bei langsamem/unreachable MCP-Server). Per-Entry-Point-Discovery existierte in unserem Fork bereits an allen relevanten Stellen (`gateway/run.py`, `cli.py`, `tui_gateway/*`, `acp_adapter/*`), daher ist die Entfernung des Modul-Level-Calls ein reiner Fix ohne Funktionsverlust.
+- **`_run_async`:** Vereinfachte Cancellation-Logik ohne Worker-Loop-Tracking wieder aktiv (potenzieller Thread-Leak bei 300s-Timeout im Gateway-/Async-Pfad) — robuste Version restauriert.
+- **`get_tool_definitions`/`_compute_tool_definitions`-Cache-Split** (inkl. `_clear_tool_defs_cache`) fehlte — Performance- und Duplicate-Tool-Name-Fix (Issue #17335) restauriert.
+- **`_schema_allows_null`, `_coerce_json`** fehlten komplett (JSON-String-Array/Object-Koerzierung, nullable-Schema-Handling) — restauriert.
+- **`handle_function_call`:** `duration_ms`-Tracking, `transform_tool_result`-Plugin-Hook, und geloggte statt stillverschluckte Hook-Exceptions fehlten — restauriert. `logger.error` → `logger.exception` im Fehlerpfad (Stacktrace).
+- **Echter Zusatzbefund waehrend der Restauration:** Ein `else`-Zweig, der `pre_tool_call` erneut feuerte wenn `skip_pre_tool_call_hook=True`, war (wieder) vorhanden — das ist der "klassische Double-Fire-Bug", fuer den es in `tests/test_model_tools.py::TestPreToolCallBlocking` bereits Regressionstests gibt. Diese Tests schlugen bei einem ersten Wiederherstellungsversuch fehl (ich hatte den `else`-Zweig faelschlich als bewusste Fork-Ergaenzung interpretiert) und haben den Fehler zuverlaessig gefangen. Endgueltiger Fix: Single-Fire-Contract wiederhergestellt.
+
+**Bewusst NICHT angefasst (gehoert zum v0.13.0-Sync, nicht zu diesem Hotfix):**
+
+- `disabled_toolsets` `elif`- statt `if`-Bug (Upstream-Issue #17309) — existierte bereits in der v0.12.0-Baseline selbst, keine Fork-Regression. Reale Exposure gering (Powerunits-Gateway-Pfad nutzt nur `enabled_toolsets`/`platform_toolsets`, nie `disabled_toolsets`).
+- `discord`/`discord_admin`-Split vs. Upstreams vereinheitlichtes `discord_server`-Tool — unklar ob bewusste Powerunits-Entscheidung (granulare Rechtetrennung) oder Altlast; Discord ist als Plattform fuer Powerunits ohnehin vollstaendig deaktiviert (`docker/apply_powerunits_runtime_policy.py` `DISABLED_PLATFORMS`), daher keine reale Exposure. Wird beim v0.13.0-Sync erneut betrachtet.
+- Die in v0.13.0 neu hinzugekommene `coerce_tool_args`-Array-Wrapping-Erweiterung — echtes v0.13-Feature, nicht Teil der v0.12.0-Baseline.
+
+**Andere Hotspot-Dateien geprueft** (gleicher Symbol-/Zeilenzahl-Check): `AGENTS.md`, `gateway/config.py`, `toolsets.py`, `agent/transports/chat_completions.py` — **keine** versteckten Verluste gefunden, nur saubere, additive Powerunits-Ergaenzungen (`_powerunits_lockdown_enabled`, `_apply_powerunits_runtime_lockdown`, `_custom_base_url_accepts_ollama_think_extra_body`, first-safe Telegram-Toolset-Lockdown). `model_tools.py` war der einzige betroffene Fall.
+
+**Verifikation:** `python -m ast`-Syntaxcheck, `tests/test_model_tools.py` (39/39), `tests/test_model_tools_async_bridge.py`, `tests/tools/test_registry.py`, `tests/hermes_cli/test_model_tools_telegram_bzn_entsoe_surface.py` — alle gruen.
+
+**Branches:** `fix/model-tools-v012-regression-restore` → gemerged nach `powerunits-internal-setup` (`520055d78`), gepusht.
+
+**Naechster Schritt:** v0.13.0-Merge (Tag `v2026.5.7`) erneut versuchen, jetzt mit korrigierter `model_tools.py`-Baseline und obligatorischem Symbol-Diff-Check vor jedem Merge-Commit.
+
+---
+
 ## 2026-07-01 — Bestandsaufnahme + v0.12.0 Versions-Metadaten-Korrektur
 
 **Kontext:** Vorbereitung des inkrementellen Sync-Vorhabens v0.12.0 → v0.17.0 (5 Minor-Versionen, ~5.350 Commits upstream seit v0.12.0).
