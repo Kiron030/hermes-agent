@@ -91,6 +91,11 @@ def _make_agent(monkeypatch):
     # unconditionally after every tool result. Stubbed as a passthrough —
     # this test exercises interrupt fanout, not guardrail decisions.
     stub._append_guardrail_observation = lambda name, args, result, failed=False: result
+    # New in v0.14: _run_tool() calls this on every tool result to strip
+    # multimodal content the active model can't consume. Stubbed as a
+    # passthrough — these tests use plain string tool results, not the
+    # multimodal-image-block path.
+    stub._tool_result_content_for_active_model = lambda name, result: result
     return stub
 
 
