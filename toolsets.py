@@ -60,6 +60,11 @@ _HERMES_CORE_TOOLS = [
     "send_message",
     # Home Assistant smart home control (gated on HASS_TOKEN via check_fn)
     "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
+    # Kanban multi-agent coordination — only in schema when the agent is
+    # spawned as a kanban worker (HERMES_KANBAN_TASK env set), otherwise
+    # zero schema footprint. Gated via check_fn in tools/kanban_tools.py.
+    "kanban_show", "kanban_complete", "kanban_block", "kanban_heartbeat",
+    "kanban_comment", "kanban_create", "kanban_link",
 ]
 
 
@@ -82,6 +87,12 @@ TOOLSETS = {
     "vision": {
         "description": "Image analysis and vision tools",
         "tools": ["vision_analyze"],
+        "includes": []
+    },
+
+    "video": {
+        "description": "Video analysis and understanding tools (opt-in, not in default toolset)",
+        "tools": ["video_analyze"],
         "includes": []
     },
     
@@ -850,6 +861,48 @@ TOOLSETS = {
         "includes": []
     },
 
+    "kanban": {
+        "description": (
+            "Kanban multi-agent coordination — only active when the agent "
+            "is spawned by the kanban dispatcher (HERMES_KANBAN_TASK env "
+            "set). The dispatcher runs inside the gateway by default; see "
+            "`kanban.dispatch_in_gateway` in config.yaml. Lets workers mark "
+            "tasks done with structured handoffs, block for human input, "
+            "heartbeat during long ops, comment on threads, and (for "
+            "orchestrators) fan out into child tasks."
+        ),
+        "tools": [
+            "kanban_show", "kanban_complete", "kanban_block",
+            "kanban_heartbeat", "kanban_comment",
+            "kanban_create", "kanban_link",
+        ],
+        "includes": [],
+    },
+
+    "discord": {
+        "description": "Discord read and participate tools (fetch messages, search members, create threads)",
+        "tools": ["discord"],
+        "includes": [],
+    },
+
+    "discord_admin": {
+        "description": "Discord server management (list channels/roles, pin messages, assign roles)",
+        "tools": ["discord_admin"],
+        "includes": [],
+    },
+
+    "yuanbao": {
+        "description": "Yuanbao platform tools - group info, member queries, DM, stickers",
+        "tools": [
+            "yb_query_group_info",
+            "yb_query_group_members",
+            "yb_send_dm",
+            "yb_search_sticker",
+            "yb_send_sticker",
+        ],
+        "includes": []
+    },
+
     "feishu_doc": {
         "description": "Read Feishu/Lark document content",
         "tools": ["feishu_doc_read"],
@@ -955,7 +1008,8 @@ TOOLSETS = {
         "description": "Discord bot toolset - full access (terminal has safety checks via dangerous command approval)",
         "tools": _HERMES_CORE_TOOLS + [
             # Discord server introspection & management (gated on DISCORD_BOT_TOKEN via check_fn)
-            "discord_server",
+            "discord",
+            "discord_admin",
         ],
         "includes": []
     },
@@ -1056,10 +1110,22 @@ TOOLSETS = {
         "includes": []
     },
 
+    "hermes-yuanbao": {
+        "description": "Yuanbao bot toolset - full access (terminal has safety checks via dangerous command approval)",
+        "tools": _HERMES_CORE_TOOLS + [
+            "yb_query_group_info",
+            "yb_query_group_members",
+            "yb_send_dm",
+            "yb_search_sticker",
+            "yb_send_sticker",
+        ],
+        "includes": []
+    },
+
     "hermes-gateway": {
         "description": "Gateway toolset - union of all messaging platform tools",
         "tools": [],
-        "includes": ["hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack", "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email", "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk", "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin", "hermes-qqbot", "hermes-webhook"]
+        "includes": ["hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack", "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email", "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk", "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin", "hermes-qqbot", "hermes-webhook", "hermes-yuanbao"]
     }
 }
 
@@ -1077,13 +1143,18 @@ def get_toolset(name: str) -> Optional[Dict[str, Any]]:
         None: If toolset not found
     """
     toolset = TOOLSETS.get(name)
-    if toolset:
-        return toolset
 
     try:
         from tools.registry import registry
     except Exception:
-        return None
+        return toolset if toolset else None
+
+    if toolset:
+        merged_tools = sorted(
+            set(toolset.get("tools", []))
+            | set(registry.get_tool_names_for_toolset(name))
+        )
+        return {**toolset, "tools": merged_tools}
 
     registry_toolset = name
     description = f"Plugin toolset: {name}"
