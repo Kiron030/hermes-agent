@@ -1,5 +1,12 @@
 # Powerunits Hermes Fork Sync Strategy v1
 
+> **Vor Beginn eines neuen Sync-Schritts ZUERST
+> [`docs/powerunits_fork_sync_preflight_checklist.md`](./powerunits_fork_sync_preflight_checklist.md)
+> lesen.** Kompakte, actionable Checkliste aus den v0.12.0-/v0.13.0-Sync-
+> Vorfällen (Dependency-Sync-Falle, Symbol-/Intra-Funktions-Diff-Check,
+> ProviderProfile-Falle, bekannte Windows-Testartefakte, Ablaufreihenfolge)
+> — spart wiederholtes Neu-Entdecken derselben Fehler.
+
 ## 1) Current repo relationship
 
 - **upstream**: `NousResearch/hermes-agent`
