@@ -2,11 +2,17 @@
 
 **ZUERST LESEN, bevor ein neuer Upstream-Sync-Schritt begonnen wird.**
 
-Dies ist eine kompakte, actionable Checkliste, destilliert aus den v0.12.0-
-und v0.13.0-Sync-Vorfällen (siehe `docs/upstream_sync_log.md` und Abschnitt 8
-von `powerunits_fork_sync_strategy_v1.md` für die vollen Incident-Writeups).
-Ziel: den nächsten Sync-Schritt schneller und mit weniger wiederholten
-Fehlern durchziehen, nicht jeden Vorfall erneut selbst entdecken müssen.
+Dies ist eine kompakte, actionable Checkliste, destilliert aus den v0.12.0-,
+v0.13.0- und v0.14.0-Sync-Vorfällen (siehe `docs/upstream_sync_log.md` und
+Abschnitt 8 von `powerunits_fork_sync_strategy_v1.md` für die vollen
+Incident-Writeups). Ziel: den nächsten Sync-Schritt schneller und mit
+weniger wiederholten Fehlern durchziehen, nicht jeden Vorfall erneut selbst
+entdecken müssen.
+
+**Bewährt beim v0.14.0-Sync:** zweiter Durchlauf mit dieser Checkliste war
+spürbar schneller — keine Dependency-Sync-Falle, kein
+Vollsuite-Bisektions-Rabbit-Hole mehr. Prozess funktioniert, weiter so
+anwenden.
 
 ---
 
@@ -19,14 +25,33 @@ letzten Prozentpunkten Testabdeckung.
 - **Hotspot-Dateien** (Abschnitt 3 der Strategie-Doku): sorgfältig prüfen,
   Symbol-Diff-Check + Intra-Funktions-Diff-Check sind Pflicht (siehe unten).
 - **Rest der Testsuite**: nur grob im Verzeichnis-Chunk-Verfahren laufen
-  lassen. Bekannte Umgebungsartefakte (Abschnitt 3 unten) pauschal abhaken,
+  lassen. Bekannte Umgebungsartefakte (Abschnitt 6 unten) pauschal abhaken,
   nicht einzeln debuggen.
 - Bricht ein Chunk-Lauf mittendrin ohne Fehlermeldung ab: **nicht
   bisektieren**. Als Umgebungsartefakt vermerken, nächster Chunk.
 
 ---
 
-## 1. Vor dem Merge: venv-Dependencies synchronisieren
+## 1. Security-Tag-Triage zuerst (bewährtes Verfahren, jetzt Pflicht)
+
+Bevor mit der eigentlichen Konfliktauflösung begonnen wird: Changelog/Commit-
+Historie der neuen Upstream-Version nach `security`/CVE/GHSA-Tags
+durchsuchen (z. B. `git log <alter-tag>..<neuer-tag> --grep -iE
+"security|CVE-|GHSA-"` sowie Release Notes). Beim v0.14.0-Sync brachte das
+den GHSA-76xc-57q6-vm5m-Fix (Ollama/OpenRouter-API-Key-Leak an
+Lookalike-Domains) zuverlässig zuerst ans Licht.
+
+- Sicherheitsrelevante Änderungen **vorrangig und besonders sorgfältig**
+  prüfen — vor den funktionalen/kosmetischen Diffs.
+- Fork-Ausnahmen (z. B. eigene Guards, die ein CVE bereits anders
+  adressieren) explizit gegen den Upstream-Fix abgleichen, nicht einfach
+  stillschweigend überschreiben lassen.
+- Ergebnis der Triage im Sync-Log-Eintrag kurz vermerken, auch wenn nichts
+  Sicherheitsrelevantes gefunden wurde.
+
+---
+
+## 2. Vor dem Merge: venv-Dependencies synchronisieren
 
 Ein Upstream-Merge bringt fast immer neue/geänderte Einträge in
 `pyproject.toml`/`uv.lock` mit (neue optionale Provider-Plugins, neue
@@ -60,7 +85,7 @@ nur eine fehlende venv-Sync.
 
 ---
 
-## 2. Hotspot-Dateien: Symbol-Diff-Check + Intra-Funktions-Diff-Check
+## 3. Hotspot-Dateien: Symbol-Diff-Check + Intra-Funktions-Diff-Check
 
 Für jede Hotspot-Datei (Abschnitt 3 der Strategie-Doku), die der Merge
 anfasst — **Pflicht**, unabhängig davon ob Git einen Konfliktmarker
@@ -77,13 +102,25 @@ gesetzt hat:
 3. Nach Auflösen jedes Konflikts in einer Datei mit stark umgebauten
    Methoden: **sofort** die volle Testsuite für diese Datei laufen lassen
    — nicht erst warten, bis alle Konfliktdateien gelöst sind.
+4. **Über die feste Hotspot-Liste hinausdenken:** Die Liste in Abschnitt 3
+   der Strategie-Doku ist nicht vollständig — beim v0.14.0-Sync ging ein
+   eigenständiger Fork-Fix (Commit `f609135`, GPT-4.1/`codex_responses`-
+   API-Mode-Bug) unbemerkt unter, weil die betroffene Funktion beim
+   Refactoring in eine andere Datei extrahiert wurde und so gar nicht mehr
+   wie die "offizielle" Hotspot-Datei aussah. Deshalb zusätzlich: für
+   Dateien, die der aktuelle Merge stark umbaut/verschiebt/extrahiert, per
+   `git log --all --grep -iE "fix|hotfix" -- <Datei>` (bzw. `git branch
+   --contains <Commit>` auf verdächtige Treffer) prüfen, ob dort
+   eigenständige (nicht von upstream stammende) Fork-Fixes liegen, die das
+   Refactoring stillschweigend verschluckt haben könnte — nicht nur die
+   feste Liste abarbeiten.
 
 **"Clean auto-merge" (kein Konfliktmarker) ist kein Beweis für
 Vollständigkeit** — das war die Kernursache beider v0.13-Vorfälle.
 
 ---
 
-## 3. ProviderProfile-Architektur-Falle (seit v0.13)
+## 4. ProviderProfile-Architektur-Falle (seit v0.13)
 
 Upstream hat mit v0.13 einen neuen Abstraktions-Layer (`providers/`,
 `ProviderProfile`) eingeführt, der providerspezifische Sonderfälle
@@ -111,7 +148,37 @@ fortsetzen (weitere Provider wandern in eigene `plugins/model-providers/*`).
 
 ---
 
-## 4. Bekannte Windows/Netzlaufwerk-Testartefakte (NICHT jedes Mal neu untersuchen)
+## 5. Composite-Toolset-/Aggregat-Verlust-Muster (wiederkehrend, jeden Sync prüfen)
+
+Wiederholtes Fehlerbild über mehrere Syncs hinweg: aggregierende
+Konfigurationsstellen verlieren beim Merge leise Einträge, ohne
+Konfliktmarker. Bisherige Fälle: `hermes-discord`, `hermes-yuanbao`
+(v0.13), `hermes-feishu` (v0.14) — jeweils Composite-Toolsets in
+`toolsets.py`, die nach dem Merge weniger Tools enthielten als ihre
+granularen Einzel-Toolsets zusammen hergeben. Dazu gesellen sich einzelne
+verlorene Funktionen/Registrierungen an ähnlichen Aggregationsstellen
+(`_gateway_platform_short_label`, `_model_section_has_credentials`,
+`browser_dialog` in `_HERMES_CORE_TOOLS`, `acp_registry/agent.json`s
+Versionsfeld).
+
+**Nach jedem Merge, bevor committet wird:**
+
+- Jeden `hermes-*`-Composite-Toolset-Eintrag in `toolsets.py` gegen die
+  Summe seiner granularen Einzel-Toolsets/-Tools abgleichen (kleiner
+  Einzeiler/Script reicht: pro Composite prüfen, ob jedes Tool aus den
+  zugehörigen granularen Toolsets auch im Composite auftaucht).
+- Dasselbe Prinzip auf andere aggregierende Register/Listen anwenden, die
+  der Merge berührt hat: Tool-Registries (`_HERMES_CORE_TOOLS`),
+  Provider-Kataloge, Capability-/Feature-Listen, Versions-Strings, die an
+  mehreren Stellen dupliziert gepflegt werden (`pyproject.toml` vs.
+  `acp_registry/agent.json`).
+- Content-Level-Diff, nicht nur Zeilenzahl-Diff: ein Composite-Eintrag
+  kann nach dem Merge syntaktisch unauffällig aussehen und trotzdem
+  Einträge verloren haben.
+
+---
+
+## 6. Bekannte Windows/Netzlaufwerk-Testartefakte (NICHT jedes Mal neu untersuchen)
 
 Diese Fehlerklassen sind **umgebungsbedingt** (Windows + gemapptes
 Netzlaufwerk als Dev-Setup), keine Merge-Regressionen. Pauschal abhaken:
@@ -148,25 +215,31 @@ Netzlaufwerk als Dev-Setup), keine Merge-Regressionen. Pauschal abhaken:
 
 ---
 
-## 5. Ablaufreihenfolge (Kurzfassung)
+## 7. Ablaufreihenfolge (Kurzfassung)
 
-1. Konflikte lösen (Integrationsbranch `integration/hermes-runtime-vX.Y-bump`
+1. **Security-Tag-Triage zuerst** (Abschnitt 1 oben) — Changelog/Commits
+   nach `security`/CVE/GHSA durchsuchen, vorrangig prüfen.
+2. Konflikte lösen (Integrationsbranch `integration/hermes-runtime-vX.Y-bump`
    von `powerunits-internal-setup`).
-2. Symbol-/Intra-Funktions-Diff-Check auf Hotspot-Dateien (Abschnitt 2 oben).
-3. venv-Deps syncen (`uv pip install -e ".[all,dev]" --python .venv\Scripts\python.exe`).
-4. Tests in Verzeichnis-Chunks (Abschnitt 4 oben), Umgebungsartefakte
+3. Symbol-/Intra-Funktions-Diff-Check auf Hotspot-Dateien **plus**
+   fork-eigene Commit-Historie auf stark umgebauten Dateien prüfen
+   (Abschnitt 3 oben).
+4. venv-Deps syncen (`uv pip install -e ".[all,dev]" --python .venv\Scripts\python.exe`).
+5. Composite-Toolset-/Aggregat-Abgleich (Abschnitt 5 oben) — vor dem
+   Testlauf, da still verlorene Einträge sonst nicht auffallen.
+6. Tests in Verzeichnis-Chunks (Abschnitt 6 oben), Umgebungsartefakte
    pauschal abhaken.
-5. `docs/upstream_sync_log.md`-Eintrag schreiben (kompakt: was gemerged,
-   welche echten Konflikte/Regressionen gefunden+gefixt, grobe Testlage,
-   offene Punkte — kein Roman).
-6. Scratch-/Temp-Dateien aufräumen (`_*.log`, `_*.txt` im Repo-Root),
+7. `docs/upstream_sync_log.md`-Eintrag schreiben (kompakt: was gemerged,
+   Security-Triage-Ergebnis, welche echten Konflikte/Regressionen
+   gefunden+gefixt, grobe Testlage, offene Punkte — kein Roman).
+8. Scratch-/Temp-Dateien aufräumen (`_*.log`, `_*.txt` im Repo-Root),
    bevor committet wird.
-7. Merge auf Integrationsbranch committen.
-8. Nach `powerunits-internal-setup` mergen und pushen — **nur** wenn keine
-   sicherheitsrelevanten offenen Fragen bestehen (first-safe policy,
-   Telegram-first, kein Shell/SSH/Docker/Code-Exec-Ausbau, keine
-   Bucket-Credentials, keine schreibfähige Produktions-DB-URL, keine
-   Worker/Deploy-Controls). Sonst: als Blocker zurückmelden, nicht selbst
-   mergen.
-9. Repo-B-Operator-Notiz aktualisieren, falls relevant.
-10. Nächste Version vorbereiten.
+9. Merge auf Integrationsbranch committen.
+10. Nach `powerunits-internal-setup` mergen und pushen — **nur** wenn keine
+    sicherheitsrelevanten offenen Fragen bestehen (first-safe policy,
+    Telegram-first, kein Shell/SSH/Docker/Code-Exec-Ausbau, keine
+    Bucket-Credentials, keine schreibfähige Produktions-DB-URL, keine
+    Worker/Deploy-Controls). Sonst: als Blocker zurückmelden, nicht selbst
+    mergen.
+11. Repo-B-Operator-Notiz aktualisieren, falls relevant.
+12. Nächste Version vorbereiten.
