@@ -88,7 +88,6 @@ _DEFAULT_PROVIDER_MODELS = {
         "claude-sonnet-4.5",
         "claude-haiku-4.5",
         "gemini-2.5-pro",
-        "grok-code-fast-1",
     ],
     "gemini": [
         "gemini-3.1-pro-preview", "gemini-3-pro-preview",
@@ -292,9 +291,9 @@ def prompt_yes_no(question: str, default: bool = True) -> bool:
 
         if not value:
             return default
-        if value in ("y", "yes"):
+        if value in {"y", "yes"}:
             return True
-        if value in ("n", "no"):
+        if value in {"n", "no"}:
             return False
         print_error("Please enter 'y' or 'n'")
 
@@ -431,6 +430,26 @@ def _print_setup_summary(config: dict, hermes_home):
     else:
         tool_status.append(("Image Generation", False, "FAL_KEY"))
 
+    # Video generation — opt-in via `hermes tools` → Video Generation.
+    # Only show the row when a plugin reports available so we don't badger
+    # users who don't care about video gen with a "missing" status line.
+    try:
+        from agent.video_gen_registry import list_providers as _list_video_providers
+        from hermes_cli.plugins import _ensure_plugins_discovered as _ensure_plugins
+        _ensure_plugins()
+        _video_backend = None
+        for _vp in _list_video_providers():
+            try:
+                if _vp.is_available():
+                    _video_backend = _vp.display_name
+                    break
+            except Exception:
+                continue
+    except Exception:
+        _video_backend = None
+    if _video_backend:
+        tool_status.append((f"Video Generation ({_video_backend})", True, None))
+
     # TTS — show configured provider
     tts_provider = cfg_get(config, "tts", "provider", default="edge")
     if subscription_features.tts.managed_by_nous:
@@ -469,14 +488,6 @@ def _print_setup_summary(config: dict, hermes_home):
             tool_status.append(("Modal Execution", False, "run 'hermes setup terminal'"))
     elif managed_nous_tools_enabled() and subscription_features.nous_auth_present:
         tool_status.append(("Modal Execution (optional via Nous subscription)", True, None))
-
-    # Tinker + WandB (RL training)
-    if get_env_value("TINKER_API_KEY") and get_env_value("WANDB_API_KEY"):
-        tool_status.append(("RL Training (Tinker)", True, None))
-    elif get_env_value("TINKER_API_KEY"):
-        tool_status.append(("RL Training (Tinker)", False, "WANDB_API_KEY"))
-    else:
-        tool_status.append(("RL Training (Tinker)", False, "TINKER_API_KEY"))
 
     # Home Assistant
     if get_env_value("HASS_TOKEN"):
@@ -609,7 +620,7 @@ def _prompt_container_resources(config: dict):
     persist_str = prompt(
         "  Persist filesystem across sessions? (yes/no)", persist_label
     )
-    terminal["container_persistent"] = persist_str.lower() in ("yes", "true", "y", "1")
+    terminal["container_persistent"] = persist_str.lower() in {"yes", "true", "y", "1"}
 
     # CPU
     current_cpu = terminal.get("container_cpu", 1)
@@ -660,7 +671,7 @@ def _prompt_vercel_sandbox_settings(config: dict):
     persist_label = "yes" if current_persist else "no"
     terminal["container_persistent"] = prompt(
         "  Persist filesystem with snapshots? (yes/no)", persist_label
-    ).lower() in ("yes", "true", "y", "1")
+    ).lower() in {"yes", "true", "y", "1"}
 
     current_cpu = terminal.get("container_cpu", 1)
     cpu_str = prompt("  CPU cores", str(current_cpu))
@@ -676,7 +687,7 @@ def _prompt_vercel_sandbox_settings(config: dict):
     except ValueError:
         pass
 
-    if terminal.get("container_disk", 51200) not in (0, 51200):
+    if terminal.get("container_disk", 51200) not in {0, 51200}:
         print_warning("Vercel Sandbox does not support custom disk sizing; resetting container_disk to 51200.")
     terminal["container_disk"] = 51200
 
@@ -1022,6 +1033,83 @@ def _install_neutts_deps() -> bool:
         return False
 
 
+def _install_kittentts_deps() -> bool:
+    """Install KittenTTS dependencies with user approval. Returns True on success."""
+    import subprocess
+    import sys
+
+    wheel_url = (
+        "https://github.com/KittenML/KittenTTS/releases/download/"
+        "0.8.1/kittentts-0.8.1-py3-none-any.whl"
+    )
+    print()
+    print_info("Installing kittentts Python package (~25-80MB model downloaded on first use)...")
+    print()
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-U", wheel_url, "soundfile", "--quiet"],
+            check=True, timeout=300,
+        )
+        print_success("kittentts installed successfully")
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print_error(f"Failed to install kittentts: {e}")
+        print_info(f"Try manually: python -m pip install -U '{wheel_url}' soundfile")
+        return False
+
+
+def _xai_oauth_logged_in_for_setup() -> bool:
+    """True iff xAI Grok OAuth credentials are already stored locally.
+
+    Lets TTS / STT setup skip the API-key prompt for users who logged in
+    through ``hermes model`` -> xAI Grok OAuth (SuperGrok Subscription).
+    """
+    try:
+        from hermes_cli.auth import get_xai_oauth_auth_status
+
+        return bool(get_xai_oauth_auth_status().get("logged_in"))
+    except Exception:
+        return False
+
+
+def _run_xai_oauth_login_from_setup() -> bool:
+    """Run the xAI Grok OAuth loopback login from inside the setup wizard.
+
+    Returns True on success, False on any failure (the caller falls back
+    to whatever the user picked next, e.g. Edge TTS).
+    """
+    try:
+        from hermes_cli.auth import (
+            DEFAULT_XAI_OAUTH_BASE_URL,
+            _is_remote_session,
+            _save_xai_oauth_tokens,
+            _update_config_for_provider,
+            _xai_oauth_loopback_login,
+        )
+    except Exception as exc:
+        print_warning(f"xAI Grok OAuth helpers unavailable: {exc}")
+        return False
+
+    open_browser = not _is_remote_session()
+    print()
+    print_info("Signing in to xAI Grok OAuth (SuperGrok Subscription)...")
+    try:
+        creds = _xai_oauth_loopback_login(open_browser=open_browser)
+        _save_xai_oauth_tokens(
+            creds["tokens"],
+            discovery=creds.get("discovery"),
+            redirect_uri=creds.get("redirect_uri", ""),
+            last_refresh=creds.get("last_refresh"),
+        )
+        _update_config_for_provider(
+            "xai-oauth", creds.get("base_url", DEFAULT_XAI_OAUTH_BASE_URL)
+        )
+        return True
+    except Exception as exc:
+        print_warning(f"xAI Grok OAuth login failed: {exc}")
+        return False
+
+
 def _setup_tts_provider(config: dict):
     """Interactive TTS provider selection with install flow for NeuTTS."""
     tts_config = config.get("tts", {})
@@ -1055,7 +1143,7 @@ def _setup_tts_provider(config: dict):
             "Edge TTS (free, cloud-based, no setup needed)",
             "ElevenLabs (premium quality, needs API key)",
             "OpenAI TTS (good quality, needs API key)",
-            "xAI TTS (Grok voices, needs API key)",
+            "xAI TTS (Grok voices — OAuth login or API key)",
             "MiniMax TTS (high quality with voice cloning, needs API key)",
             "Mistral Voxtral TTS (multilingual, native Opus, needs API key)",
             "Google Gemini TTS (30 prebuilt voices, prompt-controllable, needs API key)",
@@ -1129,21 +1217,59 @@ def _setup_tts_provider(config: dict):
                 selected = "edge"
 
     elif selected == "xai":
-        existing = get_env_value("XAI_API_KEY")
-        if not existing:
+        # Resolution order: existing OAuth tokens (free for SuperGrok subscribers
+        # via the Hermes auth store) > existing XAI_API_KEY > prompt the user.
+        # When neither is configured, offer both options instead of forcing the
+        # API-key path — xAI TTS works fine with OAuth bearer tokens too.
+        oauth_logged_in = _xai_oauth_logged_in_for_setup()
+        existing_api_key = get_env_value("XAI_API_KEY")
+
+        if oauth_logged_in:
+            print_success(
+                "xAI TTS will use your xAI Grok OAuth (SuperGrok Subscription) "
+                "credentials"
+            )
+        elif existing_api_key:
+            print_success("xAI TTS will use your existing XAI_API_KEY")
+        else:
             print()
-            api_key = prompt("xAI API key for TTS", password=True)
-            if api_key:
-                save_env_value("XAI_API_KEY", api_key)
-                print_success("xAI TTS API key saved")
+            choice_idx = prompt_choice(
+                "How do you want xAI TTS to authenticate?",
+                choices=[
+                    "Sign in with xAI Grok OAuth (SuperGrok Subscription) — browser login",
+                    "Paste an xAI API key (console.x.ai)",
+                    "Skip → fallback to Edge TTS",
+                ],
+                default=0,
+            )
+            if choice_idx == 0:
+                if _run_xai_oauth_login_from_setup():
+                    print_success(
+                        "Logged in — xAI TTS will use these OAuth credentials"
+                    )
+                else:
+                    print_warning(
+                        "xAI Grok OAuth login did not complete. "
+                        "Falling back to Edge TTS."
+                    )
+                    selected = "edge"
+            elif choice_idx == 1:
+                api_key = prompt("xAI API key for TTS", password=True)
+                if api_key:
+                    save_env_value("XAI_API_KEY", api_key)
+                    print_success("xAI TTS API key saved")
+                else:
+                    from hermes_constants import display_hermes_home as _dhh
+                    print_warning(
+                        "No xAI API key provided for TTS. Configure XAI_API_KEY "
+                        f"via hermes setup model or {_dhh()}/.env to use xAI TTS. "
+                        "Falling back to Edge TTS."
+                    )
+                    selected = "edge"
             else:
-                from hermes_constants import display_hermes_home as _dhh
-                print_warning(
-                    "No xAI API key provided for TTS. Configure XAI_API_KEY via "
-                    f"hermes setup model or {_dhh()}/.env to use xAI TTS. "
-                    "Falling back to Edge TTS."
-                )
+                print_warning("xAI TTS skipped. Falling back to Edge TTS.")
                 selected = "edge"
+
         if selected == "xai":
             print()
             voice_id = prompt("xAI voice_id (Enter for 'eve', or paste a custom voice ID)")
@@ -1276,14 +1402,13 @@ def setup_terminal_backend(config: dict):
         existing_sudo = get_env_value("SUDO_PASSWORD")
         if existing_sudo:
             print_info("Sudo password: configured")
-        else:
-            if prompt_yes_no(
-                "Enable sudo support? (stores password for apt install, etc.)", False
-            ):
-                sudo_pass = prompt("  Sudo password", password=True)
-                if sudo_pass:
-                    save_env_value("SUDO_PASSWORD", sudo_pass)
-                    print_success("Sudo password saved")
+        elif prompt_yes_no(
+            "Enable sudo support? (stores password for apt install, etc.)", False
+        ):
+            sudo_pass = prompt("  Sudo password", password=True)
+            if sudo_pass:
+                save_env_value("SUDO_PASSWORD", sudo_pass)
+                print_success("Sudo password saved")
 
     elif selected_backend == "docker":
         print_success("Terminal backend: Docker")
@@ -1651,7 +1776,7 @@ def setup_agent_settings(config: dict):
 
     current_mode = cfg_get(config, "display", "tool_progress", default="all")
     mode = prompt("Tool progress mode", current_mode)
-    if mode.lower() in ("off", "new", "all", "verbose"):
+    if mode.lower() in {"off", "new", "all", "verbose"}:
         if "display" not in config:
             config["display"] = {}
         config["display"]["tool_progress"] = mode.lower()
@@ -2366,6 +2491,7 @@ def setup_gateway(config: dict):
 
         _is_linux = _platform.system() == "Linux"
         _is_macos = _platform.system() == "Darwin"
+        _is_windows = _platform.system() == "Windows"
 
         from hermes_cli.gateway import (
             _is_service_installed,
@@ -2390,7 +2516,7 @@ def setup_gateway(config: dict):
         service_installed = _is_service_installed()
         service_running = _is_service_running()
         supports_systemd = supports_systemd_services()
-        supports_service_manager = supports_systemd or _is_macos
+        supports_service_manager = supports_systemd or _is_macos or _is_windows
 
         print()
         if supports_systemd and has_conflicting_systemd_units():
@@ -2410,6 +2536,9 @@ def setup_gateway(config: dict):
                         systemd_restart()
                     elif _is_macos:
                         launchd_restart()
+                    elif _is_windows:
+                        from hermes_cli import gateway_windows
+                        gateway_windows.restart()
                 except UserSystemdUnavailableError as e:
                     print_error("  Restart failed — user systemd not reachable:")
                     for line in str(e).splitlines():
@@ -2432,6 +2561,9 @@ def setup_gateway(config: dict):
                         systemd_start()
                     elif _is_macos:
                         launchd_start()
+                    elif _is_windows:
+                        from hermes_cli import gateway_windows
+                        gateway_windows.start()
                 except UserSystemdUnavailableError as e:
                     print_error("  Start failed — user systemd not reachable:")
                     for line in str(e).splitlines():
@@ -2442,7 +2574,12 @@ def setup_gateway(config: dict):
                 except Exception as e:
                     print_error(f"  Start failed: {e}")
         elif supports_service_manager:
-            svc_name = "systemd" if supports_systemd else "launchd"
+            if supports_systemd:
+                svc_name = "systemd"
+            elif _is_macos:
+                svc_name = "launchd"
+            else:
+                svc_name = "Scheduled Task"
             if prompt_yes_no(
                 f"  Install the gateway as a {svc_name} service? (runs in background, starts on boot)",
                 True,
@@ -2450,13 +2587,23 @@ def setup_gateway(config: dict):
                 try:
                     installed_scope = None
                     did_install = False
+                    started_inline = False
                     if supports_systemd:
                         installed_scope, did_install = install_linux_gateway_from_setup(force=False)
-                    else:
+                    elif _is_macos:
                         launchd_install(force=False)
                         did_install = True
+                    else:
+                        # gateway_windows.install() registers the Scheduled
+                        # Task AND starts it immediately (via schtasks /Run
+                        # or a direct spawn fallback), so no separate start
+                        # prompt is needed here.
+                        from hermes_cli import gateway_windows
+                        gateway_windows.install(force=False)
+                        did_install = True
+                        started_inline = True
                     print()
-                    if did_install and prompt_yes_no("  Start the service now?", True):
+                    if did_install and not started_inline and prompt_yes_no("  Start the service now?", True):
                         try:
                             if supports_systemd:
                                 systemd_start(system=installed_scope == "system")
@@ -2520,6 +2667,74 @@ def setup_tools(config: dict, first_install: bool = False):
 # =============================================================================
 
 
+def _model_section_has_credentials(config: dict) -> bool:
+    """Return True when any known inference provider has usable credentials.
+
+    Sources of truth:
+      * ``PROVIDER_REGISTRY`` in ``hermes_cli.auth`` — lists every supported
+        provider along with its ``api_key_env_vars``.
+      * ``active_provider`` in the auth store — covers OAuth device-code /
+        external-OAuth providers (Nous, Codex, Qwen, Gemini CLI, ...).
+      * The legacy OpenRouter aggregator env vars, which route generic
+        ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` values through OpenRouter.
+    """
+    try:
+        from hermes_cli.auth import get_active_provider
+        if get_active_provider():
+            return True
+    except Exception:
+        pass
+
+    try:
+        from hermes_cli.auth import PROVIDER_REGISTRY
+    except Exception:
+        PROVIDER_REGISTRY = {}  # type: ignore[assignment]
+
+    def _has_key(pconfig) -> bool:
+        for env_var in pconfig.api_key_env_vars:
+            # CLAUDE_CODE_OAUTH_TOKEN is set by Claude Code itself, not by
+            # the user — mirrors is_provider_explicitly_configured in auth.py.
+            if env_var == "CLAUDE_CODE_OAUTH_TOKEN":
+                continue
+            if get_env_value(env_var):
+                return True
+        return False
+
+    # Prefer the provider declared in config.yaml, avoids false positives
+    # from stray env vars (GH_TOKEN, etc.) when the user has already picked
+    # a different provider.
+    model_cfg = config.get("model") if isinstance(config, dict) else None
+    if isinstance(model_cfg, dict):
+        provider_id = (model_cfg.get("provider") or "").strip().lower()
+        if provider_id in PROVIDER_REGISTRY:
+            if _has_key(PROVIDER_REGISTRY[provider_id]):
+                return True
+        if provider_id == "openrouter":
+            for env_var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY"):
+                if get_env_value(env_var):
+                    return True
+
+    # OpenRouter aggregator fallback (no provider declared in config).
+    for env_var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY"):
+        if get_env_value(env_var):
+            return True
+
+    for pid, pconfig in PROVIDER_REGISTRY.items():
+        # Skip copilot in auto-detect: GH_TOKEN / GITHUB_TOKEN are
+        # commonly set for git tooling.  Mirrors resolve_provider in auth.py.
+        if pid == "copilot":
+            continue
+        if _has_key(pconfig):
+            return True
+    return False
+
+
+def _gateway_platform_short_label(label: str) -> str:
+    """Strip trailing parenthetical qualifiers from a gateway platform label."""
+    base = label.split("(", 1)[0].strip()
+    return base or label
+
+
 def _get_section_config_summary(config: dict, section_key: str) -> Optional[str]:
     """Return a short summary if a setup section is already configured, else None.
 
@@ -2528,20 +2743,7 @@ def _get_section_config_summary(config: dict, section_key: str) -> Optional[str]
     so that test patches on ``setup_mod.get_env_value`` take effect.
     """
     if section_key == "model":
-        has_key = bool(
-            get_env_value("OPENROUTER_API_KEY")
-            or get_env_value("OPENAI_API_KEY")
-            or get_env_value("ANTHROPIC_API_KEY")
-        )
-        if not has_key:
-            # Check for OAuth providers
-            try:
-                from hermes_cli.auth import get_active_provider
-                if get_active_provider():
-                    has_key = True
-            except Exception:
-                pass
-        if not has_key:
+        if not _model_section_has_credentials(config):
             return None
         model = config.get("model")
         if isinstance(model, str) and model.strip():
@@ -3091,36 +3293,25 @@ def run_setup_wizard(args):
         print_info(f"  cp {_backup_path} {config_path}")
     _print_setup_summary(config, hermes_home)
 
-    _offer_launch_chat()
-
-
-def _offer_launch_chat():
-    """Prompt the user to jump straight into chat after setup."""
-    print()
-    if not prompt_yes_no("Launch hermes chat now?", True):
-        return
-
-    from hermes_cli.relaunch import relaunch
-    relaunch(["chat"])
-
 
 def _run_first_time_quick_setup(config: dict, hermes_home, is_existing: bool):
-    """Streamlined first-time setup: provider + model only.
+    """Streamlined first-time setup: provider, model, terminal & messaging.
 
-    Applies sensible defaults for TTS (Edge), terminal (local), agent
-    settings, and tools — the user can customize later via
-    ``hermes setup <section>``.
+    Applies sensible defaults for TTS (Edge), agent settings, and tools —
+    the user can customize later via ``hermes setup <section>``.
     """
     # Step 1: Model & Provider (essential — skips rotation/vision/TTS)
     setup_model_provider(config, quick=True)
 
-    # Step 2: Apply defaults for everything else
+    # Step 2: Terminal Backend — where commands run is a core decision
+    setup_terminal_backend(config)
+
+    # Step 3: Apply defaults for everything else
     _apply_default_agent_settings(config)
-    config.setdefault("terminal", {}).setdefault("backend", "local")
 
     save_config(config)
 
-    # Step 3: Offer messaging gateway setup
+    # Step 4: Offer messaging gateway setup
     print()
     gateway_choice = prompt_choice(
         "Connect a messaging platform? (Telegram, Discord, etc.)",
@@ -3144,8 +3335,6 @@ def _run_first_time_quick_setup(config: dict, hermes_home, is_existing: bool):
     print()
 
     _print_setup_summary(config, hermes_home)
-
-    _offer_launch_chat()
 
 
 def _run_quick_setup(config: dict, hermes_home):

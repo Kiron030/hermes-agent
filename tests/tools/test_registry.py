@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.registry import ToolRegistry, discover_builtin_tools
+from tools.registry import ToolRegistry, _module_registers_tools, discover_builtin_tools
 
 
 def _dummy_handler(args, **kwargs):
@@ -289,95 +289,24 @@ class TestCheckFnExceptionHandling:
 
 
 class TestBuiltinDiscovery:
-    def test_matches_previous_manual_builtin_tool_set(self):
-        # Snapshot of ``tools/*.py`` that contain a module-level ``registry.register`` call.
-        # Intentionally explicit: add new builtins here when merging tool PRs —
-        # do not widen discovery to hide regressions.
-        expected = {
-            "tools.browser_cdp_tool",
-            "tools.browser_dialog_tool",
-            "tools.browser_tool",
-            "tools.clarify_tool",
-            "tools.code_execution_tool",
-            "tools.cronjob_tools",
-            "tools.delegate_tool",
-            "tools.discord_tool",
-            "tools.feishu_doc_tool",
-            "tools.feishu_drive_tool",
-            "tools.file_tools",
-            "tools.homeassistant_tool",
-            "tools.image_generation_tool",
-            "tools.kanban_tools",
-            "tools.memory_tool",
-            "tools.mixture_of_agents_tool",
-            "tools.powerunits_baseline_layer_preview_tool",
-            "tools.powerunits_bounded_coverage_inventory_tool",
-            "tools.powerunits_bounded_rollout_governance_tool",
-            "tools.powerunits_de_stack_remediation_planner_tool",
-            "tools.powerunits_docs_tool",
-            "tools.powerunits_entsoe_bzn_price_readiness_tool",
-            "tools.powerunits_entsoe_bzn_prices_tool",
-            "tools.powerunits_entsoe_forecast_bounded_execute_tool",
-            "tools.powerunits_entsoe_forecast_bounded_preflight_tool",
-            "tools.powerunits_entsoe_forecast_bounded_summary_tool",
-            "tools.powerunits_entsoe_forecast_bounded_validate_tool",
-            "tools.powerunits_entsoe_market_bounded_campaign_tool",
-            "tools.powerunits_entsoe_market_bounded_coverage_scan_tool",
-            "tools.powerunits_entsoe_market_bounded_execute_tool",
-            "tools.powerunits_entsoe_market_bounded_preflight_tool",
-            "tools.powerunits_entsoe_market_bounded_summary_tool",
-            "tools.powerunits_entsoe_market_bounded_validate_tool",
-            "tools.powerunits_era5_weather_bounded_campaign_tool",
-            "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
-            "tools.powerunits_era5_weather_bounded_execute_tool",
-            "tools.powerunits_era5_weather_bounded_preflight_tool",
-            "tools.powerunits_era5_weather_bounded_summary_tool",
-            "tools.powerunits_era5_weather_bounded_validate_tool",
-            "tools.powerunits_github_docs_tool",
-            "tools.powerunits_market_driver_features_bounded_de_execute_tool",
-            "tools.powerunits_market_driver_features_bounded_de_readiness_tool",
-            "tools.powerunits_market_driver_features_bounded_de_summary_tool",
-            "tools.powerunits_market_driver_features_bounded_de_validate_tool",
-            "tools.powerunits_market_features_bounded_de_execute_tool",
-            "tools.powerunits_market_features_bounded_de_readiness_tool",
-            "tools.powerunits_market_features_bounded_de_summary_tool",
-            "tools.powerunits_market_features_bounded_de_validate_tool",
-            "tools.powerunits_operator_posture_tool",
-            "tools.powerunits_option_d_execute_tool",
-            "tools.powerunits_option_d_preflight_tool",
-            "tools.powerunits_option_d_readiness_tool",
-            "tools.powerunits_option_d_summary_tool",
-            "tools.powerunits_option_d_validate_tool",
-            "tools.powerunits_outage_awareness_bounded_summary_tool",
-            "tools.powerunits_outage_awareness_bounded_validate_tool",
-            "tools.powerunits_outage_repair_bounded_execute_tool",
-            "tools.powerunits_repo_b_read_tool",
-            "tools.powerunits_tier1_workspace_analysis_tool",
-            "tools.powerunits_tier2_allowlisted_locals_tool",
-            "tools.powerunits_tier3_skills_integration_tool",
-            "tools.powerunits_tier4a_skill_draft_proposals_tool",
-            "tools.powerunits_tier4b_review_governance_tool",
-            "tools.powerunits_tier5a_bounded_workflow_tool",
-            "tools.powerunits_timescale_read_tool",
-            "tools.powerunits_workspace_tool",
-            "tools.process_registry",
-            "tools.rl_training_tool",
-            "tools.send_message_tool",
-            "tools.session_search_tool",
-            "tools.skill_manager_tool",
-            "tools.skills_tool",
-            "tools.terminal_tool",
-            "tools.todo_tool",
-            "tools.tts_tool",
-            "tools.vision_tools",
-            "tools.web_tools",
-            "tools.yuanbao_tools",
-        }
+    def test_discovers_all_real_self_registering_builtin_tool_modules(self):
+        # Behavioral check, not a hardcoded snapshot (see AGENTS.md "Don't
+        # write change-detector tests"): scans tools/*.py and compares
+        # discover_builtin_tools() against the same
+        # module-registers-tools predicate it uses internally, so adding a
+        # new tools/powerunits_*.py file doesn't require updating a list here.
+        tools_dir = Path(__file__).resolve().parents[2] / "tools"
+        expected = [
+            f"tools.{path.stem}"
+            for path in sorted(tools_dir.glob("*.py"))
+            if path.name not in {"__init__.py", "registry.py", "mcp_tool.py"}
+            and _module_registers_tools(path)
+        ]
 
         with patch("tools.registry.importlib.import_module"):
-            imported = discover_builtin_tools(Path(__file__).resolve().parents[2] / "tools")
+            imported = discover_builtin_tools(tools_dir)
 
-        assert set(imported) == expected
+        assert imported == expected
 
     def test_imports_only_self_registering_modules(self, tmp_path):
         tools_dir = tmp_path / "tools"

@@ -82,3 +82,6 @@ scripts/bundle_agent_context_for_cursor*.ps1
 *.manifest.local.json
 
 models-dev-upstream/
+hermes_cli/tui_dist/*
+hermes_cli/scripts/
+docs/superpowers/*

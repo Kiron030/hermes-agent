@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-07-01 — v0.14.0-Merge (Tag `v2026.5.16`) auf `integration/hermes-runtime-v0.14-bump`
+
+**Gemerged:** Upstream v0.14.0. Sicherheitsrelevant (zuerst triagiert, alles übernommen): exaktes Dependency-Pinning (`==X.Y.Z` statt Ranges) in `pyproject.toml`, `hermes_cli/runtime_provider.py`-Fix für GHSA-76xc-57q6-vm5m (Ollama-/OpenRouter-API-Key-Leak an Lookalike-Domains via Substring-Match statt `base_url_host_matches()`), restrukturierte `[project.optional-dependencies]` (viele Provider-Extras jetzt lazy-loaded).
+
+**Konflikte/Fork-Anpassungen:** `pyproject.toml` (Upstream-Pinning übernommen, `psycopg[binary]` + `hermes-agent[messaging]` bewusst weiter in `core`/`[all]` gehalten — Docker-Build/Telegram-First-Anforderung), `docker/entrypoint.sh` (Skill-Sync-Gating + Upstream-`auth.json`-Bootstrap kombiniert), `toolsets.py` (`hermes-cron`-Toolset übernommen), `agent/transports/chat_completions.py` (`base_url` + `session_id` in `build_api_kwargs_extras` kombiniert).
+
+**Stille Regressionen gefunden + behoben (Symbol-/Intra-Funktions-/Content-Diff-Check):**
+- `hermes_cli/setup.py`: `_gateway_platform_short_label()`-Funktionsdefinition beim Merge komplett verloren (Call-Site blieb) → `NameError`. Restauriert.
+- `hermes_cli/setup.py`: `_get_section_config_summary()`s Credential-Erkennung für Sektion "model" war eine veraltete 3-Key-Inline-Prüfung; Upstream hat das in eine umfassendere `_model_section_has_credentials()`-Logik ausgelagert (ZAI GLM, MiniMax, Copilot, alle `PROVIDER_REGISTRY`-Einträge, OAuth). Fork-Version nachgezogen.
+- `toolsets.py`: `hermes-feishu`-Composite-Toolset verlor mehrere Tools (`feishu_doc_read`, `feishu_drive_list_comments`, `feishu_drive_list_comment_replies`, `feishu_drive_reply_comment`, `feishu_drive_add_comment`) beim Merge — restauriert.
+- `toolsets.py`: neues Upstream-Tool `browser_dialog` fehlte in `_HERMES_CORE_TOOLS` — ergänzt.
+- **`run_agent.py` — echter, eigenständiger Bugfix (kein reiner Merge-Regressions-Fix, schließt offenen Punkt #2 aus dem v0.13.0-Log-Eintrag ab):** Die Auto-Upgrade-Logik `chat_completions` → `codex_responses` nutzte `self._is_direct_openai_url() OR _provider_model_requires_responses_api(...)`, wodurch *jedes* Modell (auch GPT-4.1) auf direktem `api.openai.com` faelschlich auf die Responses-API hochgestuft wurde — GPT-4.x lehnt dort `include: ["reasoning.encrypted_content"]` mit HTTP 400 ab. Ursache: Fork-Commit `f609135` (April 2026) hatte das bereits auf reines modellbasiertes Gating (`_provider_model_requires_responses_api()` allein, ohne URL-ODER) umgestellt und die entsprechende `include`/`reasoning`-Sonderbehandlung inline in `_build_api_kwargs()` ergänzt — diese Logik ging beim v0.13.0-Sync (ProviderProfile-/Transport-Layer-Refactoring, `agent/transports/codex.py`) klammheimlich unter, weil die Transport-Extraktion den alten Inline-Code ersetzt hat, ohne die Fork-Anpassung mitzunehmen. Fix: URL-ODER aus `__init__` entfernt (rein modellbasiert), neuer `openai_encrypted_reasoning_ok`-Parameter von `run_agent.py` an `agent/transports/codex.py::build_kwargs()` durchgereicht, dort `include`/`reasoning` fuer Direct-OpenAI+Nicht-GPT-5 unterdrückt. Beide zugehörigen Tests (`test_build_api_kwargs_codex_openai_direct_skips_encrypted_reasoning_for_gpt41`, `test_aiagent_openai_direct_gpt41_defaults_to_chat_completions`) sowie die Geschwistertests (`test_aiagent_openai_direct_gpt5_upgrades_to_codex_responses` etc., 362/362 in `tests/run_agent/test_run_agent_codex_responses.py` + `tests/agent/transports/`) grün.
+- `acp_registry/agent.json`: Versions-Bump auf `pyproject.toml` (0.14.0) vergessen nachzuziehen — `version` + `distribution.uvx.package`-Pin aktualisiert.
+
+**Testlage (pragmatischer Chunk-Scope, siehe Nutzervorgabe):** Alle Verzeichnis-Chunks durchlaufen (`agent+cli+cron`, `gateway+plugins+providers`, `run_agent`, `hermes_cli`, `tools`, `skills+tui_gateway+website`, Top-Level `test_*.py`+`acp`/`acp_adapter`). Nach obigen Fixes keine weiteren echten Regressionen — verbleibende Failures durchweg bekannte Windows/Netzlaufwerk-Artefakte (POSIX-only `os.WIFEXITED`/`pwd`/`fcntl`, `tirith_security` komplett Windows-deaktiviert da kein Windows-Build, `Path.home()`/`HOME`-vs-`USERPROFILE`, Matrix auf Windows ausgeblendet, `\r\n`-Zeilenenden, Proxy-Env-Case-Insensitivity, asyncio-ProactorEventLoop+`os.pipe()`, curses/systemd/launchd/WSL, Datei-Permission-Bits, SQLite-Tempdir-Cleanup) — alle einzeln stichprobenartig verifiziert, nicht neu.
+
+**Offene Punkte:** Keine sicherheitsrelevanten Blocker. `test_provider_parity.py`-Katalog-Drift (bekannter Change-Detector, aus v0.13-Log) weiterhin unangetastet.
+
+**Branches:** Committet auf `integration/hermes-runtime-v0.14-bump`, nach `powerunits-internal-setup` gemerged und gepusht.
+
+**Naechster Schritt:** Repo-B-Operator-Notiz aktualisieren, danach v0.15.0-Sync vorbereiten.
+
+---
+
 ## 2026-07-01 — v0.13.0-Merge: Konfliktauflösung + Intra-Funktions-Regressionen gefunden/behoben
 
 **Kontext:** Zweiter v0.13.0-Merge-Versuch (Tag `v2026.5.7`) nach dem `model_tools.py`-Hotfix, auf `integration/hermes-runtime-v0.13-bump`. `model_tools.py` mergte diesmal sauber (Symbol-Diff-Check: keine fehlenden Upstream-Funktionen). Verbleibende 4 echte Konflikte (`AGENTS.md`, `agent/transports/chat_completions.py`, `gateway/config.py`, `toolsets.py`) wurden aufgelöst; siehe `docs/powerunits_fork_sync_strategy_v1.md` Abschnitt 8 fuer die vollstaendige Vorfalls-Analyse (Symbol-Diff Teil 1 + Intra-Funktions-Diff Teil 2).
