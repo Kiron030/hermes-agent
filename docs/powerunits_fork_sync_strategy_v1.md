@@ -110,6 +110,14 @@ Mindestens diese Validierung nach jedem Upstream-Sync:
 5. **Telegram smoke**
    - read -> summarize -> save -> read back
    - keine Clarify-Loop/Tool-Narrationsregression
+6. **Symbol-Diff-Check auf Hotspot-Dateien (PFLICHT, seit v0.13-Sync-Vorfall 2026-07-01)**
+   - Ein "clean auto-merge" (kein `<<<<<<<`-Marker) ist bei stark refaktorierten Dateien **kein** Beweis für Vollständigkeit. Git kann bei zeilenbasierten Diffs auf beiden Seiten geänderte Funktionen ohne Konfliktmarker einseitig "gewinnen" lassen und dabei Upstream-Funktionalität stillschweigend verwerfen.
+   - Für jede Datei aus Abschnitt 3 (Hotspots), die im Merge angefasst wurde:
+     1. `git show <merge-base>:<file>` (Basis), `git show <upstream-tag>:<file>` (Upstream-Ziel), Datei im Merge-Ergebnis — je in eine Datei umleiten (kein direktes Pipe von `git show` in andere Befehle verwenden, encoding-anfällig).
+     2. Funktions-/Symbolliste extrahieren (z. B. `^def |^class |^    def `) und die drei Listen vergleichen.
+     3. Jede Funktion/Signatur, die in Upstream-Ziel existiert, aber im Merge-Ergebnis fehlt oder von der Basis-Version übernommen wurde (statt der Upstream-Version), ist ein Kandidat für stillen Verlust — muss geprüft und ggf. nachgetragen werden.
+     4. Zeilenzahl grob vergleichen (Basis + Upstream-Delta ≈ erwartete Ergebniszeilenzahl); große Abweichung nach unten ist ein Warnsignal.
+   - Bei Verdacht auf stillen Verlust: **nicht** einfach die Konfliktmarker "accept theirs/ours" lösen. Stattdessen Datei aus der Upstream-Zielversion neu aufbauen und die Fork-spezifischen Anpassungen (ermittelt via `git diff <merge-base> <fork-branch> -- <file>`) gezielt nachziehen.
 
 ---
 
@@ -196,6 +204,14 @@ Technisch:
 - Merge kann formal "resolved" sein, obwohl Marker-Reste im File bleiben; daher nach Konfliktloesung immer Marker-Scan (`<<<<<<<`, `=======`, `>>>>>>>`) + Syntax-Check auf kritische Runtime-Dateien.
 - Workflow-Diffs unter `.github/workflows/` und Supply-Chain-sensitive Pfade (z. B. `hermes_cli/setup.py`) brauchen explizite Sichtpruefung, auch wenn kein akuter Fehler sichtbar ist.
 - Tag-first plus kleiner Scope reduziert Konfliktflaeche und vereinfacht Root-Cause-Analyse bei Runtime-Breaks.
+
+### v0.13-Sync-Vorfall (2026-07-01): stiller Funktionsverlust ohne Konfliktmarker
+
+Beim Versuch, `v2026.5.7` (v0.13.0) nach `integration/hermes-runtime-v0.13-bump` zu mergen, meldete Git nur 5 echte Konflikte (`AGENTS.md`, `agent/transports/chat_completions.py`, `gateway/config.py`, `model_tools.py` x2, `toolsets.py`). Eine Symbol-Diff-Pruefung (siehe Abschnitt 4, Punkt 6 — neu eingefuehrt als direkte Konsequenz) zeigte aber: **`model_tools.py` verlor beim Merge stillschweigend vier Upstream-Funktionen** (`_clear_tool_defs_cache`, `_compute_tool_definitions`-Refactor, `_schema_allows_null`, `_coerce_json`) sowie einen Bugfix fuer `disabled_toolsets`-Handling (Upstream-Issue #17309: `elif disabled_toolsets` -> `if disabled_toolsets` als unbedingter Subtraktions-Schritt), **ohne dass Git dafuer einen Konfliktmarker gesetzt hat**. Zeilenzahl-Check haette es fruehzeitig gezeigt: Basis (Upstream v0.12.0) 811 Zeilen, Merge-Ergebnis nur 670 — deutlich zu wenig fuer eine Datei, die eigentlich Basis + Upstream-Delta + Fork-Delta enthalten sollte.
+
+Zusaetzlicher Befund: Der `disabled_toolsets`-Bug existierte bereits **vor** diesem Sync-Versuch im Fork-Stand (`elif disabled_toolsets:` statt `if disabled_toolsets:` in `get_tool_definitions()`) — vermutlich bereits beim v0.12.0-Merge stillschweigend verloren gegangen, ohne dass es bis jetzt aufgefallen ist. Sicherheitsrelevanz: `run_agent.py` ruft `get_tool_definitions(enabled_toolsets=..., disabled_toolsets=...)` mit beiden Parametern gleichzeitig auf; mit der `elif`-Logik wird `disabled_toolsets` ignoriert, sobald `enabled_toolsets` gesetzt ist. Reale Exposure zum Fundzeitpunkt: gering, da der Powerunits-Gateway-Pfad (`platform_toolsets`) ausschliesslich mit `enabled_toolsets`-Allowlisting arbeitet und `disabled_toolsets` im Live-Pfad nicht gesetzt wird — aber ein latenter Defekt, der bei zukuenftiger Nutzung von `agent.disabled_toolsets` in `config.yaml` als zusaetzliche Absicherung schweigend nicht greifen wuerde.
+
+**Konsequenz fuer den Prozess:** "Kein Konfliktmarker" != "sicher gemergt" bei Dateien, die auf beiden Seiten (Upstream und Fork) substanziell refaktoriert wurden. Ab sofort verpflichtend: Symbol-Diff-Check (Abschnitt 4.6) fuer alle Hotspot-Dateien, bevor ein Merge als "konfliktfrei geloest" gilt — unabhaengig davon, ob Git Konfliktmarker gesetzt hat oder nicht.
 
 Operativ:
 
