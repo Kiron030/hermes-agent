@@ -366,12 +366,17 @@ def _compute_tool_definitions(
             else:
                 if not quiet_mode:
                     print(f"⚠️  Unknown toolset: {toolset_name}")
-
-    elif disabled_toolsets:
+    else:
+        # Default: start with everything
         from toolsets import get_all_toolsets
         for ts_name in get_all_toolsets():
             tools_to_include.update(resolve_toolset(ts_name))
 
+    # Always apply disabled toolsets as a subtraction step at the end.
+    # This ensures that even if a composite toolset (like hermes-cli)
+    # is enabled, any tools belonging to a disabled toolset are strictly
+    # stripped out. See issue #17309.
+    if disabled_toolsets:
         for toolset_name in disabled_toolsets:
             if validate_toolset(toolset_name):
                 resolved = resolve_toolset(toolset_name)
@@ -386,10 +391,6 @@ def _compute_tool_definitions(
             else:
                 if not quiet_mode:
                     print(f"⚠️  Unknown toolset: {toolset_name}")
-    else:
-        from toolsets import get_all_toolsets
-        for ts_name in get_all_toolsets():
-            tools_to_include.update(resolve_toolset(ts_name))
 
     # Powerunits first-safe runtime lockdown: hard-cap the final callable
     # tool surface regardless of upstream defaults or caller-provided toolsets.
@@ -430,30 +431,40 @@ def _compute_tool_definitions(
                 filtered_tools[i] = {"type": "function", "function": dynamic_schema}
                 break
 
-    # Rebuild discord_server schema based on the bot's privileged intents
-    # (detected from GET /applications/@me) and the user's action allowlist
-    # in config.  Hides actions the bot's intents don't support so the
-    # model never attempts them, and annotates fetch_messages when the
+    # Rebuild discord / discord_admin schemas based on the bot's privileged
+    # intents (detected from GET /applications/@me) and the user's action
+    # allowlist in config.  Hides actions the bot's intents don't support so
+    # the model never attempts them, and annotates fetch_messages when the
     # MESSAGE_CONTENT intent is missing.
-    if "discord_server" in available_tool_names:
-        try:
-            from tools.discord_tool import get_dynamic_schema
-            dynamic = get_dynamic_schema()
-        except Exception:  # pragma: no cover — defensive, fall back to static
-            dynamic = None
-        if dynamic is None:
-            # Tool filtered out entirely (empty allowlist or detection disabled
-            # the only remaining actions).  Drop it from the schema list.
-            filtered_tools = [
-                t for t in filtered_tools
-                if t.get("function", {}).get("name") != "discord_server"
-            ]
-            available_tool_names.discard("discord_server")
-        else:
-            for i, td in enumerate(filtered_tools):
-                if td.get("function", {}).get("name") == "discord_server":
-                    filtered_tools[i] = {"type": "function", "function": dynamic}
-                    break
+    #
+    # Note: the registered tool names are "discord" / "discord_admin"
+    # (tools/discord_tool.py registry.register calls) — there is no
+    # "discord_server" tool. A prior "discord_server" single-tool variant
+    # here was dead code (the `if` never matched any registered tool name),
+    # so dynamic intent-based schema filtering silently never ran.
+    _discord_schema_fns = {
+        "discord": "get_dynamic_schema_core",
+        "discord_admin": "get_dynamic_schema_admin",
+    }
+    for discord_tool_name in _discord_schema_fns:
+        if discord_tool_name in available_tool_names:
+            try:
+                from tools import discord_tool as _dt
+                schema_fn = getattr(_dt, _discord_schema_fns[discord_tool_name])
+                dynamic = schema_fn()
+            except Exception:
+                dynamic = None
+            if dynamic is None:
+                filtered_tools = [
+                    t for t in filtered_tools
+                    if t.get("function", {}).get("name") != discord_tool_name
+                ]
+                available_tool_names.discard(discord_tool_name)
+            else:
+                for i, td in enumerate(filtered_tools):
+                    if td.get("function", {}).get("name") == discord_tool_name:
+                        filtered_tools[i] = {"type": "function", "function": dynamic}
+                        break
 
     # Strip web tool cross-references from browser_navigate description when
     # web_search / web_extract are not available.  The static schema says
@@ -515,6 +526,12 @@ def coerce_tool_args(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
     Handles ``"type": "integer"``, ``"type": "number"``, ``"type": "boolean"``,
     and union types (``"type": ["integer", "string"]``).
+
+    Also wraps bare scalar values in a single-element list when the schema
+    declares ``"type": "array"``.  Open-weight models (DeepSeek, Qwen, GLM)
+    sometimes emit ``{"urls": "https://a.com"}`` when the tool expects
+    ``{"urls": ["https://a.com"]}``; wrapping here avoids a confusing tool
+    failure on what is otherwise a well-formed call.
     """
     if not args or not isinstance(args, dict):
         return args
@@ -527,13 +544,42 @@ def coerce_tool_args(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     if not properties:
         return args
 
-    for key, value in args.items():
-        if not isinstance(value, str):
-            continue
+    for key, value in list(args.items()):
         prop_schema = properties.get(key)
         if not prop_schema:
             continue
         expected = prop_schema.get("type")
+
+        # Wrap bare non-list values when the schema declares ``array``.
+        # Strings still go through _coerce_value first so JSON-encoded
+        # arrays (``'["a","b"]'``) get parsed and nullable ``"null"``
+        # becomes ``None`` rather than ``["null"]``.
+        # ``None`` itself is preserved — we don't know whether the model
+        # meant "omit" or "empty list", and tools with sensible defaults
+        # (e.g. read_file's normalize_read_pagination) already handle it.
+        if expected == "array" and value is not None and not isinstance(value, (list, tuple)):
+            if isinstance(value, str):
+                coerced = _coerce_value(value, expected, schema=prop_schema)
+                if coerced is not value:
+                    # _coerce_value handled it (JSON-parsed list or
+                    # nullable "null" → None).
+                    args[key] = coerced
+                    continue
+                args[key] = [value]
+                logger.info(
+                    "coerce_tool_args: wrapped bare string in list for %s.%s",
+                    tool_name, key,
+                )
+                continue
+            args[key] = [value]
+            logger.info(
+                "coerce_tool_args: wrapped bare %s in list for %s.%s",
+                type(value).__name__, tool_name, key,
+            )
+            continue
+
+        if not isinstance(value, str):
+            continue
         if not expected and not _schema_allows_null(prop_schema):
             continue
         coerced = _coerce_value(value, expected, schema=prop_schema)
