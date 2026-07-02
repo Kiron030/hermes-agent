@@ -265,3 +265,51 @@ Empfehlung fuer internen Betrieb: interner Build-Job erzeugt zuerst das Bundle (
 
 `docker/powerunits_docs/` bleibt in `.gitignore`, damit interne Docs nicht in den Public-Repo-Flow geraten.
 Fuer lokalen Railway-Deploy wird das Bundle ueber `.railwayignore` explizit wieder eingeschlossen.
+
+## s6-overlay migration: `RAILWAY_RUN_UID=0` required (v3.8, incident 2026-07-02)
+
+**Symptom:** Nach dem Wechsel des Images auf die s6-overlay-Architektur (`/init` als PID 1,
+Bootstrap in `docker/stage2-hook.sh`, eingefuehrt im v0.15.0-Upstream-Sync) crasht der
+Container beim Start mit `PermissionError: [Errno 13] Permission denied` auf
+`/opt/data/config.yaml` bzw. `/opt/data/gateway.lock`, obwohl der Code lokal/frisch
+korrekt ist.
+
+**Ursache (reines Railway-Infra-Verhalten, kein Code-Bug):**
+
+- Railway mountet Volumes grundsaetzlich **root-owned** (offiziell dokumentiert:
+  <https://docs.railway.com/volumes>, Abschnitt "Volumes are mounted as the `root` user").
+- Das alte, tini-basierte Image (vor v0.15) lief **durchgehend als root** (kein
+  Privilege-Drop) — der UID-Mismatch existierte nie, weil Prozess-UID und
+  Volume-Owner-UID beide `0` waren.
+- Das neue s6-overlay-Image erwartet dagegen explizit einen **root-gestarteten**
+  Container (`docker/stage2-hook.sh` macht UID-Remap + gezielten `chown` auf
+  `$HERMES_HOME`, DANACH droppen supervidierte Services via `s6-setuidgid hermes`
+  auf UID 10000). Startet der Container-Prozess (PID 1 / `/init`) auf Railway
+  **nicht** als root, kann `stage2-hook.sh` seinen eigenen Bootstrap-`chown` nicht
+  ausfuehren, und der spaeter als `hermes` (UID 10000) laufende Gateway-Prozess
+  trifft auf weiterhin root-owned Dateien -> `PermissionError`.
+- Railways eigener, dokumentierter Fix fuer genau dieses Symptom (nicht-root-Image +
+  Volume-Permission-Fehler): Env-Var `RAILWAY_RUN_UID=0` auf dem Service setzen.
+
+**Fix (einmalig, auf Railway selbst, kein Repo-Code-Change):**
+
+1. Railway-Dashboard -> betroffener Service (`hermes-agent-production-...`) ->
+   **Variables**.
+2. Neue Variable setzen: `RAILWAY_RUN_UID=0`.
+3. Redeploy ausloesen (Railway macht das i. d. R. automatisch nach dem Setzen einer
+   Variable; sonst manuell "Redeploy" klicken).
+4. Deploy-Logs pruefen: `[stage2] Fixing ownership of /opt/data ...` /
+   `[stage2] Setup complete; starting user services` sollten jetzt erscheinen,
+   danach kein `PermissionError` mehr auf `config.yaml`/`gateway.lock`.
+
+**Kein Datenverlust-Risiko:** `docker/stage2-hook.sh` seedet Dateien nur, wenn sie
+noch nicht existieren (`seed_one` prueft `[ ! -f ... ]`), und `chown` aendert nur
+Ownership, nicht Inhalt. Bestehende `config.yaml`, Sessions, Skills etc. auf dem
+Volume bleiben unangetastet.
+
+**Lessons fuer zukuenftige Architektur-Sync-Schritte:** Ein Upstream-Wechsel des
+Container-Privilege-Modells (root-durchgehend -> root-boot + non-root-runtime, o.ae.)
+ist ein neuer, impliziter Infra-Requirement fuer bereits laufende Hosted-Deployments
+und muss beim naechsten "Upstream-Sync abgeschlossen"-Review explizit als
+Post-Deploy-Checkpunkt gegen die reale Hosting-Plattform (hier: Railway) verifiziert
+werden — nicht nur gegen den Code selbst.
