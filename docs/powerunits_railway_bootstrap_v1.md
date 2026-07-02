@@ -344,3 +344,71 @@ jemals entfernt und wieder auf den reinen Default-`ENTRYPOINT`/`CMD`-Pfad (`/ini
   Hinweis auf "Bootstrap-Schritt laeuft gar nicht" als auf "Bootstrap-Schritt laeuft, aber
   schlaegt fehl" — bei der naechsten aehnlichen Diagnose zuerst pruefen, ob die
   Boot-Stage ueberhaupt erreicht wird, bevor an der Chown-/UID-Logik selbst gezweifelt wird.
+
+## Folge-Vorfall: `ModuleNotFoundError: powerunits_telegram_overlays` (v3.8, incident 2026-07-02, Teil 2)
+
+**Symptom:** Direkt nach obigem Fix (Commit `e9bd89274`, `stage2-hook.sh` wird jetzt
+explizit aus `railway_gateway_with_dashboard.sh` aufgerufen) crashte der Service in einer
+Crash-Loop (Neustart alle ~1-2s) mit:
+
+```
+File "/opt/hermes/docker/apply_powerunits_runtime_policy.py", line 18, in <module>
+    from powerunits_telegram_overlays import (...)
+ModuleNotFoundError: No module named 'powerunits_telegram_overlays'
+```
+
+**Root Cause (verifiziert, KEIN Kontext-/Environment-Problem):** Der Traceback bricht in
+Zeile 18 ab, **nachdem** Zeile 17 (`from powerunits_capability_tier import ...`) bereits
+erfolgreich durchgelaufen ist. Das schliesst jede Hypothese rund um fehlende
+venv-Aktivierung, `PYTHONPATH`, oder falsches Arbeitsverzeichnis sofort aus — beide Module
+liegen im selben Repo-Root-Verzeichnis, ein Kontextproblem haette beide Imports gleich
+betroffen. `docker/stage2-hook.sh` ruft das Skript ohnehin unveraendert per absolutem
+Pfad zum venv-Python auf (`s6-setuidgid hermes "$INSTALL_DIR/.venv/bin/python"
+"$INSTALL_DIR/docker/apply_powerunits_runtime_policy.py"`) — identisch im alten
+(`/init`-basierten) und neuen (manuellen) Aufrufkontext.
+
+Die tatsaechliche Ursache: `powerunits_telegram_overlays.py` (erstellt in Commit
+`9df8d2c45`, "stabilize Tier 4B exposure, review_status validation, telegram overlays")
+wurde **nie** zu `[tool.setuptools] py-modules` in `pyproject.toml` hinzugefuegt — im
+Gegensatz zu `powerunits_capability_tier`, das dort explizit gelistet ist. Top-Level
+`.py`-Module ausserhalb eines Packages (wie alle `powerunits_*.py`-Dateien im Repo-Root)
+werden bei `uv pip install -e .` **nur** dann Teil der installierten/editable Distribution,
+wenn sie in dieser Liste stehen. Ohne Eintrag ist ein solches Modul ausserhalb eines rohen
+Source-Checkouts schlicht nicht importierbar — unabhaengig von CWD/PYTHONPATH/venv.
+
+Das war rein zufaellig bisher unentdeckt, weil `docker/apply_powerunits_runtime_policy.py`
+(und damit dieser Import) auf diesem Railway-Service **noch nie tatsaechlich gelaufen war**
+— das ist exakt der im ersten Teil dieses Vorfalls beschriebene Bootstrap-Bypass durch den
+Custom Start Command. Der erste Fix hat diesen Bypass behoben und dadurch zum ersten Mal
+ueberhaupt einen echten Lauf dieses Skripts auf dem gebauten Image ausgeloest, was den
+seit Commit `9df8d2c45` bereits latenten Packaging-Bug erstmals sichtbar gemacht hat.
+
+Bei der Gelegenheit zusaetzlich gefunden (gleiche Bug-Klasse, noch nicht in Produktion
+manifestiert, weil bislang durch die Capability-Tier-Gates nicht erreicht): auch
+`powerunits_skill_draft_review_contract.py` (verwendet von
+`tools/powerunits_tier4a_skill_draft_proposals_tool.py` und
+`tools/powerunits_tier4b_review_governance_tool.py`) fehlte in `py-modules`.
+
+**Fix (Commit `478b693e9`):**
+
+1. `pyproject.toml`: `powerunits_telegram_overlays` und
+   `powerunits_skill_draft_review_contract` zu `[tool.setuptools] py-modules` hinzugefuegt
+   — der eigentliche, generische Packaging-Fix.
+2. `docker/apply_powerunits_runtime_policy.py`: defensiver `sys.path.insert()` (Repo-Root
+   relativ zum eigenen Dateipfad aufgeloest) als zusaetzliche Absicherung, damit dieses
+   Skript auch bei einem zukuenftig erneut vergessenen `py-modules`-Eintrag nicht mehr
+   bricht.
+3. Neuer Invarianten-Test (`tests/test_packaging_metadata.py`,
+   `test_every_top_level_powerunits_module_is_covered_by_py_modules`): prueft, dass jedes
+   `powerunits_*.py`-Modul im Repo-Root in `py-modules` gelistet ist — verhindert, dass
+   dieser Bug bei einem zukuenftigen neuen Fork-Modul erneut unentdeckt bleibt.
+
+**Naechster Schritt fuer den User:** Redeploy anstossen (Push auf `powerunits-internal-setup`
+loest bei Railway automatisch einen Rebuild aus, sofern Auto-Deploy aktiv ist; sonst manuell
+"Redeploy" in der Railway-UI). Kein manueller Eingriff auf Railway selbst noetig — reiner
+Code-/Packaging-Fix, kein Volume-/Berechtigungsproblem.
+
+**Lesson:** Jedes neue top-level `powerunits_*.py`-Modul im Repo-Root MUSS zu `py-modules`
+in `pyproject.toml` hinzugefuegt werden, sonst ist es ausserhalb eines rohen
+Source-Checkouts (jedes gebaute Image, jeder Wheel-Install) nicht importierbar — der neue
+Invarianten-Test faengt das jetzt automatisch ab.
