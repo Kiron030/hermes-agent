@@ -103,8 +103,16 @@ Railway-Kompatibilitaetshinweis:
 
 **Empfohlener Minimal-Schritt (ein Container, Gateway + Stage-1-Dashboard):**
 
-1. Railway **Start Command** (ersetzt nur das Docker-CMD, Entrypoint bleibt):  
+1. Railway **Start Command**:  
    `/opt/hermes/docker/railway_gateway_with_dashboard.sh`
+   > **Korrektur (2026-07-02, siehe Incident-Abschnitt unten):** Die fruehere Annahme hier
+   > ("ersetzt nur das Docker-CMD, Entrypoint bleibt") ist **falsch** und wurde durch einen
+   > Produktions-Ausfall widerlegt. Railway dokumentiert explizit, dass ein Custom Start
+   > Command bei Dockerfile/Image-Deploys das komplette `ENTRYPOINT` ersetzt
+   > (<https://docs.railway.com/deployments/start-command>). Das Skript selbst wurde
+   > deshalb gehaertet: es fuehrt jetzt `docker/stage2-hook.sh` (den eigentlichen
+   > `/init`-Bootstrap) explizit selbst aus, bevor Gateway/Dashboard starten. Kein weiterer
+   > Handlungsbedarf hier, nur die urspruengliche Doku-Aussage war irrefuehrend.
 2. Env: `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, optional **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (sperrt mutierende `/api/*` HTTP-Calls).
 3. Sicherheit: Dashboard ist **keine** starke oeffentliche Auth; Zugriff absichern (VPN, Railway TCP-Proxy-Beschraenkung, organisatorisch).
 
@@ -266,50 +274,73 @@ Empfehlung fuer internen Betrieb: interner Build-Job erzeugt zuerst das Bundle (
 `docker/powerunits_docs/` bleibt in `.gitignore`, damit interne Docs nicht in den Public-Repo-Flow geraten.
 Fuer lokalen Railway-Deploy wird das Bundle ueber `.railwayignore` explizit wieder eingeschlossen.
 
-## s6-overlay migration: `RAILWAY_RUN_UID=0` required (v3.8, incident 2026-07-02)
+## s6-overlay migration: `config.yaml`/`gateway.lock` PermissionError (v3.8, incident 2026-07-02)
+
+**UPDATE (gleicher Tag, nach Re-Test):** Die urspruengliche erste Diagnose in diesem
+Abschnitt (`RAILWAY_RUN_UID=0` als alleiniger Fix) war **unvollstaendig/falsch** — der
+User hat die Variable gesetzt und neu deployed, der exakt gleiche Fehler trat weiterhin
+auf. Die echte Root Cause steht jetzt unten ("Tatsaechliche Root Cause"); die
+`RAILWAY_RUN_UID`-Recherche bleibt als dokumentierter Nebenbefund stehen (nicht falsch,
+nur nicht die eigentliche Ursache in diesem Fall).
 
 **Symptom:** Nach dem Wechsel des Images auf die s6-overlay-Architektur (`/init` als PID 1,
 Bootstrap in `docker/stage2-hook.sh`, eingefuehrt im v0.15.0-Upstream-Sync) crasht der
 Container beim Start mit `PermissionError: [Errno 13] Permission denied` auf
 `/opt/data/config.yaml` bzw. `/opt/data/gateway.lock`, obwohl der Code lokal/frisch
-korrekt ist.
+korrekt ist. Im Deploy-Log fehlt dabei **jede** `[stage2] ...`-Zeile komplett — das war
+der entscheidende Hinweis auf die echte Ursache.
 
-**Ursache (reines Railway-Infra-Verhalten, kein Code-Bug):**
+**Tatsaechliche Root Cause (verifiziert, Belege):**
 
-- Railway mountet Volumes grundsaetzlich **root-owned** (offiziell dokumentiert:
-  <https://docs.railway.com/volumes>, Abschnitt "Volumes are mounted as the `root` user").
-- Das alte, tini-basierte Image (vor v0.15) lief **durchgehend als root** (kein
-  Privilege-Drop) — der UID-Mismatch existierte nie, weil Prozess-UID und
-  Volume-Owner-UID beide `0` waren.
-- Das neue s6-overlay-Image erwartet dagegen explizit einen **root-gestarteten**
-  Container (`docker/stage2-hook.sh` macht UID-Remap + gezielten `chown` auf
-  `$HERMES_HOME`, DANACH droppen supervidierte Services via `s6-setuidgid hermes`
-  auf UID 10000). Startet der Container-Prozess (PID 1 / `/init`) auf Railway
-  **nicht** als root, kann `stage2-hook.sh` seinen eigenen Bootstrap-`chown` nicht
-  ausfuehren, und der spaeter als `hermes` (UID 10000) laufende Gateway-Prozess
-  trifft auf weiterhin root-owned Dateien -> `PermissionError`.
-- Railways eigener, dokumentierter Fix fuer genau dieses Symptom (nicht-root-Image +
-  Volume-Permission-Fehler): Env-Var `RAILWAY_RUN_UID=0` auf dem Service setzen.
+- Dieser Railway-Service nutzt seit Part D.1 dieses Dokuments einen **Custom Start
+  Command**: `/opt/hermes/docker/railway_gateway_with_dashboard.sh`.
+- Railways eigene Doku stellt unmissverstaendlich klar: *"Dockerfile / Image: the start
+  command overrides the image's `ENTRYPOINT` in exec form."*
+  (<https://docs.railway.com/deployments/start-command>, bestaetigt durch einen
+  unabhaengigen Community-Debugging-Bericht mit identischem Symptom: "The `startCommand`
+  ... completely overrides the Dockerfile's `ENTRYPOINT` and `CMD`.").
+- Unser Image setzt `ENTRYPOINT [ "/init", "/opt/hermes/docker/main-wrapper.sh" ]` (s6-overlay
+  als PID 1). Ein Custom Start Command ersetzt dieses **komplette** Array — `/init` startet
+  nie, `/etc/cont-init.d/01-hermes-setup` (→ `docker/stage2-hook.sh`) laeuft nie, der
+  UID-Remap + `chown` von `config.yaml`/`gateway.lock`/etc. auf den `hermes`-User (UID 10000)
+  passiert nie, und die Powerunits-`first_safe_v1`-Runtime-Policy-Anwendung
+  (`docker/apply_powerunits_runtime_policy.py`) laeuft ebenfalls nie.
+- `docker/hermes-exec-shim.sh` (`/opt/hermes/bin/hermes`, vorn auf `$PATH`) droppt jeden
+  `hermes`-Aufruf automatisch von root auf den `hermes`-User (UID 10000) — das war **nie**
+  das fehlende Teil. Der Gateway-Prozess lief also schon vorher korrekt als `hermes`
+  (UID 10000); er traf nur auf `config.yaml`/`gateway.lock`, die nie auf diese UID
+  umgechownt wurden, weil `stage2-hook.sh` nie ausgefuehrt wurde. Das erklaert auch, warum
+  `RAILWAY_RUN_UID=0` wirkungslos war: die Prozess-UID war nie das Problem, die
+  **Datei-Ownership auf dem Volume** war es.
+- Nebenbefund (bestaetigt fuer Vollstaendigkeit, keine Korrektur noetig): das Dashboard
+  startet trotzdem sauber (`HERMES_DASHBOARD_READY`), weil `railway_gateway_with_dashboard.sh`
+  es als eigenen, direkt exec'ten Prozess startet, der nicht von `/init`/s6-Supervision
+  abhaengt und keine der betroffenen Dateien beim Start oeffnet.
 
-**Fix (einmalig, auf Railway selbst, kein Repo-Code-Change):**
+**Code-Fix (committed, kein weiterer Railway-Handgriff noetig):**
 
-1. Railway-Dashboard -> betroffener Service (`hermes-agent-production-...`) ->
-   **Variables**.
-2. Neue Variable setzen: `RAILWAY_RUN_UID=0`.
-3. Redeploy ausloesen (Railway macht das i. d. R. automatisch nach dem Setzen einer
-   Variable; sonst manuell "Redeploy" klicken).
-4. Deploy-Logs pruefen: `[stage2] Fixing ownership of /opt/data ...` /
-   `[stage2] Setup complete; starting user services` sollten jetzt erscheinen,
-   danach kein `PermissionError` mehr auf `config.yaml`/`gateway.lock`.
+`docker/railway_gateway_with_dashboard.sh` fuehrt jetzt selbst den fehlenden
+`docker/stage2-hook.sh`-Bootstrap aus (UID-Remap, `$HERMES_HOME`-Chown, Erst-Boot-Seeding,
+`first_safe_v1`-Policy), bevor Gateway + Dashboard starten — inkl. `PATH`-Fix, damit
+`stage2-hook.sh`s interne `s6-setuidgid`-Aufrufe (normalerweise nur unter `/init`
+aufloesbar) auch in diesem direkt-exec'ten Kontext funktionieren. Idempotent, laeuft bei
+jedem Boot/Restart erneut, kein Risiko fuer bestehende Daten (`stage2-hook.sh` seedet nur
+fehlende Dateien, `chown` aendert nur Ownership).
 
-**Kein Datenverlust-Risiko:** `docker/stage2-hook.sh` seedet Dateien nur, wenn sie
-noch nicht existieren (`seed_one` prueft `[ ! -f ... ]`), und `chown` aendert nur
-Ownership, nicht Inhalt. Bestehende `config.yaml`, Sessions, Skills etc. auf dem
-Volume bleiben unangetastet.
+**RAILWAY_RUN_UID=0 kann gesetzt bleiben** (schadet nicht, war aber fuer dieses konkrete
+Symptom nicht die Ursache) — relevant bliebe sie nur, falls der Custom Start Command
+jemals entfernt und wieder auf den reinen Default-`ENTRYPOINT`/`CMD`-Pfad (`/init` +
+`main-wrapper.sh`, ohne Dashboard) umgestellt wird.
 
-**Lessons fuer zukuenftige Architektur-Sync-Schritte:** Ein Upstream-Wechsel des
-Container-Privilege-Modells (root-durchgehend -> root-boot + non-root-runtime, o.ae.)
-ist ein neuer, impliziter Infra-Requirement fuer bereits laufende Hosted-Deployments
-und muss beim naechsten "Upstream-Sync abgeschlossen"-Review explizit als
-Post-Deploy-Checkpunkt gegen die reale Hosting-Plattform (hier: Railway) verifiziert
-werden — nicht nur gegen den Code selbst.
+**Lessons fuer zukuenftige Architektur-Sync-Schritte:**
+
+- Ein Upstream-Wechsel des Container-Privilege-/Boot-Modells (hier: tini -> s6-overlay
+  mit `/init` als PID 1) macht **jeden vorhandenen Custom Start Command** auf gehosteten
+  Deployments zu einem potenziellen stillen Bootstrap-Bypass — das muss beim naechsten
+  "Upstream-Sync abgeschlossen"-Review explizit gegen jede bekannte Hosting-Plattform-
+  Konfiguration (Railway Start Command, Compose-Overrides, k8s command/args) geprueft
+  werden, nicht nur gegen den Code selbst.
+- Fehlende erwartete Log-Zeilen (hier: kein einziges `[stage2] ...`) sind ein staerkerer
+  Hinweis auf "Bootstrap-Schritt laeuft gar nicht" als auf "Bootstrap-Schritt laeuft, aber
+  schlaegt fehl" — bei der naechsten aehnlichen Diagnose zuerst pruefen, ob die
+  Boot-Stage ueberhaupt erreicht wird, bevor an der Chown-/UID-Logik selbst gezweifelt wird.
