@@ -1,0 +1,46 @@
+﻿git : error: gpg.ssh.allowedSignersFile needs to be configured and exist for ssh signature verification
+In W:\cache\tmp\ps-script-c9ef048d-8e89-4446-8537-1a300914a127.ps1:114 Zeichen:1
++ git merge --no-commit --no-ff v2026.6.19 2>&1 | Out-File -Encoding ut ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: gpg.ssh....re verification:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Auto-merging .dockerignore
+CONFLICT (modify/delete): .github/workflows/nix.yml deleted in v2026.6.19 and modified in HEAD.  Version HEAD of .github/workflows/nix.yml left in tree.
+Auto-merging .gitignore
+CONFLICT (content): Merge conflict in .gitignore
+Auto-merging AGENTS.md
+CONFLICT (content): Merge conflict in AGENTS.md
+Auto-merging Dockerfile
+CONFLICT (content): Merge conflict in Dockerfile
+Auto-merging agent/agent_init.py
+Auto-merging agent/chat_completion_helpers.py
+Auto-merging agent/transports/chat_completions.py
+Auto-merging agent/transports/codex.py
+Auto-merging docker/stage2-hook.sh
+Auto-merging gateway/config.py
+Auto-merging gateway/run.py
+CONFLICT (content): Merge conflict in gateway/run.py
+Auto-merging hermes_cli/banner.py
+Auto-merging hermes_cli/commands.py
+Auto-merging hermes_cli/runtime_provider.py
+CONFLICT (content): Merge conflict in hermes_cli/runtime_provider.py
+Auto-merging hermes_cli/setup.py
+Auto-merging hermes_cli/tools_config.py
+Auto-merging hermes_cli/web_server.py
+Auto-merging model_tools.py
+Auto-merging package-lock.json
+CONFLICT (content): Merge conflict in package-lock.json
+Auto-merging plugins/model-providers/custom/__init__.py
+Auto-merging pyproject.toml
+CONFLICT (content): Merge conflict in pyproject.toml
+Auto-merging scripts/release.py
+Auto-merging tests/agent/transports/test_chat_completions.py
+Auto-merging tests/gateway/test_agent_cache.py
+Auto-merging tests/hermes_cli/test_detect_api_mode_for_url.py
+Auto-merging tests/hermes_cli/test_tools_config.py
+Auto-merging tests/hermes_cli/test_web_server.py
+Auto-merging tests/run_agent/test_run_agent.py
+Auto-merging tests/run_agent/test_run_agent_codex_responses.py
+Auto-merging toolsets.py
+Automatic merge failed; fix conflicts and then commit the result.

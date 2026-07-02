@@ -297,6 +297,79 @@ für dieses Feature durchgeführt wurde.
 
 ---
 
+## 6b. Pflicht-Syntaxscan nach jedem Merge, VOR dem Testlauf (neu seit v0.17.0)
+
+Ein sauberer Merge ohne Konfliktmarker in einer Datei ist **kein** Beweis für
+korrekten Code, wenn beide Seiten unabhängig voneinander die *gleiche*
+Zeile an einer *leicht* unterschiedlichen Stelle einfügen (z. B. weil eine
+Seite einen erklärenden Kommentar dazwischen hat). Git löst das dann als
+"clean" 3-way-Merge auf, indem es **beide** Vorkommen behält — mit dem
+Ergebnis eines doppelten Keyword-Arguments, einer doppelten Dict-Zuweisung
+o. Ä. Passiert im v0.17.0-Sync konkret in
+`agent/transports/chat_completions.py`: sowohl unser Fork (mit erklärendem
+Kommentar) als auch der neue upstream-Commit fügten unabhängig
+`base_url=params.get("base_url"),` an fast derselben Stelle ein → Git
+behielt beide → `SyntaxError: keyword argument repeated: base_url` beim
+Import, was **80+ Tests** in einer einzigen Datei mit Collection-Errors
+zum Absturz brachte (sah nach einer großen Regression aus, war aber ein
+einzeiliger Fix).
+
+**Neuer Pflichtschritt, VOR dem ersten Test-Chunk-Lauf** (kostet nur
+Sekunden, verhindert stundenlanges Fehlsuchen):
+
+```bash
+# Alle gegenüber dem upstream-Tag geänderten .py-Dateien syntaktisch prüfen
+git diff --name-only <upstream-tag>...HEAD -- '*.py' > /tmp/changed.txt
+python -c "
+import ast
+for f in open('/tmp/changed.txt', encoding='utf-8-sig').read().splitlines():
+    f = f.strip()
+    if not f:
+        continue
+    try:
+        ast.parse(open(f, encoding='utf-8').read(), filename=f)
+    except SyntaxError as e:
+        print('SYNTAX ERROR', f, e)
+"
+```
+
+Ergänzend: kurzer Import-Smoke-Test der Hotspot-Module
+(`gateway.run`, `gateway.config`, `model_tools`, `run_agent`,
+`hermes_cli.web_server`, ggf. neu entstandene Mixin-Module wie
+`gateway.slash_commands`) — deckt auch Fälle ab, die `ast.parse` durchlässt
+(z. B. fehlende Imports nach einer Funktionsverschiebung).
+
+**PowerShell-Hinweis:** `git diff ... > datei.txt` schreibt UTF-16 mit BOM;
+beim Einlesen in Python `encoding='utf-8-sig'` verwenden, sonst
+`UnicodeDecodeError` beim ersten Byte.
+
+---
+
+## 6c. God-File-Extraktionen: verschobene Methoden erneut auf Fork-Gates prüfen (neu seit v0.17.0)
+
+Upstream refactort laut eigenem Contribution-Rubrik (`AGENTS.md`, "Refactor
+god-files into clean modules") aktiv große Dateien wie `gateway/run.py` in
+Mixins (z. B. neu in v0.17.0: `gateway/slash_commands.py`,
+`gateway/authz_mixin.py`). Wenn eine Methode, die eine unserer
+Fork-Gates enthält (z. B. `_powerunits_lockdown_enabled()`), OHNE
+Konfliktmarker in ein neues Modul verschoben wird, nimmt Git die
+upstream-Version 1:1 mit — unser Fork-Gate fehlt dann im neuen Modul,
+ohne dass ein Merge-Konflikt das anzeigt. Konkret im v0.17.0-Sync:
+`_handle_help_command`/`_handle_commands_command` wurden nach
+`gateway/slash_commands.py` verschoben und verloren dabei das
+`{} if _powerunits_lockdown_enabled() else get_skill_commands()`-Gate.
+
+**Vorgehen:** Nach dem Symbol-Diff-Check (Abschnitt 3) für jedes als
+"verschwunden" markierte Symbol in einer Hotspot-Datei zuerst prüfen, ob es
+tatsächlich gelöscht wurde oder nur an eine andere Datei verschoben wurde
+(`git grep -n "def <name>"` über den ganzen Baum). Falls verschoben: am
+neuen Ort gezielt nach den bekannten Fork-Gate-Funktionsnamen suchen
+(`_powerunits_lockdown_enabled`, `_apply_powerunits_runtime_lockdown_*`,
+`_enforce_powerunits_toolsets`) und vergleichen, ob sie an der neuen Stelle
+noch vorkommen, wo sie im alten Code vorkamen.
+
+---
+
 ## 7. Ablaufreihenfolge (Kurzfassung)
 
 1. **Security-Tag-Triage zuerst** (Abschnitt 1 oben) — Changelog/Commits
@@ -305,7 +378,10 @@ für dieses Feature durchgeführt wurde.
    von `powerunits-internal-setup`).
 3. Symbol-/Intra-Funktions-Diff-Check auf Hotspot-Dateien **plus**
    fork-eigene Commit-Historie auf stark umgebauten Dateien prüfen
-   (Abschnitt 3 oben).
+   (Abschnitt 3 oben) **plus** bei verschobenen Symbolen das neue Modul auf
+   Fork-Gates prüfen (Abschnitt 6c oben).
+3a. **Pflicht-Syntaxscan** aller geänderten `.py`-Dateien + Import-Smoke-Test
+    der Hotspot-Module (Abschnitt 6b oben) — VOR dem ersten Testlauf.
 4. venv-Deps syncen (`uv pip install -e ".[all,dev]" --python .venv\Scripts\python.exe`).
 5. Composite-Toolset-/Aggregat-Abgleich (Abschnitt 5 oben) — vor dem
    Testlauf, da still verlorene Einträge sonst nicht auffallen.
@@ -316,7 +392,11 @@ für dieses Feature durchgeführt wurde.
    gefunden+gefixt, grobe Testlage, offene Punkte — kein Roman).
 8. Scratch-/Temp-Dateien aufräumen (`_*.log`, `_*.txt` im Repo-Root),
    bevor committet wird.
-9. Merge auf Integrationsbranch committen.
+9. Merge auf Integrationsbranch committen. **Sofort danach**:
+   `git merge-base --is-ancestor <upstream-tag> HEAD` (Exit-Code 0 erwartet)
+   — 5-Sekunden-Gegenprobe, dass der Merge-Commit wirklich zwei Parents hat
+   und nicht durch eine zwischenzeitliche `git stash`-Aktion beschädigt wurde
+   (siehe kritische Warnung in Abschnitt 6a).
 10. Nach `powerunits-internal-setup` mergen und pushen — **nur** wenn keine
     sicherheitsrelevanten offenen Fragen bestehen (first-safe policy,
     Telegram-first, kein Shell/SSH/Docker/Code-Exec-Ausbau, keine
