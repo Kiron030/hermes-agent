@@ -172,40 +172,67 @@ for sock in /var/run/docker.sock /run/docker.sock; do
 done
 
 # --- Fix ownership of data volume ---
-# When HERMES_UID is remapped or the top-level $HERMES_HOME isn't owned by
-# the runtime hermes UID, restore ownership to hermes — but ONLY for the
-# directories hermes actually writes to. The full $HERMES_HOME may be a
-# host-mounted bind containing unrelated user files; `chown -R` would
-# silently destroy host ownership of those (see issue #19788).
+# HISTORY (see docs/powerunits_railway_bootstrap_v1.md, 2026-07-02 incident,
+# part 3): this used to be a hand-maintained ALLOWLIST of "known hermes
+# subdirs" (cron/, sessions/, logs/, ... — the same list the mkdir -p block
+# below seeds), gated behind whether the TOP-LEVEL $HERMES_HOME directory
+# itself had the wrong owner. Both properties were bugs in practice:
 #
-# The canonical list of hermes-owned subdirs is the same one the s6-setuidgid
-# mkdir -p block below seeds. Keep them in sync if the seed list changes.
+# 1. The allowlist chronically drifted behind the code. There are dozens of
+#    `get_hermes_home() / "..."` call sites across the Python codebase
+#    (cache/, plugins/, pairing/, checkpoints/, whatsapp/, per-provider and
+#    per-platform dynamically-named paths, ...) and it grows with every
+#    feature. Each omission reproduces the exact same class of production
+#    PermissionError one new subdirectory/file at a time.
+# 2. The `needs_chown` gate only looked at the TOP-LEVEL directory's owner.
+#    Once that was fixed once (e.g. by an earlier boot, or a partially
+#    completed earlier run of this very script), it stayed "already correct"
+#    forever — so anything created afterwards with the wrong owner (a file
+#    left over from a pre-migration volume, or a `docker exec <container>
+#    hermes ...` command run as root) was never revisited on any later boot.
+#
+# Fix: reconcile ownership of every top-level entry under $HERMES_HOME
+# UNCONDITIONALLY on every boot (cheap — this directory is small), using a
+# DENYLIST instead of an allowlist so newly added state paths are covered by
+# default instead of needing to be remembered. Only entries an operator
+# explicitly opts to protect are skipped, preserving the one legitimate case
+# the old allowlist was guarding against: $HERMES_HOME as a bind-mounted host
+# directory that ALSO holds unrelated, non-hermes files at its top level
+# (issue #19788). The default denylist is empty (safe for the overwhelmingly
+# common case of a hermes-dedicated volume/mount). Configure via
+# HERMES_DATA_DIR_CHOWN_EXCLUDE (space-separated top-level names, relative to
+# $HERMES_HOME) for that rare case, e.g.
+# HERMES_DATA_DIR_CHOWN_EXCLUDE="my-notes some-other-dir".
 actual_hermes_uid=$(id -u hermes)
-needs_chown=false
-if [ "$(stat -c %u "$HERMES_HOME" 2>/dev/null)" != "$actual_hermes_uid" ]; then
-    needs_chown=true
-fi
-if [ "$needs_chown" = true ]; then
-    echo "[stage2] Fixing ownership of $HERMES_HOME (targeted) to hermes ($actual_hermes_uid)"
-    # In rootless Podman the container's "root" is mapped to an
-    # unprivileged host UID — chown will fail. That's fine: the volume
-    # is already owned by the mapped user on the host side.
-    #
-    # Top-level $HERMES_HOME: chown the directory itself (not its contents)
-    # so hermes can mkdir new subdirs but bind-mounted host files keep
-    # their existing ownership.
-    chown hermes:hermes "$HERMES_HOME" 2>/dev/null || \
-        echo "[stage2] Warning: chown $HERMES_HOME failed (rootless container?) — continuing"
-    # Hermes-owned subdirs: recursive chown is safe here because these are
-    # created and managed exclusively by hermes (see the s6-setuidgid mkdir
-    # -p block below for the canonical list).
-    for sub in cron sessions logs hooks memories skills skins plans workspace home profiles hermes_workspace pairing platforms/pairing; do
-        if [ -e "$HERMES_HOME/$sub" ]; then
-            chown -R hermes:hermes "$HERMES_HOME/$sub" 2>/dev/null || \
-                echo "[stage2] Warning: chown $HERMES_HOME/$sub failed (rootless container?) — continuing"
+echo "[stage2] Reconciling ownership of $HERMES_HOME to hermes ($actual_hermes_uid)"
+# In rootless Podman the container's "root" is mapped to an unprivileged
+# host UID — chown will fail. That's fine: the volume is already owned by
+# the mapped user on the host side.
+chown hermes:hermes "$HERMES_HOME" 2>/dev/null || \
+    echo "[stage2] Warning: chown $HERMES_HOME failed (rootless container?) — continuing"
+# `*` and `.[!.]*` together cover regular and dot entries without matching
+# `.` / `..`. Direct iteration (no `sh -c`/`find -exec` wrapper) avoids a
+# second shell interpreter — same shell-metacharacter defense as the
+# mkdir -p block below (PR #30136 review item O2).
+for entry in "$HERMES_HOME"/* "$HERMES_HOME"/.[!.]*; do
+    [ -e "$entry" ] || continue
+    name=$(basename "$entry")
+    excluded=false
+    for denied in ${HERMES_DATA_DIR_CHOWN_EXCLUDE:-}; do
+        if [ "$name" = "$denied" ]; then
+            excluded=true
+            break
         fi
     done
-fi
+    [ "$excluded" = true ] && continue
+    # Skip entries already owned by hermes — avoids a needless recursive
+    # walk of large, already-correct trees (e.g. skills/, node_modules/,
+    # cache/) on every single boot.
+    if [ "$(stat -c %u "$entry" 2>/dev/null)" != "$actual_hermes_uid" ]; then
+        chown -R hermes:hermes "$entry" 2>/dev/null || \
+            echo "[stage2] Warning: chown $entry failed (rootless container?) — continuing"
+    fi
+done
 
 # --- Immutable install tree ---
 # Do not chown runtime code or dependency trees under $INSTALL_DIR back to the
@@ -214,52 +241,6 @@ fi
 # HERMES_DISABLE_LAZY_INSTALLS=1. Keeping /opt/hermes root-owned and
 # non-writable prevents an agent session from self-modifying the installed
 # source, venv, TUI bundle, or node_modules and bricking the gateway.
-
-# Always reset ownership of $HERMES_HOME/profiles to hermes on every
-# boot. Profile dirs and files can land owned by root when commands
-# are invoked via `docker exec <container> hermes …` (which defaults
-# to root unless `-u` is passed), and that breaks the cont-init
-# reconciler (02-reconcile-profiles) which runs as hermes and walks
-# the profiles dir. Idempotent; skipped on rootless containers where
-# chown would fail.
-if [ -d "$HERMES_HOME/profiles" ]; then
-    chown -R hermes:hermes "$HERMES_HOME/profiles" 2>/dev/null || true
-fi
-
-# Always reset ownership of $HERMES_HOME/cron on every boot for the same
-# docker-exec/root-write reason as profiles/. The cron scheduler state
-# (jobs.json) must stay readable by the unprivileged hermes runtime even
-# after root-context maintenance commands or scheduler writes.
-if [ -d "$HERMES_HOME/cron" ]; then
-    chown -R hermes:hermes "$HERMES_HOME/cron" 2>/dev/null || true
-fi
-
-# Reset ownership of hermes-owned top-level state files on every boot.
-# The targeted data-volume chown above only covers hermes-owned
-# *subdirectories*; loose state files living directly under $HERMES_HOME
-# are missed. When those files are created or rewritten by
-# `docker exec <container> hermes …` (root unless `-u` is passed) they
-# land root-owned, and the unprivileged hermes runtime then hits
-# PermissionError on next startup (e.g. gateway.lock / state.db /
-# auth.json), producing a gateway restart loop.
-#
-# We use an explicit allowlist rather than a blanket `find -user root`
-# sweep so host-owned files in a bind-mounted $HERMES_HOME are never
-# touched — same targeted-ownership contract as the subdir chown above
-# (issue #19788, PR #19795). The list mirrors the top-level *file*
-# entries of hermes_cli.profile_distribution.USER_OWNED_EXCLUDE plus the
-# runtime lock files; keep them in sync if that set changes.
-for f in \
-    auth.json auth.lock .env \
-    state.db state.db-shm state.db-wal \
-    hermes_state.db \
-    response_store.db response_store.db-shm response_store.db-wal \
-    gateway.pid gateway.lock gateway_state.json processes.json \
-    active_profile; do
-    if [ -e "$HERMES_HOME/$f" ]; then
-        chown hermes:hermes "$HERMES_HOME/$f" 2>/dev/null || true
-    fi
-done
 
 # --- config.yaml permissions ---
 # Ensure config.yaml is readable by the hermes runtime user even if it

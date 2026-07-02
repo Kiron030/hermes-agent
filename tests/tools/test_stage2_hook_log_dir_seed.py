@@ -48,13 +48,23 @@ def test_logs_gateways_is_seeded(stage2_text: str) -> None:
     assert '"$HERMES_HOME/logs"' in block
 
 
-def test_logs_subtree_is_healed_when_chown_needed(stage2_text: str) -> None:
-    """The needs_chown repair loop must cover the logs subtree recursively —
-    that is what makes the seed entry above sufficient (no separate
-    logs/gateways loop entry needed)."""
-    m = re.search(r"for sub in ([^;]*); do", stage2_text)
-    assert m, "stage2-hook.sh must contain the needs_chown subdir repair loop"
-    assert "logs" in m.group(1).split(), (
-        "the needs_chown loop must recursively chown logs/ — it covers "
-        "logs/gateways, so the seed list does not need a loop twin"
+def test_logs_subtree_is_healed_on_every_boot(stage2_text: str) -> None:
+    """The top-level ownership-reconciliation loop must cover the logs/
+    subtree recursively and unconditionally — that is what makes the seed
+    entry above sufficient (no separate logs/gateways allowlist entry
+    needed).
+
+    Prior to the 2026-07-02 incident (part 3, see
+    docs/powerunits_railway_bootstrap_v1.md) this was a hand-maintained
+    `for sub in cron sessions logs ...` allowlist gated behind a one-time
+    top-level ownership check. Both the allowlist and the gate are gone —
+    replaced by an unconditional loop that walks every top-level entry
+    under $HERMES_HOME (see
+    tests/tools/test_stage2_hook_toplevel_chown.py for functional
+    coverage), so `logs/` (and anything else) is healed by default without
+    needing to be named."""
+    assert "for sub in" not in stage2_text, (
+        "the hand-maintained subdir allowlist should be gone; see "
+        "tests/tools/test_stage2_hook_toplevel_chown.py"
     )
+    assert 'for entry in "$HERMES_HOME"/* "$HERMES_HOME"/.[!.]*; do' in stage2_text

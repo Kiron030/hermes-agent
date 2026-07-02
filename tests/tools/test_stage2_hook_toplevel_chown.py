@@ -1,29 +1,44 @@
-"""Contract test: the s6-overlay stage2 hook resets ownership of hermes-owned
-top-level state files in $HERMES_HOME — but only those, never arbitrary
-host-owned files.
+"""Contract test: the s6-overlay stage2 hook reconciles ownership of every
+top-level entry under $HERMES_HOME on every boot, using a DENYLIST rather
+than an allowlist.
 
-Regression guard for the gateway restart loop reported in #35098: files such
-as gateway.lock / state.db / auth.json live directly under $HERMES_HOME (not in
-a subdir), so the targeted subdir chown misses them. When created or rewritten
-by `docker exec <container> hermes …` (root unless `-u` is passed) they land
-root-owned and the unprivileged hermes runtime then hits PermissionError on next
-startup.
+History:
 
-The fix uses an explicit allowlist rather than a blanket `find -user root`
-sweep, preserving the targeted-ownership contract from #19788 / PR #19795: a
-bind-mounted $HERMES_HOME may contain host-owned files Hermes does not manage,
-and those must never be chowned.
+- #19788 / PR #19795: a blanket `chown -R $HERMES_HOME` was replaced with a
+  hand-maintained ALLOWLIST of "known hermes subdirs" (cron/, sessions/,
+  logs/, ...), to avoid clobbering host-owned files in a bind-mounted
+  $HERMES_HOME.
+- #35098: the subdir allowlist missed top-level *files* (gateway.lock,
+  state.db, auth.json, ...) living directly under $HERMES_HOME, so a second,
+  separate allowlist was added for those.
+- 2026-07-02 Railway incident, part 3 (see
+  docs/powerunits_railway_bootstrap_v1.md): BOTH allowlists chronically
+  drifted behind the dozens of `get_hermes_home() / "..."` call sites across
+  the Python codebase (sessions/, pairing/, cache/, plugins/, checkpoints/,
+  whatsapp/, dynamically-named per-provider/per-platform paths, ...), and the
+  whole repair was additionally gated behind whether the TOP-LEVEL directory
+  itself had the wrong owner — once fixed once, anything created afterwards
+  with a stale owner (a file left over from a pre-migration volume, or a
+  `docker exec <container> hermes ...` write as root) was never revisited on
+  any later boot. Production symptom: `PermissionError` on
+  `sessions/sessions.json` and `pairing/telegram-approved.json`, neither of
+  which was in either allowlist and both created after the top-level
+  directory had already been "fixed" once.
 
-The s6-overlay rework moved bootstrap from docker/entrypoint.sh (now a shim) to
-docker/stage2-hook.sh, installed as /etc/cont-init.d/01-hermes-setup. This test
-targets that location.
+Both allowlists were replaced by a single unconditional, denylist-based
+reconciliation loop that walks every top-level entry under $HERMES_HOME
+(files and directories, including dotfiles) on every boot and chowns
+whatever isn't already hermes-owned. The denylist
+(`HERMES_DATA_DIR_CHOWN_EXCLUDE`) preserves the original #19788 intent for
+the one legitimate remaining case: an operator who bind-mounts a host
+directory that ALSO holds unrelated, non-hermes files at its top level.
 """
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -39,68 +54,96 @@ def stage2_text() -> str:
     return STAGE2_HOOK.read_text()
 
 
-def _toplevel_chown_loop(text: str) -> str:
-    """Extract the `for f in … chown hermes:hermes "$HERMES_HOME/$f" … done`
-    block that repairs top-level state-file ownership."""
+def _reconciliation_block(text: str) -> str:
+    """Extract the unconditional top-level ownership-reconciliation block,
+    from the `actual_hermes_uid=...` assignment through the closing `done`
+    of the `for entry in ...` loop."""
     m = re.search(
-        r"(for f in \\\n(?:.*\\\n)*?.*; do\n(?:.*\n)*?done)",
+        r"actual_hermes_uid=\$\(id -u hermes\)\n(?:.*\n)*?^done\n",
         text,
+        re.MULTILINE,
     )
-    assert m, "stage2-hook.sh must contain the top-level-file chown for-loop (#35098)"
-    block = m.group(1)
-    assert 'chown hermes:hermes "$HERMES_HOME/$f"' in block, (
-        "the top-level-file loop must chown each allowlisted file to hermes"
-    )
+    assert m, "stage2-hook.sh must contain the ownership-reconciliation block"
+    block = m.group(0)
+    assert "for entry in" in block
+    assert 'chown -R hermes:hermes "$entry"' in block
     return block
 
 
-def test_toplevel_chown_loop_present(stage2_text: str) -> None:
-    block = _toplevel_chown_loop(stage2_text)
-    # The reported-broken files must be covered.
-    for required in ("auth.json", "state.db", "gateway.lock", "gateway_state.json"):
-        assert required in block, (
-            f"top-level chown allowlist must include {required!r} (#35098)"
-        )
+def test_reconciliation_is_not_gated_by_toplevel_ownership(stage2_text: str) -> None:
+    """The old `needs_chown` gate (checking only the top-level directory's
+    owner) allowed subdirectories/files created after that top-level check
+    already passed to stay permanently unrepaired. The new reconciliation
+    must run unconditionally on every boot — i.e. the `needs_chown`
+    variable itself (assignment or use) must be gone, not merely renamed."""
+    assert not re.search(r"\bneeds_chown\s*=", stage2_text), (
+        "the top-level-ownership gate variable must be gone — the "
+        "reconciliation loop runs unconditionally on every boot "
+        "(2026-07-02 incident part 3)"
+    )
+    assert "$needs_chown" not in stage2_text
 
 
-def test_no_blanket_find_user_root_sweep(stage2_text: str) -> None:
-    """The fix must NOT reintroduce a blanket `find … -user root` chown of
-    $HERMES_HOME contents — that would clobber host-owned files in a bind mount
-    (#19788 / PR #19795)."""
-    assert not re.search(r"find\s+\"?\$\{?HERMES_HOME\}?\"?[^\n]*-user\s+root", stage2_text), (
-        "stage2-hook.sh must not blanket-chown root-owned files under "
-        "$HERMES_HOME via `find -user root`; use the targeted allowlist instead "
-        "so host-owned bind-mounted files are preserved (#19788, #19795)."
+def test_reconciliation_supports_operator_denylist(stage2_text: str) -> None:
+    block = _reconciliation_block(stage2_text)
+    assert "HERMES_DATA_DIR_CHOWN_EXCLUDE" in block, (
+        "the reconciliation loop must support an opt-out denylist for the "
+        "rare case of unrelated host files at the top level of a "
+        "bind-mounted $HERMES_HOME (#19788)"
     )
 
 
-def _run_loop(text: str, present_files: list[str]) -> list[str]:
-    """Run the extracted chown loop in a sandbox $HERMES_HOME, with `chown`
-    stubbed to record which paths it was asked to touch. Returns the basenames
-    the loop attempted to chown."""
+def test_no_blanket_find_user_root_sweep(stage2_text: str) -> None:
+    """Must not reintroduce a `find ... -user root` sweep — that was
+    rejected in favor of stat-based per-entry comparison, which is
+    tolerant of rootless/Podman UID mapping quirks that can make `-user
+    root` matches unreliable."""
+    assert not re.search(r"find\s+\"?\$\{?HERMES_HOME\}?\"?[^\n]*-user\s+root", stage2_text)
+
+
+def _run_reconciliation(
+    stage2_text: str,
+    present: list[str],
+    exclude: str = "",
+) -> list[str]:
+    """Run the extracted reconciliation block in a sandbox $HERMES_HOME, with
+    `chown`/`id` stubbed so we can observe which top-level entries it
+    selects without needing real root privileges or an actual `hermes`
+    system user. Returns the basenames it attempted to chown."""
     bash = shutil.which("bash")
     if bash is None:
         pytest.skip("bash not available")
-    block = _toplevel_chown_loop(text)
-
-    import tempfile
+    block = _reconciliation_block(stage2_text)
 
     with tempfile.TemporaryDirectory() as d:
         dpath = Path(d)
         home = dpath / "home"
         home.mkdir()
-        for f in present_files:
-            (home / f).touch()
-        # A non-allowlisted, "host-owned" file that must never be chowned.
-        (home / "host_secret.json").touch()
+        for rel in present:
+            target = home / rel
+            if rel.endswith("/"):
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.touch()
 
-        # Stub chown to record the basename of its last argument (the path),
-        # so we observe exactly which files the allowlist loop selected
-        # without needing real root privileges.
+        # as_posix(): the harness script is interpreted by bash, which
+        # expects forward slashes regardless of host OS (Windows dev
+        # checkouts included).
+        home_posix = home.as_posix()
+        log_posix = (dpath / "chown.log").as_posix()
+
+        # Stub `id -u hermes` (no real hermes system user in the test
+        # sandbox) and `chown` (no real root privileges). Every real call in
+        # the block is `chown [-R] hermes:hermes "$path"`, so the last
+        # positional arg (basename-stripped) is always the top-level entry
+        # name — same technique as the pre-existing chown-loop harness.
         script = (
             "set -e\n"
-            f'HERMES_HOME="{home}"\n'
-            f'chown() {{ for a in "$@"; do :; done; echo "${{a##*/}}" >> "{dpath}/chown.log"; }}\n'
+            f'HERMES_HOME="{home_posix}"\n'
+            f'HERMES_DATA_DIR_CHOWN_EXCLUDE="{exclude}"\n'
+            'id() { echo 10000; }\n'
+            f'chown() {{ for a in "$@"; do :; done; echo "${{a##*/}}" >> "{log_posix}"; }}\n'
             + block
         )
         script_path = dpath / "harness.sh"
@@ -112,27 +155,57 @@ def _run_loop(text: str, present_files: list[str]) -> list[str]:
         log = dpath / "chown.log"
         if not log.exists():
             return []
-        return [ln for ln in log.read_text().splitlines() if ln]
+        touched = [ln for ln in log.read_text().splitlines() if ln]
+        # Drop the entry for $HERMES_HOME itself (the unconditional
+        # top-level chown that always fires first).
+        home_name = home.name
+        return [t for t in touched if t != home_name]
 
 
-def test_loop_chowns_present_allowlisted_files(stage2_text: str) -> None:
-    touched = _run_loop(stage2_text, ["auth.json", "state.db", "gateway.lock"])
-    assert "auth.json" in touched
-    assert "state.db" in touched
-    assert "gateway.lock" in touched
+def test_reconciles_arbitrary_new_toplevel_dirs_without_an_allowlist(
+    stage2_text: str,
+) -> None:
+    """The whole point of the fix: directories/files that were never on any
+    hand-maintained list (a brand new feature's state dir, or the two paths
+    that actually broke production — sessions/sessions.json and
+    pairing/telegram-approved.json) must be reconciled by default."""
+    touched = _run_reconciliation(
+        stage2_text,
+        present=[
+            "sessions/sessions.json",
+            "pairing/telegram-approved.json",
+            "some_brand_new_feature_nobody_has_added_to_any_list/state.json",
+            "cache/model_catalog.json",
+            "config.yaml",
+            ".env",
+        ],
+    )
+    assert "sessions" in touched
+    assert "pairing" in touched
+    assert "some_brand_new_feature_nobody_has_added_to_any_list" in touched
+    assert "cache" in touched
+    assert "config.yaml" in touched
+    assert ".env" in touched
 
 
-def test_loop_skips_nonallowlisted_host_file(stage2_text: str) -> None:
-    """A file NOT on the allowlist (e.g. a host-owned file in a bind mount) must
-    never be chowned, even if present."""
-    touched = _run_loop(stage2_text, ["auth.json"])
-    assert "host_secret.json" not in touched, (
-        "the allowlist loop must not touch non-allowlisted files (#19788)"
+def test_reconciliation_respects_operator_denylist(stage2_text: str) -> None:
+    touched = _run_reconciliation(
+        stage2_text,
+        present=["sessions/sessions.json", "my-host-notes/todo.txt"],
+        exclude="my-host-notes",
+    )
+    assert "sessions" in touched
+    assert "my-host-notes" not in touched, (
+        "an operator-denylisted top-level entry must never be chowned (#19788)"
     )
 
 
-def test_loop_skips_absent_files(stage2_text: str) -> None:
-    """Allowlisted files that don't exist are skipped (no spurious chown)."""
-    touched = _run_loop(stage2_text, ["auth.json"])
-    # state.db wasn't created, so it must not appear.
-    assert "state.db" not in touched
+def test_reconciliation_does_not_choke_on_dotfiles_or_empty_dir(stage2_text: str) -> None:
+    # An empty $HERMES_HOME (fresh volume, nothing seeded yet) and a
+    # dotfile-only tree must not error out (unmatched glob patterns are a
+    # classic POSIX sh footgun this must guard against).
+    touched = _run_reconciliation(stage2_text, present=[])
+    assert touched == []
+
+    touched = _run_reconciliation(stage2_text, present=[".env"])
+    assert ".env" in touched

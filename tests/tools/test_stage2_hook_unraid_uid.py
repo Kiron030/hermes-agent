@@ -7,7 +7,6 @@ after targeted ownership reconciliation.
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -61,20 +60,29 @@ def test_uid_gid_validator_rejects_root_invalid_and_out_of_range(
     assert not _validate_uid_gid(stage2_text, value)
 
 
-def _targeted_chown_subdirs(text: str) -> list[str]:
-    m = re.search(
-        r"for sub in (?P<items>.*?); do\n\s*if \[ -e \"\$HERMES_HOME/\$sub\" \]",
-        text,
-        re.DOTALL,
+def test_ownership_reconciliation_covers_legacy_and_new_pairing_dirs(
+    stage2_text: str,
+) -> None:
+    """Legacy (`pairing/`) and new (`platforms/pairing/`) pairing stores must
+    both keep writable ownership after boot.
+
+    Previously this required each pairing path to be named explicitly in a
+    hand-maintained `for sub in ...` allowlist. That allowlist (and the
+    top-level-ownership gate it lived behind) caused the exact production
+    incident this test now guards against: `pairing/telegram-approved.json`
+    PermissionError on a Railway deploy where the top-level $HERMES_HOME
+    directory had already been chowned once before (2026-07-02 incident,
+    part 3 — see docs/powerunits_railway_bootstrap_v1.md). The generalized,
+    unconditional top-level reconciliation loop
+    (tests/tools/test_stage2_hook_toplevel_chown.py) now covers `pairing/`
+    and `platforms/` (which contains `platforms/pairing/`) by default,
+    without either needing to be named.
+    """
+    assert "for sub in" not in stage2_text, (
+        "the hand-maintained subdir allowlist should be gone; see "
+        "tests/tools/test_stage2_hook_toplevel_chown.py"
     )
-    assert m, "stage2-hook.sh must contain the targeted subdir chown loop"
-    return m.group("items").split()
-
-
-def test_targeted_chown_covers_legacy_and_new_pairing_dirs(stage2_text: str) -> None:
-    subdirs = _targeted_chown_subdirs(stage2_text)
-    assert "pairing" in subdirs
-    assert "platforms/pairing" in subdirs
+    assert 'for entry in "$HERMES_HOME"/* "$HERMES_HOME"/.[!.]*; do' in stage2_text
 
 
 def test_seeded_directory_list_covers_legacy_and_new_pairing_dirs(stage2_text: str) -> None:
