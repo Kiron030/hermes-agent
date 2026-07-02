@@ -234,11 +234,14 @@ auffälligen Einzelfall bis auf Codezeilenebene zu analysieren:
 1. Fehlschlag isoliert laufen lassen (`pytest <eine Testid> -q`) — prüft,
    ob es sich um Testreihenfolge-/xdist-Kontamination handelt (isoliert
    grün = kein Bug, sondern Test-Isolationsproblem).
-2. Falls isoliert weiterhin rot: `git stash` (um zurück auf den
-   Pre-Merge-Fork-Stand zu wechseln, OHNE den Merge-Fortschritt zu
-   verlieren), denselben Test laufen lassen, `git stash pop` (Merge-Stand
-   wiederherstellen). Schlägt der Test schon dort fehl → vorbestehend,
-   keine neue Regression, kurz im Sync-Log vermerken und weiter.
+2. Falls isoliert weiterhin rot: **NICHT** `git stash` benutzen, solange ein
+   `git merge --no-commit` noch offen ist (siehe **kritische Warnung**
+   unten) — stattdessen `git worktree add ../hermes-agent-premerge-check
+   <pre-merge-commit>` (z. B. der alte Branch-Tip vor dem Merge), denselben
+   Test dort laufen lassen, danach `git worktree remove
+   ../hermes-agent-premerge-check`. Schlägt der Test schon dort fehl →
+   vorbestehend, keine neue Regression, kurz im Sync-Log vermerken und
+   weiter.
 3. Nur wenn ein Test isoliert UND auf dem Pre-Merge-Stand grün war, aber
    nach dem Merge rot ist, handelt es sich um eine echte Regression, die
    eine tiefere Analyse rechtfertigt.
@@ -246,11 +249,29 @@ auffälligen Einzelfall bis auf Codezeilenebene zu analysieren:
    *aussehende* Fehlschläge (Credential-Guards, Powerunits-Gate-Tests,
    Codex-Encrypted-Reasoning) — genau dort lohnt sich die 30-Sekunden-
    Gegenprobe, um echte Blocker von Altlasten zu unterscheiden.
-5. Nach `git stash pop`: immer `git status --porcelain -uno` (Dateianzahl)
-   gegenprüfen, dass der volle Merge-Zustand wiederhergestellt wurde,
-   bevor weitergemacht wird — PowerShell-Pipe-Ausgaben können bei sehr
-   großen Diffs (2000+ Dateien) inkonsistent gepuffert wirken, auch wenn
-   der Zustand korrekt ist.
+5. Falls doch ein `git worktree` zu aufwendig ist und nur ein einzelner
+   Dateiinhalt verglichen werden soll, reicht oft auch
+   `git show <pre-merge-commit>:<pfad>` — das berührt den laufenden
+   Merge-Zustand überhaupt nicht.
+
+**KRITISCHE WARNUNG (Bug gefunden + gefixt im v0.17.0-Sync):** `git stash`
+während einer offenen `git merge --no-commit --no-ff`-Session (auch nachdem
+alle Konflikte bereits aufgelöst und gestaged wurden) kann `.git/MERGE_HEAD`
+stillschweigend verwerfen. Der folgende `git commit` erzeugt dann einen
+normalen Einzel-Parent-Commit statt eines echten Merge-Commits — der
+Dateiinhalt ist zwar korrekt gemerged, aber die Commit-Historie verliert die
+Ancestor-Beziehung zum upstream-Tag. Genau das ist beim v0.16.0-Sync
+passiert (Merge-Commit `f0c344683` hatte nur einen Parent statt zwei), was
+beim darauffolgenden v0.17.0-Sync-Versuch zu einem massiv aufgeblähten
+Konfliktbild führte (489 statt der erwarteten ~15-20 Dateien), weil
+`git merge-base` auf v0.15.0 statt v0.16.0 zurückfiel. Gefixt via
+`git merge -s ours <übersprungener-Tag>` (leerer Merge, der nur die
+Ancestor-Kante nachträgt, ohne den Dateibaum zu verändern) — siehe
+Sync-Log-Eintrag v0.17.0. **Nach jedem Merge-Commit** (bevor der nächste
+Sync-Schritt beginnt) kurz verifizieren:
+`git merge-base --is-ancestor <upstream-tag> HEAD` muss Exit-Code 0 liefern
+— das ist die 5-Sekunden-Gegenprobe, die diesen Bug beim nächsten Mal sofort
+aufdecken würde, statt ihn erst einen Sync-Schritt später zu bemerken.
 
 **Neue Windows-Testartefakt-Instanz (v0.16.0):** TOML-Konfigurationstests,
 die einen Windows-`Path`/`WindowsPath` direkt in einen TOML-String
