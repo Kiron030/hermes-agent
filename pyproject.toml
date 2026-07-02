@@ -317,7 +317,22 @@ hermes-acp = "acp_adapter.entry:main"
 [tool.setuptools]
 # rl_cli dropped upstream (#26106, Atropos RL environments removed);
 # powerunits_capability_tier is a fork-specific module, kept.
-py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_bootstrap", "hermes_constants", "hermes_state", "hermes_time", "hermes_logging", "utils", "powerunits_capability_tier", "mcp_serve"]
+#
+# powerunits_telegram_overlays + powerunits_skill_draft_review_contract added
+# 2026-07-02: both were created as top-level fork modules (Tier 4B/telegram-
+# overlay work) but never added here, so they were never part of ANY
+# installed (editable or wheel) build of this package -- only
+# powerunits_capability_tier (explicitly listed) was ever importable outside
+# a raw source checkout. This was latent/undetected because the only two
+# callers -- docker/apply_powerunits_runtime_policy.py (stage2-hook.sh) and
+# the Tier 4A/4B tools (tools/powerunits_tier4a_skill_draft_proposals_tool.py,
+# tools/powerunits_tier4b_review_governance_tool.py) -- had never actually
+# run against a built/deployed image before (see
+# docs/powerunits_railway_bootstrap_v1.md incident log). Any new top-level
+# `powerunits_*.py` fork module MUST be added here or it will
+# ModuleNotFoundError the moment something outside a source checkout imports
+# it.
+py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_bootstrap", "hermes_constants", "hermes_state", "hermes_time", "hermes_logging", "utils", "powerunits_capability_tier", "powerunits_telegram_overlays", "powerunits_skill_draft_review_contract", "mcp_serve"]
 
 [tool.setuptools.data-files]
 # i18n catalogs. locales/ is a bare data directory (no __init__.py), so it is

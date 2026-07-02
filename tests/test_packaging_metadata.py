@@ -78,6 +78,42 @@ def test_every_on_disk_subpackage_is_covered_by_packages_find():
     )
 
 
+def test_every_top_level_powerunits_module_is_covered_by_py_modules():
+    """Regression test for the 2026-07-02 Railway ModuleNotFoundError incident.
+
+    ``[tool.setuptools] py-modules`` is a hand-maintained allowlist of
+    top-level (non-package) ``.py`` files that get included in an editable
+    or wheel install. ``powerunits_telegram_overlays.py`` and
+    ``powerunits_skill_draft_review_contract.py`` were both added to the repo
+    root without being added here, so neither was ever importable outside a
+    raw source checkout. This went undetected until
+    ``docker/apply_powerunits_runtime_policy.py`` (invoked from
+    ``docker/stage2-hook.sh``) actually ran against a built image for the
+    first time and crash-looped the Railway gateway with
+    ``ModuleNotFoundError: No module named 'powerunits_telegram_overlays'``.
+
+    Every top-level ``powerunits_*.py`` module on disk must be declared in
+    ``py-modules``, or it will silently fail to import for any caller that
+    isn't running from a raw source checkout (packaged installs, standalone
+    docker/ boot scripts, etc.).
+    """
+    data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = set(data["tool"]["setuptools"]["py-modules"])
+
+    on_disk = {
+        p.stem
+        for p in REPO_ROOT.glob("powerunits_*.py")
+        if p.is_file()
+    }
+
+    missing = sorted(on_disk - declared)
+    assert not missing, (
+        "These top-level powerunits_*.py modules exist on disk but are missing "
+        "from [tool.setuptools] py-modules in pyproject.toml, so they will "
+        f"ModuleNotFoundError outside a raw source checkout: {missing}"
+    )
+
+
 def test_packaging_declared_as_core_dependency():
     """Regression for #40503.
 

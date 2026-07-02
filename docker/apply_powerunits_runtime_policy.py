@@ -10,7 +10,24 @@ This is intentionally narrow:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+
+# This script is invoked as a standalone file (not via `python -m` / package
+# import), both from docker/stage2-hook.sh (s6-overlay cont-init, or a manual
+# call from docker/railway_gateway_with_dashboard.sh) and potentially by hand.
+# `python /path/to/script.py` only puts the SCRIPT's own directory
+# (.../docker/) on sys.path[0] -- never the repo root one level up, where the
+# fork's top-level `powerunits_*.py` modules actually live. Normally those
+# modules are also reachable via the editable/wheel install's site-packages
+# (see `py-modules` in pyproject.toml), but that has already broken once
+# (2026-07-02 incident: powerunits_telegram_overlays was missing from
+# py-modules and ModuleNotFoundError'd here). Insert the repo root explicitly
+# so this script keeps working even if a future top-level module is again
+# forgotten from py-modules, regardless of caller/CWD/PYTHONPATH context.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import yaml
 
