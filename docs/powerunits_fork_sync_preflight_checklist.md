@@ -14,6 +14,14 @@ spürbar schneller — keine Dependency-Sync-Falle, kein
 Vollsuite-Bisektions-Rabbit-Hole mehr. Prozess funktioniert, weiter so
 anwenden.
 
+**Bewährt beim v0.16.0-Sync:** bei einem sehr großen Release-Sprung (927
+Commits, u. a. komplett neues Dashboard-Admin-Panel mit ~7400 geänderten
+Zeilen in einer einzigen Datei) hat sich gezeigt, dass gezieltes
+Stichproben-Gegenprüfen ("failing Test X — passt das schon auf dem
+Pre-Merge-Stand?" via `git stash` + Testlauf) sehr viel schneller zur
+Gewissheit "keine neue Regression" führt als jeden auffälligen Fehlschlag
+einzeln bis auf Codezeilenebene zu analysieren. Siehe Abschnitt 6a unten.
+
 ---
 
 ## 0. Test-Standard für diesen Prozess (User-Vorgabe)
@@ -212,6 +220,59 @@ Netzlaufwerk als Dev-Setup), keine Merge-Regressionen. Pauschal abhaken:
   - Top-Level `tests/test_*.py`
   - Stirbt ein Chunk selbst mittendrin: nicht weiter bisektieren, als
     bekanntes Artefakt vermerken, nächster Chunk.
+
+---
+
+## 6a. Stichproben-Gegenprüfung statt Einzelfall-Analyse (neu seit v0.16.0)
+
+Bei großen Release-Sprüngen (100+ Commits) ist die absolute Fehlschlag-Zahl
+über alle Chunks hinweg oft sehr hoch (300-500+), ohne dass das eine echte
+Merge-Regression bedeutet — die meisten Fehlschläge fallen in die
+bekannten Umgebungsartefakt-Klassen aus Abschnitt 6. Statt jeden
+auffälligen Einzelfall bis auf Codezeilenebene zu analysieren:
+
+1. Fehlschlag isoliert laufen lassen (`pytest <eine Testid> -q`) — prüft,
+   ob es sich um Testreihenfolge-/xdist-Kontamination handelt (isoliert
+   grün = kein Bug, sondern Test-Isolationsproblem).
+2. Falls isoliert weiterhin rot: `git stash` (um zurück auf den
+   Pre-Merge-Fork-Stand zu wechseln, OHNE den Merge-Fortschritt zu
+   verlieren), denselben Test laufen lassen, `git stash pop` (Merge-Stand
+   wiederherstellen). Schlägt der Test schon dort fehl → vorbestehend,
+   keine neue Regression, kurz im Sync-Log vermerken und weiter.
+3. Nur wenn ein Test isoliert UND auf dem Pre-Merge-Stand grün war, aber
+   nach dem Merge rot ist, handelt es sich um eine echte Regression, die
+   eine tiefere Analyse rechtfertigt.
+4. Diese Methode ist besonders wertvoll für sicherheits-/fork-relevant
+   *aussehende* Fehlschläge (Credential-Guards, Powerunits-Gate-Tests,
+   Codex-Encrypted-Reasoning) — genau dort lohnt sich die 30-Sekunden-
+   Gegenprobe, um echte Blocker von Altlasten zu unterscheiden.
+5. Nach `git stash pop`: immer `git status --porcelain -uno` (Dateianzahl)
+   gegenprüfen, dass der volle Merge-Zustand wiederhergestellt wurde,
+   bevor weitergemacht wird — PowerShell-Pipe-Ausgaben können bei sehr
+   großen Diffs (2000+ Dateien) inkonsistent gepuffert wirken, auch wenn
+   der Zustand korrekt ist.
+
+**Neue Windows-Testartefakt-Instanz (v0.16.0):** TOML-Konfigurationstests,
+die einen Windows-`Path`/`WindowsPath` direkt in einen TOML-String
+interpolieren (z. B. `output_directory = "{some_windows_path}"`), brechen
+auf Windows, weil TOML-Basic-Strings Backslash als Escape-Zeichen
+behandeln — betraf `tests/plugins/test_nemo_relay_plugin.py` beim
+v0.16.0-Sync. Gehört zur allgemeinen Pfadseparator-Artefaktklasse aus
+Abschnitt 6, aber mit einer TOML-spezifischen Ausprägung, die leicht wie
+ein echter Plugin-Bug aussieht (stiller Parse-Fehler, keine offensichtliche
+Windows-Fehlermeldung).
+
+**Neuer Checkpunkt bei großen Feature-Releases (Dashboard/Admin-UI o. Ä.):**
+Wenn ein Upstream-Release eine neue Bedienoberfläche mit administrativen
+Fähigkeiten einführt (z. B. Dashboard-Admin-Panel mit Gateway-/Ops-Kontrolle),
+gezielt prüfen: (a) ist die Oberfläche standardmäßig deaktiviert
+(Env-Var-Gate), (b) bindet sie standardmäßig nur an Loopback oder verlangt
+sie bei Nicht-Loopback-Bind eine Auth-Gate (fail-closed), (c) gibt es ein
+`--insecure`-artiges Flag, das nur per explizitem Opt-in aktivierbar ist,
+(d) setzt keine Docker-/Compose-/Railway-Konfigurationsdatei im Repo diese
+Gates automatisch auf "an". Ergebnis kurz im Sync-Log vermerken, auch wenn
+unauffällig — das ist der eigentliche Beleg, dass die Safety-Posture-Prüfung
+für dieses Feature durchgeführt wurde.
 
 ---
 
