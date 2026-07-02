@@ -412,3 +412,96 @@ Code-/Packaging-Fix, kein Volume-/Berechtigungsproblem.
 in `pyproject.toml` hinzugefuegt werden, sonst ist es ausserhalb eines rohen
 Source-Checkouts (jedes gebaute Image, jeder Wheel-Install) nicht importierbar — der neue
 Invarianten-Test faengt das jetzt automatisch ab.
+
+## Folge-Vorfall: PermissionError auf `sessions/sessions.json` + `pairing/telegram-approved.json` (v3.8, incident 2026-07-02, Teil 3)
+
+**Symptom:** Nach den beiden vorherigen Fixes (Bootstrap-Bypass-Fix + Packaging-Fix) startete
+der Gateway sauber durch (`[stage2] Setup complete; starting user services`,
+`HERMES_DASHBOARD_READY`), aber es traten **weitere, neue** `PermissionError`s bei zwei
+anderen Dateien unter `/opt/data` auf:
+
+- Beim Boot: `[gateway] Warning: Failed to load pairing sessions: [Errno 13] Permission
+  denied: '/opt/data/sessions/sessions.json'` (nicht fatal, nur Warning).
+- Beim Verarbeiten einer eingehenden Telegram-Nachricht: `PermissionError: [Errno 13]
+  Permission denied: '/opt/data/pairing/telegram-approved.json'` — dieser Fehler war fatal
+  fuer die Nachrichtenverarbeitung und wurde dem User direkt in Telegram angezeigt.
+
+**Root Cause (verifiziert im Code):** `docker/stage2-hook.sh`s Chown-Logik war seit PR
+#19795 (Mai 2026, Issue #19788) bewusst auf eine **hand-gepflegte Allowlist** bekannter
+Hermes-Unterordner beschraenkt (`cron sessions logs hooks memories skills skins plans
+workspace home profiles hermes_workspace pairing platforms/pairing`), plus eine separate
+Allowlist bekannter Top-Level-Dateien (`auth.json`, `state.db`, `gateway.lock`, ...). Das war
+urspruenglich eine bewusste Design-Entscheidung, um bei einem host-bind-gemounteten
+`$HERMES_HOME` fremde, nicht-Hermes-Dateien nicht versehentlich umzuchownen.
+
+Zwei unabhaengige Probleme in dieser Allowlist-Architektur haben zusammen die aktuellen
+Fehler verursacht:
+
+1. **Die Allowlist war bereits unvollstaendig** (obwohl `sessions` und `pairing` tatsaechlich
+   BEIDE bereits in der Liste standen!) — das zeigt, dass selbst eine sorgfaeltig gepflegte
+   Liste das Problem nicht strukturell loest: eine Code-Audit von `get_hermes_home() / "..."`
+   im gesamten Python-Codebase (`gateway/`, `hermes_cli/`, `tools/`, `plugins/`, `agent/`, ...)
+   ergab **weit ueber 30 verschiedene** Unterordner/Dateien unter `$HERMES_HOME`, mehrere
+   davon dynamisch benannt (z.B. pro Provider, pro Messaging-Plattform) und damit prinzipiell
+   nicht statisch auflistbar.
+2. **Der eigentliche Trigger:** Die rekursive Chown-Behandlung der Unterordner-Allowlist war
+   hinter einer Bedingung versteckt, die NUR prueft, ob das TOP-LEVEL-Verzeichnis
+   `$HERMES_HOME` selbst falsch owned ist (`needs_chown`). Sobald das top-level Verzeichnis
+   EINMAL korrekt auf `hermes` gechownt wurde (was durch einen frueheren — teilweise
+   gecrashten — Boot-Versuch in diesem Vorfall bereits geschehen war, siehe Teil 1+2), blieb
+   diese Bedingung fuer ALLE folgenden Boots dauerhaft `false` — und die komplette
+   Unterordner-/Datei-Reparatur lief nie wieder, selbst wenn `sessions/sessions.json` oder
+   `pairing/telegram-approved.json` (aus einer alten Volume-Version von vor der s6-Migration,
+   oder durch einen root-kontextigen `docker exec ... hermes ...`-Schreibvorgang) weiterhin
+   falsch owned waren.
+
+**Fix (Commit-Hash siehe unten):** `docker/stage2-hook.sh` grundlegend ueberarbeitet:
+
+1. Die beiden hand-gepflegten Allowlists (Unterordner + Top-Level-Dateien) sowie die separaten
+   Ad-hoc-"immer-auf-jedem-Boot-zuruecksetzen"-Bloecke fuer `profiles/` und `cron/` wurden
+   **entfernt** und durch EINE einzige, generische Reconciliation-Loop ersetzt, die JEDEN
+   Top-Level-Eintrag unter `$HERMES_HOME` (Dateien, Ordner, inkl. Dotfiles) erfasst.
+2. Diese Loop laeuft **unbedingt bei jedem Boot** (kein `needs_chown`-Gate mehr) — behebt damit
+   strukturell auch das zweite Problem oben.
+3. Statt einer Allowlist wird jetzt eine **Denylist** verwendet
+   (`HERMES_DATA_DIR_CHOWN_EXCLUDE`, space-separated Top-Level-Namen), Default leer. Das
+   bewahrt die urspruengliche #19788-Absicht (Schutz vor Zerstoerung fremder Host-Dateien in
+   einem bind-gemounteten `$HERMES_HOME`) fuer den seltenen Fall, dass ein Operator das
+   explizit braucht — deckt aber im Normalfall (dediziertes Volume/Mount) automatisch JEDEN
+   aktuellen UND jeden zukuenftigen Hermes-State-Pfad ab, ohne dass er irgendwo eingetragen
+   werden muss.
+4. Bereits vor dem Chown geprueft (`stat -c %u`), ob ein Eintrag schon korrekt owned ist —
+   vermeidet unnoetige rekursive Traversierung bereits korrekter, potenziell grosser
+   Unterbaeume (`skills/`, `node_modules/`, `cache/`, ...) bei jedem Boot.
+5. Tests aktualisiert/erweitert (`tests/tools/test_stage2_hook_toplevel_chown.py`,
+   `tests/tools/test_stage2_hook_log_dir_seed.py`, `tests/tools/test_stage2_hook_unraid_uid.py`,
+   `tests/test_docker_home_override_scripts.py`): funktionale Tests simulieren jetzt u.a.
+   explizit einen frei erfundenen, auf keiner Liste stehenden Unterordner
+   (`some_brand_new_feature_nobody_has_added_to_any_list/`) und pruefen, dass er trotzdem
+   automatisch mitgechownt wird — das ist der direkte Regressionsschutz gegen genau diese
+   Bug-Klasse.
+
+**Abdeckung bestaetigt:** Der neue Mechanismus deckt den **gesamten** `$HERMES_HOME`-Baum ab,
+nicht nur die zwei aktuell gemeldeten Pfade (`sessions/sessions.json`,
+`pairing/telegram-approved.json`) — inklusive aller im Code-Audit gefundenen Pfade (`cache/`,
+`plugins/`, `checkpoints/`, `whatsapp/`, `mcp-installs/`, dynamisch benannte
+Provider-/Plattform-Dateien, u.v.m.) sowie jedem zukuenftigen, noch nicht existierenden
+State-Pfad, den ein spaeteres Feature hinzufuegt.
+
+**Naechster Schritt fuer den User:** Redeploy anstossen (Push loest bei aktivem Auto-Deploy
+automatisch einen Rebuild aus; sonst manuell "Redeploy" in der Railway-UI). Kein weiterer
+manueller Eingriff auf Railway noetig.
+
+**Preflight-Checkliste (neuer, genereller Punkt fuer zukuenftige Docker-/Entrypoint-Aenderungen):**
+
+> Bei Docker-/Entrypoint-Aenderungen, die Datei-Ownership betreffen: IMMER rekursiv auf das
+> gesamte Datenverzeichnis anwenden (ggf. mit einer kurzen, expliziten Denylist fuer bekannte
+> Ausnahmen), NIE nur auf einzelne zum Zeitpunkt der Aenderung bekannte Dateien/Ordner —
+> sonst tauchen bei jedem neuen Feature/Unterordner erneut einzelne PermissionErrors auf
+> einem bestehenden Volume auf. Eine Allowlist-basierte Ownership-Reparatur ist ein
+> Wartungs-Zeitbombe: sie ist per Definition nur so vollstaendig wie der Stand des Codes zum
+> Zeitpunkt ihrer letzten Aktualisierung, waehrend `get_hermes_home()`-Aufrufstellen
+> kontinuierlich wachsen. Zusaetzlich: jede Ownership-Reparatur-Bedingung, die nur den
+> TOP-LEVEL-Zustand prueft (statt jeden Eintrag einzeln), kann nach einem einzigen
+> erfolgreichen Teil-Lauf dauerhaft "scharf gestellt" bleiben und nie wieder greifen —
+> Reparaturen muessen pro Eintrag, nicht pro Verzeichnis-Wurzel, geprueft werden.
