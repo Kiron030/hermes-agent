@@ -319,6 +319,53 @@ DEFAULT_CONTEXT_LENGTHS = {
     "zai-org/GLM-5": 202752,
 }
 
+# Real, hard per-model completion-token (max_tokens/max_completion_tokens) caps
+# for OpenAI's DIRECT api.openai.com endpoint.
+#
+# Needed because provider="custom" (plugins/model-providers/custom/__init__.py,
+# CustomProfile) ships a generous generic default_max_tokens=65536 intended for
+# local/Ollama-style backends that tolerate huge output caps (see that file's
+# docstring re: Ollama num_predict=128 truncation, #39281). When a "custom"
+# profile alias is instead pointed at REAL OpenAI (e.g. Powerunits'
+# first_safe_v1 policy: base_url=https://api.openai.com/v1, model=gpt-4.1-mini),
+# that generic 65536 default silently exceeds OpenAI's real, much lower hard
+# limits and gets rejected with HTTP 400:
+#   "max_tokens is too large: 65536. This model supports at most 32768
+#    completion tokens, whereas you provided 65536."
+# error_classifier.py's _CONTEXT_OVERFLOW_PATTERNS matches "max_tokens" in that
+# message, so it gets classified as context_overflow — which fails immediately
+# with "Cannot compress further" on a short/fresh session (nothing to
+# compress), surfacing as a confusing "Context too large" auto-reset even
+# though the actual conversation is tiny (2026-07-02 incident, part 5; see
+# docs/powerunits_primary_provider_routing_v1.md).
+#
+# Source: https://platform.openai.com/docs/models (max output tokens per
+# model family). Only the gpt-4.1 family is listed — that's what's affected
+# by CustomProfile's 65536 default; gpt-5.x already forces
+# max_completion_tokens correctly and doesn't need a lowered cap here.
+OPENAI_DIRECT_MAX_COMPLETION_TOKENS: Dict[str, int] = {
+    "gpt-4.1-nano": 32768,
+    "gpt-4.1-mini": 32768,
+    "gpt-4.1": 32768,
+}
+
+
+def get_openai_direct_max_completion_tokens(model: str) -> Optional[int]:
+    """Return the real max completion-token cap for *model* on direct OpenAI.
+
+    Longest-substring-first matching (mirrors the DEFAULT_CONTEXT_LENGTHS
+    lookup style). Returns None for models not in the table — callers should
+    fall back to their own default in that case.
+    """
+    name = (model or "").strip().lower()
+    if not name:
+        return None
+    for key in sorted(OPENAI_DIRECT_MAX_COMPLETION_TOKENS, key=len, reverse=True):
+        if key in name:
+            return OPENAI_DIRECT_MAX_COMPLETION_TOKENS[key]
+    return None
+
+
 # xAI Grok models that ACCEPT the `reasoning.effort` parameter on
 # api.x.ai. Verified live against /v1/responses 2026-05-10:
 #
@@ -1045,6 +1092,19 @@ def parse_available_output_tokens_from_error(error_msg: str) -> Optional[int]:
     the error does not look like a max_tokens-too-large error.
     """
     error_lower = error_msg.lower()
+
+    # OpenAI direct API format (e.g. gpt-4.1-mini on api.openai.com when a
+    # caller requests more than the model's hard completion-token cap):
+    #   "max_tokens is too large: 65536. This model supports at most 32768
+    #    completion tokens, whereas you provided 65536."
+    # The reported cap IS the available output budget directly (OpenAI
+    # already validates this before considering input size), so no
+    # subtraction is needed — unlike Anthropic's available_tokens formula.
+    _m_openai_cap = re.search(r'supports at most (\d+)\s*completion tokens', error_lower)
+    if _m_openai_cap:
+        cap = int(_m_openai_cap.group(1))
+        if cap >= 1:
+            return cap
 
     # Must look like an output-cap error, not a prompt-length error.
     is_output_cap_error = (

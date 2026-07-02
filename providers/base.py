@@ -145,7 +145,7 @@ class ProviderProfile:
         """
         return {}, {}
 
-    def get_max_tokens(self, model: str | None) -> int | None:
+    def get_max_tokens(self, model: str | None, *, base_url: str | None = None) -> int | None:
         """Return the default max_tokens cap for *model*.
 
         Overrideable hook for providers that need per-model output caps —
@@ -153,9 +153,14 @@ class ProviderProfile:
         different completion-token limit. The transport calls this when
         the user hasn't set an explicit max_tokens.
 
+        ``base_url`` is forwarded (not just ``model``) so profiles that are
+        used as a generic alias for multiple real backends — e.g. "custom"
+        covers both local/Ollama-style servers AND real hosted APIs like
+        api.openai.com — can tell those apart and apply the right cap. See
+        ``plugins/model-providers/custom/__init__.py::CustomProfile``.
+
         Default: return self.default_max_tokens (the static profile field),
-        ignoring the model name. Override in a subclass to vary the cap
-        per-model.
+        ignoring model/base_url. Override in a subclass to vary the cap.
         """
         return self.default_max_tokens
 

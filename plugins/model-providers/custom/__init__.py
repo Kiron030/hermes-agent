@@ -4,12 +4,27 @@ Covers any endpoint registered as provider="custom", including local
 Ollama instances. Key quirks:
   - ollama_num_ctx → extra_body.options.num_ctx (local context window)
   - reasoning_config disabled → extra_body.think = False
+  - max_tokens capped to real per-model limits when base_url is actually
+    OpenAI's hosted API rather than a local/Ollama-style relay
 """
 
 from typing import Any
 
+from agent.model_metadata import get_openai_direct_max_completion_tokens
 from providers import register_provider
 from providers.base import ProviderProfile
+
+
+def _points_at_real_openai(base_url: Any) -> bool:
+    """True when base_url is OpenAI's actual hosted API, not a local relay.
+
+    "custom" is a generic alias — it covers local/Ollama-style servers AND
+    real hosted OpenAI-compatible endpoints under one provider name. The two
+    have very different hard limits, so callers that need to know which real
+    backend they're talking to (e.g. get_max_tokens()) use this check.
+    """
+    s = str(base_url or "").strip().lower()
+    return "api.openai.com" in s
 
 
 def _accepts_ollama_think_extra_body(base_url: Any) -> bool:
@@ -78,6 +93,24 @@ class CustomProfile(ProviderProfile):
         if not (base_url or self.base_url):
             return None
         return super().fetch_models(api_key=api_key, base_url=base_url, timeout=timeout)
+
+    def get_max_tokens(self, model: str | None, *, base_url: Any = None) -> int | None:
+        """Cap max_tokens to OpenAI's real per-model limit on direct OpenAI.
+
+        default_max_tokens=65536 (below) is deliberately generous for
+        local/Ollama-style backends. Real OpenAI enforces much lower hard
+        per-model caps and rejects anything higher with HTTP 400 (e.g.
+        gpt-4.1-mini supports at most 32768 completion tokens) — which
+        error_classifier.py's broad _CONTEXT_OVERFLOW_PATTERNS then
+        misclassifies as context_overflow, causing a spurious "Cannot
+        compress further" session reset on what may be a brand-new, tiny
+        session. See docs/powerunits_primary_provider_routing_v1.md.
+        """
+        if _points_at_real_openai(base_url):
+            cap = get_openai_direct_max_completion_tokens(model)
+            if cap is not None:
+                return cap
+        return self.default_max_tokens
 
 
 custom = CustomProfile(

@@ -435,6 +435,38 @@ class TestNousProfile:
         assert "reasoning" not in eb
 
 
+class TestCustomProfile:
+    """provider="custom" aliases both local/Ollama backends and real hosted
+    OpenAI-compatible endpoints under one name. get_max_tokens() must tell
+    them apart via base_url (2026-07-02 incident, part 5)."""
+
+    def test_default_max_tokens_field(self):
+        p = get_provider_profile("custom")
+        assert p.default_max_tokens == 65536
+
+    def test_no_base_url_keeps_generous_default(self):
+        p = get_provider_profile("custom")
+        assert p.get_max_tokens("llama3") == 65536
+
+    def test_local_ollama_base_url_keeps_generous_default(self):
+        p = get_provider_profile("custom")
+        assert p.get_max_tokens("llama3", base_url="http://localhost:11434/v1") == 65536
+
+    def test_real_openai_caps_known_model(self):
+        p = get_provider_profile("custom")
+        assert p.get_max_tokens("gpt-4.1-mini", base_url="https://api.openai.com/v1") == 32768
+        assert p.get_max_tokens("gpt-4.1", base_url="https://api.openai.com/v1") == 32768
+        assert p.get_max_tokens("gpt-4.1-nano", base_url="https://api.openai.com/v1") == 32768
+
+    def test_real_openai_unknown_model_keeps_default(self):
+        p = get_provider_profile("custom")
+        assert p.get_max_tokens("gpt-5.4", base_url="https://api.openai.com/v1") == 65536
+
+    def test_alias_lookup_resolves_same_profile(self):
+        assert get_provider_profile("ollama").name == "custom"
+        assert get_provider_profile("local").name == "custom"
+
+
 class TestQwenProfile:
     def test_max_tokens(self):
         p = get_provider_profile("qwen-oauth")

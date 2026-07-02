@@ -19,12 +19,14 @@ from agent.model_metadata import (
     CONTEXT_PROBE_TIERS,
     DEFAULT_CONTEXT_LENGTHS,
     DEFAULT_FALLBACK_CONTEXT,
+    OPENAI_DIRECT_MAX_COMPLETION_TOKENS,
     _strip_provider_prefix,
     estimate_tokens_rough,
     estimate_messages_tokens_rough,
     get_model_context_length,
     get_next_probe_tier,
     get_cached_context_length,
+    get_openai_direct_max_completion_tokens,
     parse_context_limit_from_error,
     save_context_length,
     fetch_model_metadata,
@@ -1387,6 +1389,44 @@ class TestParseContextLimitFromError:
         """Very large number (>10M) should be rejected."""
         msg = "maximum context length is 99999999999"
         assert parse_context_limit_from_error(msg) is None
+
+
+# =========================================================================
+# OpenAI direct completion-token caps (2026-07-02 incident, part 5)
+# =========================================================================
+
+class TestOpenAIDirectMaxCompletionTokens:
+    """gpt-4.1 family's real hard output-token caps on api.openai.com.
+
+    provider="custom" (CustomProfile) defaults max_tokens to a generous
+    65536 for local/Ollama-style backends; when "custom" instead points at
+    real OpenAI, that default exceeds the model's actual limit and OpenAI
+    400s. This table lets CustomProfile.get_max_tokens() apply the real cap.
+    """
+
+    def test_gpt_4_1_mini(self):
+        assert get_openai_direct_max_completion_tokens("gpt-4.1-mini") == 32768
+
+    def test_gpt_4_1_nano(self):
+        assert get_openai_direct_max_completion_tokens("gpt-4.1-nano") == 32768
+
+    def test_gpt_4_1_bare(self):
+        assert get_openai_direct_max_completion_tokens("gpt-4.1") == 32768
+
+    def test_case_insensitive(self):
+        assert get_openai_direct_max_completion_tokens("GPT-4.1-Mini") == 32768
+
+    def test_unknown_model_returns_none(self):
+        assert get_openai_direct_max_completion_tokens("gpt-5.4") is None
+        assert get_openai_direct_max_completion_tokens("claude-opus-4.6") is None
+
+    def test_empty_or_none_returns_none(self):
+        assert get_openai_direct_max_completion_tokens("") is None
+        assert get_openai_direct_max_completion_tokens(None) is None
+
+    def test_table_values_are_positive_ints(self):
+        for model, cap in OPENAI_DIRECT_MAX_COMPLETION_TOKENS.items():
+            assert isinstance(cap, int) and cap > 0, model
 
 
 # =========================================================================

@@ -62,3 +62,30 @@ class TestParseCharBasedOutputCap:
         msg = ("maximum context length is 1000 tokens. However, you requested "
                "1000 output tokens and your prompt contains 9000 characters.")
         assert parse_available_output_tokens_from_error(msg) is None
+
+
+class TestParseOpenAIDirectOutputCap:
+    """Direct OpenAI API's hard per-model completion-token cap message.
+
+    2026-07-02 incident: provider="custom" pointed at real api.openai.com
+    (gpt-4.1-mini) sent max_tokens=65536 (CustomProfile's generic
+    local/Ollama default), which OpenAI rejects outright since gpt-4.1-mini's
+    real hard cap is 32768. error_classifier.py matches "max_tokens" in the
+    message and classifies it as context_overflow; this parser must recognize
+    the specific OpenAI phrasing so the retry reduces max_tokens instead of
+    failing "Cannot compress further" on a short/fresh session.
+    """
+
+    def test_openai_direct_completion_cap_format(self):
+        msg = (
+            "max_tokens is too large: 65536. This model supports at most "
+            "32768 completion tokens, whereas you provided 65536."
+        )
+        assert parse_available_output_tokens_from_error(msg) == 32768
+
+    def test_openai_direct_completion_cap_case_insensitive(self):
+        msg = (
+            "Max_Tokens is too large: 100000. This model supports at most "
+            "16384 Completion Tokens, whereas you provided 100000."
+        )
+        assert parse_available_output_tokens_from_error(msg) == 16384

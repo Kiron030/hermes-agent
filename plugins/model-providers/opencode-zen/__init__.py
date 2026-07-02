@@ -43,7 +43,7 @@ class OpenCodeGoProfile(ProviderProfile):
         "mimo-v2.5-pro": 131072,
     }
 
-    def get_max_tokens(self, model: str | None) -> int | None:
+    def get_max_tokens(self, model: str | None, *, base_url: str | None = None) -> int | None:
         cap = self._MODEL_MAX_TOKENS.get(_flat_model_name(model))
         if cap is not None:
             return cap

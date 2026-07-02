@@ -506,6 +506,59 @@ class TestChatCompletionsBuildKwargs:
         # Qwen default: 65536 from profile.default_max_tokens
         assert kw["max_tokens"] == 65536
 
+    def test_custom_provider_ollama_keeps_generous_default(self, transport):
+        """A genuine local/Ollama-style 'custom' backend keeps the 65536 floor."""
+        from providers import get_provider_profile
+        profile = get_provider_profile("custom")
+        kw = transport.build_kwargs(
+            model="llama3", messages=[{"role": "user", "content": "Hi"}],
+            provider_profile=profile,
+            base_url="http://localhost:11434/v1",
+            max_tokens_param_fn=lambda n: {"max_tokens": n},
+        )
+        assert kw["max_tokens"] == 65536
+
+    def test_custom_provider_on_real_openai_caps_to_model_limit(self, transport):
+        """2026-07-02 incident: provider=custom pointed at real OpenAI must not
+        send the generic 65536 Ollama-floor — gpt-4.1-mini's real hard cap is
+        32768 and OpenAI 400s ("max_tokens is too large: 65536. This model
+        supports at most 32768 completion tokens...") on anything higher.
+        """
+        from providers import get_provider_profile
+        profile = get_provider_profile("custom")
+        kw = transport.build_kwargs(
+            model="gpt-4.1-mini", messages=[{"role": "user", "content": "Hi"}],
+            provider_profile=profile,
+            base_url="https://api.openai.com/v1",
+            max_tokens_param_fn=lambda n: {"max_completion_tokens": n},
+        )
+        assert kw["max_completion_tokens"] == 32768
+
+    def test_custom_provider_on_real_openai_unknown_model_keeps_default(self, transport):
+        """Models not in the direct-OpenAI cap table fall back to the profile default."""
+        from providers import get_provider_profile
+        profile = get_provider_profile("custom")
+        kw = transport.build_kwargs(
+            model="gpt-5.4", messages=[{"role": "user", "content": "Hi"}],
+            provider_profile=profile,
+            base_url="https://api.openai.com/v1",
+            max_tokens_param_fn=lambda n: {"max_completion_tokens": n},
+        )
+        assert kw["max_completion_tokens"] == 65536
+
+    def test_custom_provider_explicit_user_max_tokens_wins_over_openai_cap(self, transport):
+        """An explicit user-configured model.max_tokens still takes priority."""
+        from providers import get_provider_profile
+        profile = get_provider_profile("custom")
+        kw = transport.build_kwargs(
+            model="gpt-4.1-mini", messages=[{"role": "user", "content": "Hi"}],
+            provider_profile=profile,
+            base_url="https://api.openai.com/v1",
+            max_tokens=8000,
+            max_tokens_param_fn=lambda n: {"max_completion_tokens": n},
+        )
+        assert kw["max_completion_tokens"] == 8000
+
     def test_anthropic_max_output_for_claude_on_aggregator(self, transport):
         msgs = [{"role": "user", "content": "Hi"}]
         kw = transport.build_kwargs(
