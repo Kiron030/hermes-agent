@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-07-04 — v0.18.0-Merge (Tag `v2026.7.1`) auf `integration/hermes-runtime-v0.18-bump`
+
+**Gemerged:** Upstream v0.18.0 (1953 Commits ggü. v0.17.0 / `v2026.6.19`). Security-Tag-Triage zuerst: zahlreiche sicherheitsgetaggte Commits im Bereich `v2026.6.19..v2026.7.1` — u. a. IDOR-Härtung für persisted `/resume`/`/sessions` (Chat-/Thread-Origin-Proof), Browser private-network/CDP-Guards, Cron-`base_url`-Credential-Exfiltration-Block, Dashboard-Plugin-Backend-Import auf bundled Plugins beschränkt (#43719), aiohttp 3.14.1 + cryptography-Floor, `/proc`-Read-Leak-Blocker, Tool-Override-Opt-in-Sink. Alle additiv; keine Fork-Kollision mit `first_safe_v1`/Telegram-first. Managed-scope/Relay weiterhin inaktiv im Powerunits-Deploy (kein `GATEWAY_RELAY_URL`, kein `/etc/hermes`).
+
+**Konfliktauflösungen (12 Dateien + 3 modify/delete-Tests):** `Dockerfile` (Upstreams `COPY --link --chmod` + Fork-CRLF/chmod für `entrypoint.sh`/`railway_gateway_with_dashboard.sh`/`stage2-hook.sh`), `docker/stage2-hook.sh` (Fork-Denylist-Reconciliation **beibehalten**, Upstreams Symlink-Guards + `chown_hermes_tree` + always-on profiles/cron/top-level-file-Blöcke **additiv kombiniert** — kein Rückfall auf Upstreams allowlist/`needs_chown`-Gate), `docker/SOUL.md` (Powerunits-Persona beibehalten), `gateway/run.py` (Upstreams `_normalize_root_model_keys` + Fork-Lockdown **danach**), `hermes_cli/banner.py` (first-safe-Skills-Hide + Upstreams enabled-toolset-Filter), `hermes_cli/runtime_provider.py` (api.anthropic.com→`anthropic_messages` von Upstream; api.openai.com→`None` Fork-Verhalten wiederhergestellt), `tools/registry.py` (`os`+`sys`), Tests additiv kombiniert (`test_registry`, `test_output_cap_parsing`, `test_detect_api_mode_for_url`), `package-lock.json` (Upstream). Fork-Tests für stage2-hook/docker-home beibehalten und an kombinierte stage2-Architektur angepasst.
+
+**Fork-Fix-Verlust-Check:** Produktions-Pfade verifiziert intakt — `docker/railway_gateway_with_dashboard.sh` (stage2-bootstrap), rekursiver/denylist-basierter chown in `stage2-hook.sh`, `pyproject.toml`-py-modules (`powerunits_telegram_overlays`, …), `plugins/model-providers/custom/__init__.py::get_max_tokens`, `agent/model_metadata.py::OPENAI_DIRECT_MAX_COMPLETION_TOKENS`, `gateway/run.py`+`gateway/slash_commands.py` first_safe-Gates. Pflicht-Syntaxscan (150 geänderte `.py`) + Import-Smoke grün; kein `base_url`-Duplikat in `chat_completions.py`.
+
+**Testlage (pragmatisch):** Chunks `tests/gateway+stage2` (~160 Fails bei 8402 Pass), `tests/agent+packaging` (~72 Fails bei 5142 Pass) — überwiegend bekannte Windows/Netzlaufwerk-/xdist-Artefakte; stage2-Hotspot-Tests nach Anpassung 7/7 grün (3 skipped ohne bash). Keine Safety-Posture-Blocker.
+
+**Offene Punkte:** Keine.
+
+**Branches:** Committet auf `integration/hermes-runtime-v0.18-bump`, nach `powerunits-internal-setup` gemerged und gepusht.
+
+---
+
 ## 2026-07-02 — v0.17.0-Merge (Tag `v2026.6.19`) auf `integration/hermes-runtime-v0.17-bump` — **letzter Schritt des v0.12→v0.17-Plans**
 
 **Gemerged:** Upstream v0.17.0 (927→ca. 950 Commits ggü. v0.16.0). Security-Tag-Triage zuerst: 34 sicherheitsgetaggte Commits im Bereich `v2026.6.5..v2026.6.19` gesichtet — u. a. `f6416f50f fix(deps): bump urllib3 and PyJWT to clear CVEs (#40179)` (via `uv`-Dep-Sync übernommen), `da7253215 fix(cron): sanitize env for job script subprocesses`, `fc4635458 fix(security): fail closed when an own-policy gateway adapter has no allowlist`, `f6f363662 fix(discord): fail closed for component button auth when no allowlist set`, `3380563d9 fix(security): stop /api/status leaking host paths and PID on gated binds`, `621bf3a87 fix(security): strip shell escapes in denylist normalizer; fail-closed on missing approval module`. Alle additiv, keine Fork-Kollision. Neue A2-Relay-/Managed-NAS-Architektur (`gateway/relay/`, `hermes_cli/managed_scope.py`) geprüft: `self_provision_relay()` feuert nur bei explizit gesetzter `GATEWAY_RELAY_URL` (nicht gesetzt in unserem Dockerfile/Deploy), `managed_scope.apply_managed_overlay()` liest nur `/etc/hermes` bzw. `$HERMES_MANAGED_DIR` (beide bei uns nicht vorhanden) — beide Features bleiben inaktiv im Powerunits-Deploy, kein Safety-Posture-Fund.

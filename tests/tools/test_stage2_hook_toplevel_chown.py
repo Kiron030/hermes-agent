@@ -56,17 +56,20 @@ def stage2_text() -> str:
 
 def _reconciliation_block(text: str) -> str:
     """Extract the unconditional top-level ownership-reconciliation block,
-    from the `actual_hermes_uid=...` assignment through the closing `done`
-    of the `for entry in ...` loop."""
+    from the helper functions through the closing `done` of the
+    `for entry in ...` loop."""
     m = re.search(
-        r"actual_hermes_uid=\$\(id -u hermes\)\n(?:.*\n)*?^done\n",
+        r"actual_hermes_uid=\$\(id -u hermes\)\n(?:.*\n)*?"
+        r'^for entry in "\$HERMES_HOME"/\* "\$HERMES_HOME"/\.\[!\.\]\*; do\n'
+        r"(?:.*\n)*?^done\n",
         text,
         re.MULTILINE,
     )
     assert m, "stage2-hook.sh must contain the ownership-reconciliation block"
     block = m.group(0)
     assert "for entry in" in block
-    assert 'chown -R hermes:hermes "$entry"' in block
+    assert 'chown_hermes_tree "$entry"' in block
+    assert "path_has_symlink_component" in block
     return block
 
 

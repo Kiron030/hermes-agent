@@ -370,6 +370,29 @@ noch vorkommen, wo sie im alten Code vorkamen.
 
 ---
 
+## 6d. `stage2-hook.sh`: Fork-Denylist-Reconciliation vs. Upstream-Chown-Refactor (neu seit v0.18.0)
+
+Upstream v0.18.0 refactort den `$HERMES_HOME`-Chown-Block (Symlink-Guards
+via `path_has_symlink_component`/`refuse_symlinked_path`, `chown_hermes_tree`,
+always-on profiles/cron/top-level-file-Blöcke) und behält dabei intern noch
+ein **allowlist-/needs_chown-Gate** für Subdirs. Der Fork ersetzte das durch
+eine **unconditional denylist-basierte Top-Level-Schleife** (2026-07-02
+Railway-Incident, part 3). Beim Merge **beides kombinieren**, nicht
+"incoming" blind nehmen:
+
+- Fork-Schleife (`for entry in "$HERMES_HOME"/* ...`, `HERMES_DATA_DIR_CHOWN_EXCLUDE`,
+  kein `needs_chown`) **beibehalten**, aber `chown -R` durch `chown_hermes_tree`
+  ersetzen (Upstream-Symlink-Schutz).
+- Upstreams always-on profiles/cron/top-level-file-Blöcke **additiv** drunter
+  lassen (docker-exec-as-root-Härtung) — das widerspricht nicht der
+  Denylist-Schleife.
+- Contract-Tests in `tests/tools/test_stage2_hook_toplevel_chown.py` und
+  `tests/test_docker_home_override_scripts.py` ggf. anpassen (erwarten
+  `chown_hermes_tree`, nicht bare `chown -R`; profiles/cron-Blöcke dürfen
+  wieder vorhanden sein).
+
+---
+
 ## 7. Ablaufreihenfolge (Kurzfassung)
 
 1. **Security-Tag-Triage zuerst** (Abschnitt 1 oben) — Changelog/Commits

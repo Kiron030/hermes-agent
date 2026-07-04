@@ -82,27 +82,21 @@ def test_dashboard_run_does_not_derive_insecure_from_bind_host() -> None:
 
 
 def test_stage2_hook_repairs_ownership_of_every_toplevel_entry_on_every_boot() -> None:
-    """profiles/ and cron/ (and every other top-level entry under
-    $HERMES_HOME) must be reclaimed after root-context writes, on every
-    boot — not just once, and not just for a hand-picked subset.
+    """Every top-level entry under $HERMES_HOME must be reclaimable after
+    root-context writes, on every boot — not just once, and not just for a
+    hand-picked allowlist.
 
-    Previously profiles/ and cron/ each had their own dedicated
-    unconditional "always reset on every boot" block, added ad hoc as each
-    one caused its own production incident. That per-directory pattern was
-    generalized into a single unconditional reconciliation loop covering
-    the whole $HERMES_HOME tree (2026-07-02 incident, part 3 — see
-    docs/powerunits_railway_bootstrap_v1.md and
-    tests/tools/test_stage2_hook_toplevel_chown.py for the functional
-    coverage). This test just asserts the generalized mechanism replaced
-    the two one-off blocks rather than merely duplicating them.
+    The Powerunits denylist-based reconciliation loop (2026-07-02 incident,
+    part 3) is the primary mechanism. Upstream v0.18.0 additionally keeps
+    explicit always-on profiles/cron/top-level-file blocks with symlink
+    guards — additive hardening for docker-exec-as-root writes, not a
+    replacement for the generalized loop.
     """
     text = STAGE2_HOOK.read_text(encoding="utf-8")
 
-    # The old per-directory one-off blocks must be gone...
-    assert 'if [ -d "$HERMES_HOME/profiles" ]; then' not in text
-    assert 'if [ -d "$HERMES_HOME/cron" ]; then' not in text
-
-    # ...replaced by the single generalized, unconditional reconciliation
-    # loop that covers profiles/, cron/, and everything else by default.
     assert 'for entry in "$HERMES_HOME"/* "$HERMES_HOME"/.[!.]*; do' in text
+    assert "HERMES_DATA_DIR_CHOWN_EXCLUDE" in text
     assert not re.search(r"\bneeds_chown\s*=", text)
+    assert "chown_hermes_tree" in text
+    assert 'if [ -d "$HERMES_HOME/profiles" ]; then' in text
+    assert 'if [ -d "$HERMES_HOME/cron" ]; then' in text
