@@ -99,25 +99,56 @@ Railway-Kompatibilitaetshinweis:
 
 **Ursache (Default-Deploy):** Das Image startet per [`Dockerfile`](../Dockerfile) **`CMD [ "gateway", "run" ]`** — also nur das **Messaging-Gateway** (z. B. Telegram **Long-Polling**). Es laeuft **kein** HTTP-Server auf der von Railway injizierten Umgebungsvariable **`PORT`**. Der Reverse-Proxy erreicht keinen Listener → **502 Bad Gateway**.
 
-**Dashboard:** Die Web-UI ist ein **separater** Befehl (`hermes dashboard` / [`hermes_cli/main.py`](../hermes_cli/main.py) → [`hermes_cli/web_server.py`](../hermes_cli/web_server.py)). Sie wird vom Default-CMD **nicht** gestartet. Zusaetzlich bindet das Dashboard standardmaessig **`127.0.0.1:9119`** — aus Sicht Railway unerreichbar; oeffentlich braucht es **`0.0.0.0`** und den **Railway-`PORT`** sowie **`--insecure`** (Upstream-Vorgabe fuer Nicht-Loopback-Binds).
+**Dashboard (Upstream v0.18+):** Die Web-UI ist ein **separater** Befehl (`hermes dashboard` → [`hermes_cli/web_server.py`](../hermes_cli/web_server.py)). Ab **v0.18** verweigert `start_server()` jeden **Nicht-Loopback-Bind** (`0.0.0.0`, Railway-`PORT`) **ohne registrierten Auth-Provider** — **`--insecure` ist tot** (Juni-2026-Hardening, siehe `hermes_cli/web_server.py`). Fehlermeldung im Deploy-Log:
 
-**Empfohlener Minimal-Schritt (ein Container, Gateway + Stage-1-Dashboard):**
+```
+Refusing to bind dashboard to 0.0.0.0 — the auth gate engages on non-loopback binds,
+but no auth providers are registered.
+```
 
-1. Railway **Start Command**:  
-   `/opt/hermes/docker/railway_gateway_with_dashboard.sh`
-   > **Korrektur (2026-07-02, siehe Incident-Abschnitt unten):** Die fruehere Annahme hier
-   > ("ersetzt nur das Docker-CMD, Entrypoint bleibt") ist **falsch** und wurde durch einen
-   > Produktions-Ausfall widerlegt. Railway dokumentiert explizit, dass ein Custom Start
-   > Command bei Dockerfile/Image-Deploys das komplette `ENTRYPOINT` ersetzt
-   > (<https://docs.railway.com/deployments/start-command>). Das Skript selbst wurde
-   > deshalb gehaertet: es fuehrt jetzt `docker/stage2-hook.sh` (den eigentlichen
-   > `/init`-Bootstrap) explizit selbst aus, bevor Gateway/Dashboard starten. Kein weiterer
-   > Handlungsbedarf hier, nur die urspruengliche Doku-Aussage war irrefuehrend.
-2. Env: `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`, optional **`HERMES_POWERUNITS_DASHBOARD_MODE=observe`** (sperrt mutierende `/api/*` HTTP-Calls).
-3. Sicherheit: Dashboard ist **keine** starke oeffentliche Auth; Zugriff absichern (VPN, Railway TCP-Proxy-Beschraenkung, organisatorisch).
+**Empfohlener Start (Telegram-first / Powerunits first_safe_v1 — Option A):**
 
-Siehe Skript: [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh).  
-Erweiterte Lessons (**Dashboard + `HERMES_HOME` + bundled skills** als Capability-Atlas): [`docs/powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md).
+1. Railway **Start Command** (kein oeffentliches Dashboard noetig):
+   `/opt/hermes/docker/railway_gateway.sh`
+   — oder weiterhin `/opt/hermes/docker/railway_gateway_with_dashboard.sh` (startet seit v0.18-Fix **standardmaessig nur das Gateway**, siehe unten).
+2. Env: `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1` (im Image bereits gesetzt).
+3. **Erwartetes Verhalten:** Die oeffentliche Railway-Domain kann **502** zeigen (kein HTTP auf `PORT`) — **normal und akzeptabel**, solange Telegram per Long-Polling laeuft. Railway-Status sollte **Running** sein (nicht Crashed).
+
+**Optional — oeffentliches Dashboard (Option C, nur bei Bedarf):**
+
+1. Start Command: `/opt/hermes/docker/railway_gateway_with_dashboard.sh`
+2. Env **zusaetzlich**:
+   - `HERMES_DASHBOARD=1`
+   - Auth-Provider, z. B. `HERMES_DASHBOARD_BASIC_AUTH_USERNAME` + `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD` (oder `_PASSWORD_HASH` + `_SECRET`)
+   - optional `HERMES_POWERUNITS_DASHBOARD_MODE=observe` (sperrt mutierende `/api/*` HTTP-Calls)
+3. **Nicht** mehr `--insecure` allein — das umgeht die Auth-Gate nicht mehr.
+
+Skripte: [`docker/railway_gateway.sh`](../docker/railway_gateway.sh) (Gateway-only), [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh) (Gateway + optional Dashboard mit Auth).  
+Erweiterte Lessons (**Dashboard + `HERMES_HOME` + bundled skills**): [`docs/powerunits_hermes_dashboard_skills_atlas_v1.md`](powerunits_hermes_dashboard_skills_atlas_v1.md).
+
+### Vorfall v0.18 Dashboard-Auth-Gate (2026-07-04)
+
+**Symptom:** Nach Deploy auf Hermes **v0.18** Railway-Status **Crashed**, Telegram antwortet nicht. Deploy-Log endet mit der obigen `Refusing to bind dashboard to 0.0.0.0`-Meldung.
+
+**Root Cause:** Der bisherige Start Command `/opt/hermes/docker/railway_gateway_with_dashboard.sh` startete `hermes dashboard --host 0.0.0.0 --port $PORT --insecure`. Upstream v0.18 macht `--insecure` zu einem No-Op und bricht ohne konfigurierten Auth-Provider mit **exit 1** ab. Weil das Skript `exec hermes dashboard` als PID-1-Prozess nutzt, beendet der Dashboard-Abbruch den **gesamten Container** — auch das im Hintergrund gestartete Gateway stirbt mit.
+
+**Fix (Repo A, Branch `powerunits-internal-setup`):**
+
+- Neues Skript [`docker/railway_gateway.sh`](../docker/railway_gateway.sh): nur `hermes gateway run --replace` (+ stage2-bootstrap).
+- [`docker/railway_gateway_with_dashboard.sh`](../docker/railway_gateway_with_dashboard.sh): **Default Gateway-only**; Dashboard auf `$PORT` nur wenn **`HERMES_DASHBOARD=1`** **und** ein Auth-Provider gesetzt ist.
+
+**Operator-Aktion:** Image neu deployen (Redeploy / leerer Push). **Start Command muss nicht geaendert werden**, wenn bereits `railway_gateway_with_dashboard.sh` gesetzt ist — nach dem Fix startet Telegram wieder. Fuer explizite Klarheit empfohlen: Start Command auf `railway_gateway.sh` umstellen.
+
+**Deaktivieren ohne Skriptwechsel:** `HERMES_DASHBOARD` unset lassen (Default). Es gibt **kein** `HERMES_DASHBOARD=0`-Spezialflag — alles ausser der truthy-Liste in `docker/s6-rc.d/dashboard/run` gilt als aus.
+
+**Auth-Provider-Optionen (Upstream, falls Dashboard oeffentlich):**
+
+| Option | Konfiguration |
+|--------|----------------|
+| basic_auth | `dashboard.basic_auth.username` + `password_hash` in `config.yaml`, oder `HERMES_DASHBOARD_BASIC_AUTH_*` env |
+| OAuth (Nous) | `hermes dashboard register` → `HERMES_DASHBOARD_OAUTH_CLIENT_ID` |
+| OIDC | `HERMES_DASHBOARD_OIDC_ISSUER` + `HERMES_DASHBOARD_OIDC_CLIENT_ID` |
+| loopback only | `--host 127.0.0.1` + Tunnel (nicht fuer Railway-`PORT` geeignet) |
 
 ---
 

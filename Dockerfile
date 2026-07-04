@@ -204,9 +204,11 @@ COPY --link --chmod=a+rX,go-w . .
 # - normalize CRLF -> LF (prevents "/bin/bash^M" / "No such file or directory")
 # - set executable bit independent of host git filemode
 RUN sed -i 's/\r$//' /opt/hermes/docker/entrypoint.sh && \
+    sed -i 's/\r$//' /opt/hermes/docker/railway_gateway.sh && \
     sed -i 's/\r$//' /opt/hermes/docker/railway_gateway_with_dashboard.sh && \
     sed -i 's/\r$//' /opt/hermes/docker/stage2-hook.sh && \
     chmod 0755 /opt/hermes/docker/entrypoint.sh && \
+    chmod 0755 /opt/hermes/docker/railway_gateway.sh && \
     chmod 0755 /opt/hermes/docker/railway_gateway_with_dashboard.sh && \
     chmod 0755 /opt/hermes/docker/stage2-hook.sh
 

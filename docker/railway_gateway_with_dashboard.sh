@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# Railway public URL (502 fix): run Telegram gateway + bind dashboard to $PORT.
+# Railway: Telegram gateway + optional dashboard on $PORT.
 #
-# Default Docker CMD is `gateway run` only — no HTTP server on PORT, so Railway's
-# proxy returns 502. Use this script as the Railway **Start Command** when you
-# need Stage-1 dashboard over the generated domain.
+# Default (Telegram-first / Powerunits first_safe_v1): **gateway only** — no
+# HTTP listener on $PORT. Upstream v0.18+ refuses 0.0.0.0 dashboard binds
+# without a registered auth provider (--insecure no longer bypasses the gate).
+#
+# To expose the dashboard on the Railway domain, set **both**:
+#   HERMES_DASHBOARD=1
+#   and one auth provider, e.g.:
+#     HERMES_DASHBOARD_BASIC_AUTH_USERNAME + _PASSWORD (or _PASSWORD_HASH)
+#     HERMES_DASHBOARD_OAUTH_CLIENT_ID
+#     HERMES_DASHBOARD_OIDC_ISSUER + HERMES_DASHBOARD_OIDC_CLIENT_ID
+# Pair with HERMES_POWERUNITS_DASHBOARD_MODE=observe for read-only /api/ writes.
 #
 # IMPORTANT (2026-07-02 incident): Railway's own docs confirm that for
 # Dockerfile/image deployments, a custom Start Command "overrides the image's
@@ -12,20 +20,10 @@
 # (s6-overlay, our real ENTRYPOINT) and its cont-init.d bootstrap — including
 # docker/stage2-hook.sh's UID remap, $HERMES_HOME chown of config.yaml/
 # gateway.lock/etc., first-boot config seeding, and the Powerunits
-# first_safe_v1 runtime-policy hook — NEVER RUN. An earlier version of this
-# script (and docs/powerunits_railway_bootstrap_v1.md) incorrectly assumed
-# "Start Command only replaces CMD, entrypoint still runs" — that assumption
-# is wrong for this image's 2-element `ENTRYPOINT [ "/init", "main-wrapper.sh" ]`
-# and caused a production PermissionError on /opt/data/config.yaml +
-# /opt/data/gateway.lock (unreadable because they were never re-chowned to the
-# runtime user). Fix: run the same stage2 bootstrap explicitly, here, before
-# starting the gateway/dashboard. Idempotent — safe on every restart.
+# first_safe_v1 runtime-policy hook — NEVER RUN. This script runs stage2-hook.sh
+# explicitly before starting services. Idempotent — safe on every restart.
 #
 # Expects venv + PATH from the image (same container as `hermes`).
-# Pair with HERMES_POWERUNITS_DASHBOARD_MODE=observe for read-only /api/ writes.
-#
-# Security: `--insecure` is required for 0.0.0.0 (see hermes_cli/web_server.py).
-# Prefer IP allowlists / VPN; never treat the dashboard as a public product surface.
 set -euo pipefail
 
 _install_dir="${HERMES_INSTALL_DIR:-/opt/hermes}"
@@ -57,15 +55,39 @@ fi
 
 _listen_port="${PORT:-9119}"
 
-# No manual privilege drop needed here: /opt/hermes/bin (ahead of
-# .venv/bin on PATH via the image's baked ENV) resolves `hermes` to
-# docker/hermes-exec-shim.sh, which already auto-drops root -> hermes
-# before exec'ing the real binary (see that file for details). That drop
-# was never the missing piece — the missing piece was stage2-hook.sh (above)
-# actually chowning config.yaml/gateway.lock to the hermes user it drops to.
-hermes gateway run --replace &
-exec hermes dashboard \
-    --host 0.0.0.0 \
-    --port "${_listen_port}" \
-    --insecure \
-    --no-open
+_has_dash_auth=false
+if [ -n "${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-}" ] && \
+   { [ -n "${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}" ] || \
+     [ -n "${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH:-}" ]; }; then
+    _has_dash_auth=true
+fi
+if [ -n "${HERMES_DASHBOARD_OAUTH_CLIENT_ID:-}" ]; then
+    _has_dash_auth=true
+fi
+if [ -n "${HERMES_DASHBOARD_OIDC_ISSUER:-}" ] && \
+   [ -n "${HERMES_DASHBOARD_OIDC_CLIENT_ID:-}" ]; then
+    _has_dash_auth=true
+fi
+
+_want_dashboard=false
+case "${HERMES_DASHBOARD:-}" in
+    1|true|TRUE|True|yes|YES|Yes|on|ON|On) _want_dashboard=true ;;
+esac
+
+if [ "$_want_dashboard" = true ] && [ "$_has_dash_auth" = true ]; then
+    # Gateway in background; dashboard holds PID 1 on $PORT with auth gate satisfied.
+    hermes gateway run --replace &
+    exec hermes dashboard \
+        --host 0.0.0.0 \
+        --port "${_listen_port}" \
+        --no-open
+fi
+
+if [ "$_want_dashboard" = true ] && [ "$_has_dash_auth" = false ]; then
+    echo "[railway] HERMES_DASHBOARD is set but no dashboard auth provider is configured." >&2
+    echo "[railway] v0.18+ requires basic_auth, OAuth, or OIDC for non-loopback binds." >&2
+    echo "[railway] Starting gateway only so Telegram keeps working." >&2
+fi
+
+# Telegram-first default: foreground gateway, no public dashboard surface.
+exec hermes gateway run --replace
