@@ -164,6 +164,23 @@ Only when Tier **4A** skill drafts are already enabled and operators want the **
 
 ---
 
+## Bounded family smoke order (Tier-1 DE window; optional weekly)
+
+When Repo B bounded HTTP is enabled and you want a **repeatable read-only health pass** (no execute/recompute):
+
+1. **Market features** — `POST …/market-features-hourly/validate-window` for **`DE`** and **`PL`**, 24h UTC slice, `version=v1`.
+2. **ENTSO-E market** — `POST …/entsoe-market-sync/validate-window` for **`DE`**, **`NL`**, **`BE`**, **`FR`** (same window).
+3. **ERA5 weather** — `POST …/era5-weather/validate-window` for **`DE`**.
+4. **Coverage snapshot** — `POST …/coverage-snapshot` with `country_codes: ["DE"]`, same window (layer + pipeline freshness rollup).
+
+**Repo B in-process smoke (no Telegram):** from sibling repo `EU-PP-Database`:  
+`cd backend && uv run python -m scripts.ops.smoke_bounded_validate_window_v1`  
+(HTTP mode against Railway API: `--http` + `POWERUNITS_SMOKE_API_BASE` + `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`.)
+
+**Interpretation:** `outcome=warning` may be normal on sparse windows; **`failed`** or HTTP 5xx → investigate before any execute. Full execute path remains **preflight → execute → validate → summary** per family (Tier 5A records only; Repo B owns truth).
+
+---
+
 ## Rollback basics
 
 - [ ] **Webhook:** point Telegram webhook back to last-known-good Hermes URL (previous Railway service / project) if this service is bad.
