@@ -871,6 +871,19 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_bounded_coverage_snapshot": {
+        "description": (
+            "**Bounded coverage snapshot (read-only data health)** — one HTTP POST to "
+            "`/internal/hermes/bounded/v1/coverage-snapshot` (Repo B). Layer coverage + **baseline_ready** + "
+            "latest **`data_pipeline_runs`** (ENTSO-E market, ERA5, market features). Product precursor to "
+            "`GET /api/v1/market-data/trust-snapshot`. Requires "
+            "`HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED`, POWERUNITS_INTERNAL_EXECUTE_BASE_URL, "
+            "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET. **No Hermes-side canonical state** — rerun after repairs."
+        ),
+        "tools": ["read_powerunits_coverage_snapshot_v1"],
+        "includes": [],
+    },
+
     "powerunits_bounded_rollout_governance": {
         "description": (
             "**Bounded rollout governance matrix (read-only)** — Repo B authoritative allowlists/routes surfaced as "

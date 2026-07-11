@@ -344,6 +344,21 @@ def bounded_coverage_inventory_requirement_text() -> str:
     )
 
 
+# Cross-cutting read-only **coverage snapshot** (layer coverage + pipeline freshness).
+BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED"
+
+
+def bounded_coverage_snapshot_enabled() -> bool:
+    return _truthy(BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV)
+
+
+def bounded_coverage_snapshot_requirement_text() -> str:
+    return (
+        f"{BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV} must be truthy (read-only Repo B snapshot; "
+        "same contract as product trust-snapshot precursor — Hermes stores no canonical state)"
+    )
+
+
 # Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
 BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
 
