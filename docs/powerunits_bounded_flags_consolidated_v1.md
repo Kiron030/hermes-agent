@@ -122,7 +122,7 @@ Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo
 
 ### Bounded coverage snapshot v1 (read-only data health)
 
-Hermes **`read_powerunits_coverage_snapshot_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-snapshot`** (same **`POWERUNITS_INTERNAL_EXECUTE_*`** bearer stack). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED`**. Returns expand-style **layer coverage**, **`baseline_ready`**, and latest **`data_pipeline_runs`** for core ingest jobs — same backend contract as the product **`GET /api/v1/market-data/trust-snapshot`** precursor. **Not** the family matrix inventory tool; Hermes stores **no** canonical snapshot (rerun after bounded repairs).
+Hermes **`read_powerunits_coverage_snapshot_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-snapshot`** (same **`POWERUNITS_INTERNAL_EXECUTE_*`** bearer stack). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED`**. Telegram leaf toolset **`powerunits_bounded_coverage_snapshot`** is in **`first_safe_v1`** base overlays (persisted by **`docker/apply_powerunits_runtime_policy.py`** on deploy restart). Returns expand-style **layer coverage**, **`baseline_ready`**, and latest **`data_pipeline_runs`** for core ingest jobs — same backend contract as the product **`GET /api/v1/market-data/trust-snapshot`** precursor. **Not** the family matrix inventory tool; Hermes stores **no** canonical snapshot (rerun after bounded repairs).
 
 ### DE bounded stack remediation planner (read-only)
 
