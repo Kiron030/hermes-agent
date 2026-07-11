@@ -56,7 +56,26 @@ def test_persist_profile_skips_explicit_railway_override(
     monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
     monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED", "0")
     env_path = tmp_path / ".env"
+    explicit = profiles._explicit_env_keys_at_boot()
 
-    out = profiles.persist_bounded_profile_to_hermes_env(env_path)
+    out = profiles.persist_bounded_profile_to_hermes_env(
+        env_path, explicit_env_keys=explicit
+    )
     assert "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED" in out["skipped_explicit"]
     assert profiles.ENV_MANAGED_BEGIN not in (env_path.read_text(encoding="utf-8") if env_path.exists() else "")
+
+
+def test_persist_not_suppressed_after_apply_in_same_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: apply then persist in init subprocess must still write .env."""
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
+    monkeypatch.delenv("HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED", raising=False)
+    env_path = tmp_path / ".env"
+    explicit = profiles._explicit_env_keys_at_boot()
+    profiles.apply_bounded_profile_to_process_env()
+
+    out = profiles.persist_bounded_profile_to_hermes_env(
+        env_path, explicit_env_keys=explicit
+    )
+    assert "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED" in out["persisted"]

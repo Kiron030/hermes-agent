@@ -140,13 +140,26 @@ def _profile_expansion_for_active_profile() -> tuple[str | None, dict[str, str] 
     return profile, expansion, False
 
 
-def persist_bounded_profile_to_hermes_env(env_path: Path) -> dict[str, Any]:
+def _explicit_env_keys_at_boot() -> frozenset[str]:
+    """Railway/container keys present before profile bootstrap mutates ``os.environ``."""
+    return frozenset(k for k, v in os.environ.items() if (v or "").strip())
+
+
+def persist_bounded_profile_to_hermes_env(
+    env_path: Path,
+    *,
+    explicit_env_keys: frozenset[str] | None = None,
+) -> dict[str, Any]:
     """Write profile gates into ``$HERMES_HOME/.env`` for the gateway process.
 
     ``apply_powerunits_runtime_policy.py`` runs in a short-lived init subprocess;
     ``os.environ`` mutations there do not reach the supervised gateway. The gateway
     loads ``$HERMES_HOME/.env`` via ``load_hermes_dotenv()`` at import time.
+
+    Pass ``explicit_env_keys`` captured **before** :func:`apply_bounded_profile_to_process_env`
+    so in-process profile fills do not suppress persistence (Railway-only subprocess bug).
     """
+    explicit = explicit_env_keys if explicit_env_keys is not None else _explicit_env_keys_at_boot()
     profile, expansion, unknown = _profile_expansion_for_active_profile()
     existing = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
     file_keys = _parse_env_keys_outside_managed_block(existing)
@@ -172,7 +185,7 @@ def persist_bounded_profile_to_hermes_env(env_path: Path) -> dict[str, Any]:
     skipped_explicit: list[str] = []
     managed_lines: list[str] = [ENV_MANAGED_BEGIN, f"# profile={profile}"]
     for key, value in expansion.items():
-        if (os.getenv(key) or "").strip() or key in file_keys:
+        if key in explicit or key in file_keys:
             skipped_explicit.append(key)
             continue
         managed_lines.append(f"{key}={value}")
@@ -185,6 +198,9 @@ def persist_bounded_profile_to_hermes_env(env_path: Path) -> dict[str, Any]:
         parts.append(base)
     if persisted:
         parts.append("\n".join(managed_lines))
+    elif expansion:
+        # Profile active but every key is an explicit Railway override — remove stale block.
+        pass
 
     env_path.parent.mkdir(parents=True, exist_ok=True)
     new_content = "\n\n".join(parts)
