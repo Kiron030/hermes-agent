@@ -184,7 +184,7 @@ HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
 | `stage1_read_health` | Data-health triptychon + bounded reads/validates — **no primary execute** |
 | `stage1_operator_execute` | Above + market features, ENTSO-E, ERA5, outage repair execute |
 
-**Mechanics:** `docker/apply_powerunits_runtime_policy.py` calls `apply_bounded_profile_to_process_env()` at container start. Profile keys fill **only missing** env vars — explicit Railway values **always win**.
+**Mechanics:** `docker/apply_powerunits_runtime_policy.py` persists profile gates into `$HERMES_HOME/.env` (gateway loads them via `load_hermes_dotenv()`). Profile keys fill **only missing** env vars — explicit Railway values **always win**.
 
 **Posture:** `summarize_powerunits_operator_posture` exposes `bounded_profile_v1_read_only` (alignment drift) and optional `data_health_fingerprint_de_read_only`.
 
