@@ -26,6 +26,8 @@ metadata:
 
 ## Procedure (strict order)
 
+**Do not** use `read_powerunits_bounded_workflow_run`, roadmap markdown paths, or doc aliases — call the three API tools below directly.
+
 1. **Pick window** — default **7 UTC days** `[start,end)` ending at today 00:00Z unless operator specifies otherwise.
 2. **Snapshot** — call `read_powerunits_coverage_snapshot_v1` for requested `country_codes` (default `DE`, `PL`).
 3. **Inventory** — call `inventory_powerunits_bounded_coverage_v1` same window/countries. Prefer `chat_summary`; avoid dumping full JSON to Telegram.

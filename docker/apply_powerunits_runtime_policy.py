@@ -35,6 +35,7 @@ from powerunits_capability_tier import read_powerunits_capability_tier
 from powerunits_bounded_profiles_v1 import (
     active_bounded_profile_id,
     apply_bounded_profile_to_process_env,
+    persist_bounded_profile_to_hermes_env,
 )
 from powerunits_telegram_overlays import (
     TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
@@ -193,13 +194,16 @@ def apply_policy(config_path: Path) -> None:
 def main() -> int:
     hermes_home = Path(os.getenv("HERMES_HOME", "/opt/data"))
     config_path = hermes_home / "config.yaml"
+    env_path = hermes_home / ".env"
     profile_result = apply_bounded_profile_to_process_env()
+    persist_result = persist_bounded_profile_to_hermes_env(env_path)
     apply_policy(config_path)
     msg = f"[powerunits-policy] applied {POLICY_ID} to {config_path}"
     if profile_result.get("profile"):
         msg += (
             f" (bounded_profile_v1={profile_result['profile']}, "
             f"applied={len(profile_result.get('applied') or [])}, "
+            f"persisted={len(persist_result.get('persisted') or [])}, "
             f"explicit_overrides={len(profile_result.get('skipped_explicit') or [])})"
         )
     print(msg)
