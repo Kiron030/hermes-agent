@@ -151,6 +151,49 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
     return snap
 
 
+def _data_health_fingerprint_v1() -> dict[str, Any]:
+    """Optional lightweight DE snapshot when coverage-snapshot gate is on."""
+    out: dict[str, Any] = {"fetch_attempted": False}
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from tools.powerunits_bounded_coverage_snapshot_tool import (
+            check_powerunits_bounded_coverage_snapshot_requirements,
+            read_powerunits_coverage_snapshot_v1,
+        )
+
+        if not check_powerunits_bounded_coverage_snapshot_requirements():
+            out["skipped_reason"] = "coverage_snapshot_gate_off"
+            return out
+
+        out["fetch_attempted"] = True
+        end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=7)
+        raw = read_powerunits_coverage_snapshot_v1(
+            country_codes=["DE"],
+            window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            version="v1",
+        )
+        snap = json.loads(raw)
+        if snap.get("success") and snap.get("http_status_from_repo_b") == 200:
+            out.update(
+                {
+                    "de_baseline_ready": snap.get("baseline_ready"),
+                    "de_baseline_reason": snap.get("baseline_readiness_reason"),
+                    "http_status_from_repo_b": snap.get("http_status_from_repo_b"),
+                    "correlation_id": snap.get("correlation_id"),
+                    "latest_pipeline_runs": snap.get("latest_pipeline_runs"),
+                }
+            )
+        else:
+            out["fetch_error"] = snap.get("error_code") or snap.get("message") or "snapshot_failed"
+    except Exception as exc:
+        out["fetch_attempted"] = True
+        out["fetch_error"] = str(exc)[:240]
+    return out
+
+
 def summarize_powerunits_operator_posture(**_: Any) -> str:
     """Return JSON: tier env, bounded posture, overlays 2A/2B + Tier 3 + Tier 4A + Tier 4B + Tier 5A."""
 
@@ -465,6 +508,29 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                     f"tier5a_workflow_watch_summary_failed:{str(exc)[:120]}"
                 )
 
+        bounded_profile_readout: dict[str, Any]
+        try:
+            from powerunits_bounded_profiles_v1 import evaluate_bounded_profile_alignment
+
+            bounded_profile_readout = evaluate_bounded_profile_alignment()
+            if bounded_profile_readout.get("unknown_profile"):
+                caution.append(
+                    f"bounded_profile_unknown:{bounded_profile_readout.get('profile')}"
+                )
+            elif bounded_profile_readout.get("profile") and not bounded_profile_readout.get(
+                "aligned"
+            ):
+                missing_n = bounded_profile_readout.get("missing_count") or 0
+                caution.append(f"bounded_profile_drift:missing_{missing_n}_env_gates")
+        except Exception as exc:
+            bounded_profile_readout = {"error": str(exc)[:240]}
+
+        data_health_fingerprint = _data_health_fingerprint_v1()
+        if data_health_fingerprint.get("fetch_error"):
+            caution.append(
+                f"data_health_fingerprint_failed:{data_health_fingerprint['fetch_error'][:80]}"
+            )
+
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
             "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3) / Tier 4A (tier>=4) / Tier 4B (tier>=5) / Tier 5A (tier>=6).",
@@ -520,6 +586,12 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "tier4b_governance_watch_read_only": tier4b_watch,
                 "tier5a_workflow_watch_read_only": tier5a_watch,
                 "phase_1a_exports_signals_read_only": exports_signals,
+                "bounded_profile_v1_read_only": bounded_profile_readout,
+                "data_health_fingerprint_de_read_only": data_health_fingerprint,
+                "operator_playbooks_v1": [
+                    "skills/productivity/powerunits-data-health-triptychon/SKILL.md",
+                    "skills/productivity/powerunits-de-outage-repair-playbook/SKILL.md",
+                ],
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
                 "caution_flags": sorted(set(caution)),

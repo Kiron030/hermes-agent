@@ -343,7 +343,7 @@ hermes-acp = "acp_adapter.entry:main"
 # `powerunits_*.py` fork module MUST be added here or it will
 # ModuleNotFoundError the moment something outside a source checkout imports
 # it.
-py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_bootstrap", "hermes_constants", "hermes_state", "hermes_time", "hermes_logging", "utils", "powerunits_capability_tier", "powerunits_telegram_overlays", "powerunits_skill_draft_review_contract", "mcp_serve"]
+py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_bootstrap", "hermes_constants", "hermes_state", "hermes_time", "hermes_logging", "utils", "powerunits_capability_tier", "powerunits_telegram_overlays", "powerunits_skill_draft_review_contract", "powerunits_bounded_profiles_v1", "mcp_serve"]
 
 [tool.setuptools.data-files]
 # i18n catalogs. locales/ is a bare data directory (no __init__.py), so it is

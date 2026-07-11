@@ -168,3 +168,29 @@ HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED
 ---
 
 **Canonical code:** `tools/powerunits_bounded_family_gates.py`
+
+---
+
+## Bounded env profiles (v1)
+
+Instead of setting ~25 individual gates on Railway, set **one** profile:
+
+```text
+HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
+```
+
+| Profile | Purpose |
+|---------|---------|
+| `stage1_read_health` | Data-health triptychon + bounded reads/validates — **no primary execute** |
+| `stage1_operator_execute` | Above + market features, ENTSO-E, ERA5, outage repair execute |
+
+**Mechanics:** `docker/apply_powerunits_runtime_policy.py` calls `apply_bounded_profile_to_process_env()` at container start. Profile keys fill **only missing** env vars — explicit Railway values **always win**.
+
+**Posture:** `summarize_powerunits_operator_posture` exposes `bounded_profile_v1_read_only` (alignment drift) and optional `data_health_fingerprint_de_read_only`.
+
+**Operator cheat sheet:** `docs/powerunits_operator_env_cheat_sheet_v1.md`
+
+**Canonical code:** `powerunits_bounded_profiles_v1.py`
+
+**Skills:** `skills/productivity/powerunits-data-health-triptychon/`, `skills/productivity/powerunits-de-outage-repair-playbook/`
+

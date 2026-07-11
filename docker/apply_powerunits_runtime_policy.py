@@ -32,6 +32,10 @@ if _REPO_ROOT not in sys.path:
 import yaml
 
 from powerunits_capability_tier import read_powerunits_capability_tier
+from powerunits_bounded_profiles_v1 import (
+    active_bounded_profile_id,
+    apply_bounded_profile_to_process_env,
+)
 from powerunits_telegram_overlays import (
     TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
     merge_capability_overlays_into_telegram,
@@ -162,6 +166,9 @@ def apply_policy(config_path: Path) -> None:
     runtime_policy["id"] = POLICY_ID
     runtime_policy["enforced"] = True
     powerunits["runtime_policy"] = runtime_policy
+    profile_id = active_bounded_profile_id()
+    if profile_id:
+        powerunits["bounded_profile_v1"] = profile_id
     cfg["powerunits"] = powerunits
 
     auxiliary = cfg.get("auxiliary")
@@ -186,8 +193,16 @@ def apply_policy(config_path: Path) -> None:
 def main() -> int:
     hermes_home = Path(os.getenv("HERMES_HOME", "/opt/data"))
     config_path = hermes_home / "config.yaml"
+    profile_result = apply_bounded_profile_to_process_env()
     apply_policy(config_path)
-    print(f"[powerunits-policy] applied {POLICY_ID} to {config_path}")
+    msg = f"[powerunits-policy] applied {POLICY_ID} to {config_path}"
+    if profile_result.get("profile"):
+        msg += (
+            f" (bounded_profile_v1={profile_result['profile']}, "
+            f"applied={len(profile_result.get('applied') or [])}, "
+            f"explicit_overrides={len(profile_result.get('skipped_explicit') or [])})"
+        )
+    print(msg)
     return 0
 
 

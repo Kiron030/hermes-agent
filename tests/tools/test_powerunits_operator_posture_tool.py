@@ -335,3 +335,13 @@ def test_posture_includes_exports_subset(posture_mod, tmp_path: Path) -> None:
     assert exp.get("exports_pointer_present") is True
     assert exp.get("summarize_attempted") is True
     assert int(exp.get("file_count") or 0) >= 1
+
+
+def test_posture_includes_bounded_profile_and_playbooks(posture_mod) -> None:
+    out = json.loads(posture_mod.summarize_powerunits_operator_posture())
+    assert "bounded_profile_v1_read_only" in out
+    assert "data_health_fingerprint_de_read_only" in out
+    playbooks = out.get("operator_playbooks_v1") or []
+    assert any("powerunits-data-health-triptychon" in p for p in playbooks)
+    assert any("powerunits-de-outage-repair-playbook" in p for p in playbooks)
+
