@@ -359,6 +359,23 @@ def bounded_coverage_snapshot_requirement_text() -> str:
     )
 
 
+# Cross-cutting read-only **worker country coverage freshness** rollup.
+WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV = (
+    "HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED"
+)
+
+
+def worker_country_coverage_freshness_enabled() -> bool:
+    return _truthy(WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV)
+
+
+def worker_country_coverage_freshness_requirement_text() -> str:
+    return (
+        f"{WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "worker-country-coverage freshness rollup; no jobs or Tier-1 promotion)"
+    )
+
+
 # Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
 BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
 

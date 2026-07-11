@@ -124,6 +124,14 @@ Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo
 
 Hermes **`read_powerunits_coverage_snapshot_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-snapshot`** (same **`POWERUNITS_INTERNAL_EXECUTE_*`** bearer stack). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED`**. Telegram leaf toolset **`powerunits_bounded_coverage_snapshot`** is in **`first_safe_v1`** base overlays (persisted by **`docker/apply_powerunits_runtime_policy.py`** on deploy restart). Returns expand-style **layer coverage**, **`baseline_ready`**, and latest **`data_pipeline_runs`** for core ingest jobs — same backend contract as the product **`GET /api/v1/market-data/trust-snapshot`** precursor. **Not** the family matrix inventory tool; Hermes stores **no** canonical snapshot (rerun after bounded repairs).
 
+### Bounded coverage inventory v1 (read-only family matrix)
+
+Hermes **`inventory_powerunits_bounded_coverage_v1`** → Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`**. **Gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Telegram toolset **`powerunits_bounded_coverage_inventory`** is in **`first_safe_v1`** base overlays. Optional inline **`csv_export`** only — **no** Hermes-side canonical matrix.
+
+### Worker country coverage freshness v1 (read-only post-deploy rollup)
+
+Hermes **`read_powerunits_worker_country_coverage_freshness_v1`** → Repo B **`POST /internal/hermes/bounded/v1/worker-country-coverage/freshness/read`**. **Gate:** **`HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED`**. Telegram toolset **`powerunits_worker_country_coverage_freshness`** is in **`first_safe_v1`** base overlays. Complements post-deploy worker smoke docs in Repo B.
+
 ### DE bounded stack remediation planner (read-only)
 
 Single Hermes gate: **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`**. Enables **`plan_powerunits_de_stack_remediation`** (**one** HTTP POST to Repo B **`…/remediation/de-stack-plan`**). Independent of ENTSO‑E / ERA5 / forecast / market‑features execute primaries; still requires **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** + **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**. **No job execution** on this surface — JSON **`tool_hint_hermes`** values are manual operator hints only.

@@ -884,6 +884,17 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_worker_country_coverage_freshness": {
+        "description": (
+            "**Worker country coverage freshness rollup (read-only)** — one HTTP POST to "
+            "`/internal/hermes/bounded/v1/worker-country-coverage/freshness/read`. Per surface/country "
+            "latest timestamp, window row counts, outcome. Requires "
+            "`HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED` + bounded execute credentials."
+        ),
+        "tools": ["read_powerunits_worker_country_coverage_freshness_v1"],
+        "includes": [],
+    },
+
     "powerunits_bounded_rollout_governance": {
         "description": (
             "**Bounded rollout governance matrix (read-only)** — Repo B authoritative allowlists/routes surfaced as "
