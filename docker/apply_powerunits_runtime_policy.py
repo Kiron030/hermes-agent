@@ -36,6 +36,7 @@ from powerunits_bounded_profiles_v1 import (
     active_bounded_profile_id,
     apply_bounded_profile_to_process_env,
     persist_bounded_profile_to_hermes_env,
+    _explicit_env_keys_at_boot,
 )
 from powerunits_telegram_overlays import (
     TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
@@ -195,8 +196,11 @@ def main() -> int:
     hermes_home = Path(os.getenv("HERMES_HOME", "/opt/data"))
     config_path = hermes_home / "config.yaml"
     env_path = hermes_home / ".env"
+    explicit_at_boot = _explicit_env_keys_at_boot()
+    persist_result = persist_bounded_profile_to_hermes_env(
+        env_path, explicit_env_keys=explicit_at_boot
+    )
     profile_result = apply_bounded_profile_to_process_env()
-    persist_result = persist_bounded_profile_to_hermes_env(env_path)
     apply_policy(config_path)
     msg = f"[powerunits-policy] applied {POLICY_ID} to {config_path}"
     if profile_result.get("profile"):

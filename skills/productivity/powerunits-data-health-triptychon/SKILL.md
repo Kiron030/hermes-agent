@@ -26,7 +26,7 @@ metadata:
 
 ## Procedure (strict order)
 
-**Do not** use `read_powerunits_bounded_workflow_run`, roadmap markdown paths, or doc aliases — call the three API tools below directly.
+**Do not** use `read_powerunits_doc`, `read_powerunits_bounded_workflow_run`, roadmap markdown paths, or doc aliases — call the three API tools below directly by **tool name** (not as doc manifest keys).
 
 1. **Pick window** — default **7 UTC days** `[start,end)` ending at today 00:00Z unless operator specifies otherwise.
 2. **Snapshot** — call `read_powerunits_coverage_snapshot_v1` for requested `country_codes` (default `DE`, `PL`).
