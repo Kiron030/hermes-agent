@@ -343,6 +343,7 @@ def test_posture_includes_bounded_profile_and_playbooks(posture_mod) -> None:
     assert "data_health_fingerprint_de_read_only" in out
     playbooks = out.get("operator_playbooks_v1") or []
     assert any("powerunits-data-health-triptychon" in p for p in playbooks)
+    assert any("powerunits-multi-country-analyst-read-v1" in p for p in playbooks)
     assert any("powerunits-de-outage-repair-playbook" in p for p in playbooks)
     assert any("powerunits-stage1-de-bounded-repair-sequence" in p for p in playbooks)
 

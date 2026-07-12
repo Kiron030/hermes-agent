@@ -895,6 +895,16 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_multi_country_data_health": {
+        "description": (
+            "**Multi-country data-health analyst (read-only orchestrator)** — runs snapshot + inventory + "
+            "worker freshness for national Tier-1 ISO2 (default 11) and returns **`operator_summary_v1`** "
+            "green vs ops-action rollup. Requires all three data-health gates plus bounded execute credentials."
+        ),
+        "tools": ["read_powerunits_multi_country_data_health_v1"],
+        "includes": [],
+    },
+
     "powerunits_bounded_rollout_governance": {
         "description": (
             "**Bounded rollout governance matrix (read-only)** — Repo B authoritative allowlists/routes surfaced as "
