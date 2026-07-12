@@ -192,6 +192,17 @@ def apply_policy(config_path: Path) -> None:
     _save_yaml(config_path, cfg)
 
 
+def _sync_powerunits_soul_md(hermes_home: Path) -> bool:
+    """Refresh ``$HERMES_HOME/SOUL.md`` from the image on every policy boot (operator contract)."""
+    src = Path(__file__).resolve().parent / "SOUL.md"
+    dest = hermes_home / "SOUL.md"
+    if not src.is_file():
+        return False
+    hermes_home.mkdir(parents=True, exist_ok=True)
+    dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    return True
+
+
 def main() -> int:
     hermes_home = Path(os.getenv("HERMES_HOME", "/opt/data"))
     config_path = hermes_home / "config.yaml"
@@ -202,6 +213,7 @@ def main() -> int:
     )
     profile_result = apply_bounded_profile_to_process_env()
     apply_policy(config_path)
+    soul_synced = _sync_powerunits_soul_md(hermes_home)
     msg = f"[powerunits-policy] applied {POLICY_ID} to {config_path}"
     if profile_result.get("profile"):
         msg += (
@@ -210,6 +222,8 @@ def main() -> int:
             f"persisted={len(persist_result.get('persisted') or [])}, "
             f"explicit_overrides={len(profile_result.get('skipped_explicit') or [])})"
         )
+    if soul_synced:
+        msg += f" (SOUL.md synced to {hermes_home / 'SOUL.md'})"
     print(msg)
     return 0
 

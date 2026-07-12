@@ -344,4 +344,5 @@ def test_posture_includes_bounded_profile_and_playbooks(posture_mod) -> None:
     playbooks = out.get("operator_playbooks_v1") or []
     assert any("powerunits-data-health-triptychon" in p for p in playbooks)
     assert any("powerunits-de-outage-repair-playbook" in p for p in playbooks)
+    assert any("powerunits-stage1-de-bounded-repair-sequence" in p for p in playbooks)
 

@@ -591,6 +591,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "operator_playbooks_v1": [
                     "skills/productivity/powerunits-data-health-triptychon/SKILL.md",
                     "skills/productivity/powerunits-de-outage-repair-playbook/SKILL.md",
+                    "skills/productivity/powerunits-stage1-de-bounded-repair-sequence/SKILL.md",
                 ],
                 "bounded_assumptions_summary": bounded_assumptions,
                 "operator_next_checks_before_tier_increase": operator_before_tier_up,
