@@ -182,7 +182,7 @@ HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
 | Profile | Purpose |
 |---------|---------|
 | `stage1_read_health` | Data-health triptychon + bounded reads/validates — **no primary execute** |
-| `stage1_operator_execute` | Above + market features, ENTSO-E, ERA5, outage repair execute |
+| `stage1_operator_execute` | Above + market features, **market driver**, ENTSO-E, ERA5, outage repair execute |
 
 **Mechanics:** `docker/apply_powerunits_runtime_policy.py` persists profile gates into `$HERMES_HOME/.env` (gateway loads them via `load_hermes_dotenv()`). Profile keys fill **only missing** env vars — explicit Railway values **always win**.
 
