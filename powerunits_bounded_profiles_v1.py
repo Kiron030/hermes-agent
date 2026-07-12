@@ -66,6 +66,7 @@ STAGE1_OPERATOR_EXECUTE: Final[dict[str, str]] = {
     "HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED": "1",
     "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED": "1",
     "HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED": "1",
+    "HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED": "1",
 }
 
 PROFILE_ENV_EXPANSIONS_V1: Final[dict[str, dict[str, str]]] = {
@@ -78,7 +79,7 @@ PROFILE_DESCRIPTIONS_V1: Final[dict[str, str]] = {
         "Data-health triptychon + bounded reads/validates; no primary execute families."
     ),
     "stage1_operator_execute": (
-        "read_health plus bounded execute (market features, ENTSO-E, ERA5, outage repair)."
+        "read_health plus bounded execute (market features, market driver, ENTSO-E, ERA5, outage repair)."
     ),
 }
 

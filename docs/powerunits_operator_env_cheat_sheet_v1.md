@@ -9,7 +9,7 @@ Set **one** profile on Railway; individual vars remain as overrides.
 | Profile | Env | Use when |
 |---------|-----|----------|
 | **Read health** | `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health` | Daily ops, triptychon, validates — **no execute** |
-| **Operator execute** | `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_operator_execute` | Above + bounded recompute (market, ENTSO-E, ERA5, outage repair) |
+| **Operator execute** | `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_operator_execute` | Above + market features, **market driver**, ENTSO-E, ERA5, outage repair |
 
 At container start, `apply_powerunits_runtime_policy.py` fills **missing** profile keys only — explicit Railway values win.
 
@@ -34,6 +34,7 @@ At container start, `apply_powerunits_runtime_policy.py` fills **missing** profi
 | Family | Primary gate |
 |--------|----------------|
 | Market features DE/PL | `HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_ENABLED` |
+| Market driver DE | `HERMES_POWERUNITS_MARKET_DRIVER_FEATURES_BOUNDED_ENABLED` |
 | Option D PL | `HERMES_POWERUNITS_OPTION_D_EXECUTE_ENABLED` (+ preflight) |
 | ENTSO-E market | `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED` |
 | ENTSO-E forecast | `HERMES_POWERUNITS_ENTSOE_FORECAST_BOUNDED_ENABLED` |

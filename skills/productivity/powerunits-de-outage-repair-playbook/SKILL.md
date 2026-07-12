@@ -19,6 +19,8 @@ metadata:
 
 ## Phase A — Diagnose (read-only, always first)
 
+**Do not** use `read_powerunits_doc` — call bounded tools by exact name below.
+
 1. Run triptychon skill or at minimum:
    - `inventory_powerunits_bounded_coverage_v1` for `DE`, 7d window
    - Outage awareness **validate** + **summary** bounded tools for DE (24h slice)
