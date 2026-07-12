@@ -59,6 +59,7 @@ TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "powerunits_entsoe_forecast_bounded_execute",
     "powerunits_entsoe_forecast_bounded_validate",
     "powerunits_entsoe_forecast_bounded_summary",
+    "powerunits_entsoe_empirical_candidate_validate",
     "powerunits_entsoe_bzn_price_readiness",
     "powerunits_entsoe_bzn_prices",
     "powerunits_bounded_coverage_snapshot",

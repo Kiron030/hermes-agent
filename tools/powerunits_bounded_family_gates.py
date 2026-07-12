@@ -389,3 +389,20 @@ def bounded_rollout_governance_requirement_text() -> str:
         f"{BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV} must be truthy; plus "
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET (same bounded internal bearer stack)."
     )
+
+
+# Empirical ENTSO-E candidate validate (ADR 045 — DK/NO/IE read-only, not Tier-1 promotion).
+ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV = (
+    "HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED"
+)
+
+
+def entsoe_empirical_candidate_validate_enabled() -> bool:
+    return _truthy(ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV)
+
+
+def entsoe_empirical_candidate_validate_requirement_text() -> str:
+    return (
+        f"{ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "empirical candidate validate-window; no jobs or Tier-1 promotion)"
+    )

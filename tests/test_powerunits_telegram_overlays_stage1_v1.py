@@ -19,6 +19,7 @@ _STAGE1_EXECUTE_FAMILIES = (
     "powerunits_era5_weather_bounded_campaign",
     "powerunits_de_stack_remediation_planner",
     "powerunits_multi_country_data_health",
+    "powerunits_entsoe_empirical_candidate_validate",
 )
 
 

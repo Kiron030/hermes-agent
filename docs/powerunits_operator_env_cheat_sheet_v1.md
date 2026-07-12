@@ -45,6 +45,7 @@ At container start, `apply_powerunits_runtime_policy.py` fills **missing** profi
 | `inventory_powerunits_bounded_coverage_v1` | `HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED=1` |
 | `read_powerunits_worker_country_coverage_freshness_v1` | `HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED=1` |
 | `read_powerunits_multi_country_data_health_v1` | All three gates above |
+| `validate_powerunits_entsoe_empirical_candidate_window_v1` | `HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED=1` |
 
 **Skills:** `powerunits-data-health-triptychon`, `powerunits-multi-country-analyst-read-v1`
 
@@ -78,6 +79,9 @@ Returns `bounded_profile_v1_read_only`, `data_health_fingerprint_de_read_only` (
 |------|-----|------|
 | **0** (today) | `HERMES_POWERUNITS_CAPABILITY_TIER=0` | Trusted Analyst, bounded tools |
 | **1** | `=1` after baseline tag | Workspace analysis overlay |
+| **2–6** | progressive | Allowlisted locals, skills observer, drafts, governance, workflow scaffolding — **not** country coverage |
+
+**Operator recommendation:** **`0` or `1`** for bounded multi-country analyst focus. **`6`** only if you actively use Tier 3–5A overlays (skill drafts, governance lanes, workflow scaffolding). Tier env is **orthogonal** to national Tier-1 country scope.
 
 See `docs/powerunits_hermes_progressive_posture_v1.md` before tier increases.
 

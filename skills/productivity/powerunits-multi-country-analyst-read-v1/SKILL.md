@@ -29,7 +29,8 @@ See **`read_powerunits_multi_country_data_health_v1`** → `country_scope_v1` fo
 1. **Posture** (optional) — `summarize_powerunits_operator_posture` for tier/profile alignment + `data_health_fingerprint`.
 2. **Orchestrator** — `read_powerunits_multi_country_data_health_v1` (default 7d window, all national Tier-1).
 3. **Governance** (optional) — `governance_powerunits_bounded_rollout_read_v1` when operator asks what Hermes may execute per country/family now.
-4. **Synthesize** for Telegram (structure):
+4. **Empirical deep dive (DK/NO/IE):** `validate_powerunits_entsoe_empirical_candidate_window_v1` — market + forecast families; **not** Tier-1 execute.
+5. **Synthesize** for Telegram (structure):
    - **Headline:** green count / action count / window
    - **Top 3 action countries** with one line each (inventory or freshness driver)
    - **Scope reminder:** market features DE/PL, driver DE, outage DE-only
@@ -42,8 +43,9 @@ See **`read_powerunits_multi_country_data_health_v1`** → `country_scope_v1` fo
 |----------|------|---------|
 | 1 | `read_powerunits_multi_country_data_health_v1` | Cross-country rollup |
 | 2 | `governance_powerunits_bounded_rollout_read_v1` | Hermes allowed-now matrix |
-| 3 | `summarize_powerunits_operator_posture` | Env/tier/profile fingerprint |
-| 4 | `plan_powerunits_de_stack_remediation` | Read-only DE-stack repair plan (no auto-run) |
+| 3 | `validate_powerunits_entsoe_empirical_candidate_window_v1` | DK/NO/IE empirical read-only (ADR 045) |
+| 4 | `summarize_powerunits_operator_posture` | Env/tier/profile fingerprint |
+| 5 | `plan_powerunits_de_stack_remediation` | Read-only DE-stack repair plan (no auto-run) |
 
 **Never** in this skill without explicit operator write confirmation: `*_execute_*`, `*_repair_*`, outage repair.
 
