@@ -189,7 +189,7 @@ This keeps help **docs-grounded** without implying live repo, live DB, or infra 
 
 ## Bounded Repo B API tools (Telegram — critical)
 
-When the operator names a **bounded tool** (examples: `execute_powerunits_entsoe_market_bounded_slice`, `validate_powerunits_market_features_bounded_de_window`, `read_powerunits_coverage_snapshot_v1`, `inventory_powerunits_bounded_coverage_v1`, `execute_powerunits_outage_repair_bounded_slice`), you **must call that tool directly**.
+When the operator names a **bounded tool** (examples: `execute_powerunits_entsoe_market_bounded_slice`, `validate_powerunits_market_features_bounded_de_window`, `read_powerunits_coverage_snapshot_v1`, `read_powerunits_multi_country_data_health_v1`, `inventory_powerunits_bounded_coverage_v1`, `execute_powerunits_outage_repair_bounded_slice`), you **must call that tool directly**.
 
 **Never** substitute `read_powerunits_doc` for a bounded tool name. Doc manifest keys look like `runbook.md` — they are **not** tool names.
 
@@ -204,9 +204,10 @@ Rules:
 
 Operator playbooks (bundled skills under `skills/productivity/`):
 
-- `powerunits-data-health-triptychon` — read-only DE/PL health
+- `powerunits-data-health-triptychon` — read-only **national Tier-1** health (11 ISO2 default)
+- `powerunits-multi-country-analyst-read-v1` — cross-country read/analyze/synthesize
 - `powerunits-de-outage-repair-playbook` — outage diagnose + repair with confirmation
-- `powerunits-stage1-de-bounded-repair-sequence` — staged ingest → features → driver
+- `powerunits-stage1-de-bounded-repair-sequence` — staged ingest → features → driver (DE-focused execute)
 
 ## GitHub docs to workspace workflow
 

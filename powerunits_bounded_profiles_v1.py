@@ -27,6 +27,8 @@ ENV_MANAGED_BEGIN: Final[str] = (
 ENV_MANAGED_END: Final[str] = "# END powerunits_bounded_profile_v1"
 _ENV_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 
+from powerunits_operator_country_scope_v1 import ERA5_TIER1_CSV_V1
+
 # Read-only data health + bounded reads (no primary execute families).
 STAGE1_READ_HEALTH: Final[dict[str, str]] = {
     "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED": "1",
@@ -39,6 +41,9 @@ STAGE1_READ_HEALTH: Final[dict[str, str]] = {
     "HERMES_POWERUNITS_BASELINE_LAYER_PREVIEW_ENABLED": "1",
     "HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED": "1",
     "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED": "1",
+    "HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED": "1",
+    # ERA5 Tier-1 bbox keys — unset Hermes env narrows to DE-only.
+    "HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES": ERA5_TIER1_CSV_V1,
     # Validate/summary/readiness via legacy per-step keys (no primary ⇒ no execute).
     "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_VALIDATE_ENABLED": "1",
     "HERMES_POWERUNITS_MARKET_FEATURES_BOUNDED_DE_READINESS_ENABLED": "1",
@@ -72,14 +77,19 @@ STAGE1_OPERATOR_EXECUTE: Final[dict[str, str]] = {
 PROFILE_ENV_EXPANSIONS_V1: Final[dict[str, dict[str, str]]] = {
     "stage1_read_health": STAGE1_READ_HEALTH,
     "stage1_operator_execute": STAGE1_OPERATOR_EXECUTE,
+    "stage1_analyst_read": STAGE1_READ_HEALTH,
 }
 
 PROFILE_DESCRIPTIONS_V1: Final[dict[str, str]] = {
     "stage1_read_health": (
-        "Data-health triptychon + bounded reads/validates; no primary execute families."
+        "Data-health triptychon + bounded reads/validates; ERA5 Tier-1 allowlist; no primary execute."
     ),
     "stage1_operator_execute": (
-        "read_health plus bounded execute (market features, market driver, ENTSO-E, ERA5, outage repair)."
+        "read_health plus bounded execute (market features DE/PL, market driver DE, ENTSO-E national Tier-1, "
+        "ERA5 Tier-1, outage repair DE)."
+    ),
+    "stage1_analyst_read": (
+        "Alias of stage1_read_health — multi-country read/analyze/synthesize (national Tier-1 triptychon)."
     ),
 }
 

@@ -10,6 +10,11 @@ import pytest
 import powerunits_bounded_profiles_v1 as profiles
 
 
+def test_stage1_analyst_read_is_alias_of_read_health() -> None:
+    assert profiles.PROFILE_ENV_EXPANSIONS_V1["stage1_analyst_read"] is profiles.STAGE1_READ_HEALTH
+    assert "GB" in profiles.STAGE1_READ_HEALTH["HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES"]
+
+
 def test_apply_profile_fills_missing_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
     monkeypatch.delenv("HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED", raising=False)

@@ -152,15 +152,21 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
 
 
 def _data_health_fingerprint_v1() -> dict[str, Any]:
-    """Optional lightweight DE snapshot when coverage-snapshot gate is on."""
+    """Optional lightweight national Tier-1 snapshot when coverage-snapshot gate is on."""
     out: dict[str, Any] = {"fetch_attempted": False}
     try:
         from datetime import datetime, timedelta, timezone
 
+        from powerunits_operator_country_scope_v1 import (
+            default_triptychon_country_codes,
+            operator_country_scope_summary_v1,
+        )
         from tools.powerunits_bounded_coverage_snapshot_tool import (
             check_powerunits_bounded_coverage_snapshot_requirements,
             read_powerunits_coverage_snapshot_v1,
         )
+
+        out["country_scope_v1"] = operator_country_scope_summary_v1()
 
         if not check_powerunits_bounded_coverage_snapshot_requirements():
             out["skipped_reason"] = "coverage_snapshot_gate_off"
@@ -169,21 +175,33 @@ def _data_health_fingerprint_v1() -> dict[str, Any]:
         out["fetch_attempted"] = True
         end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         start = end - timedelta(days=7)
+        countries = default_triptychon_country_codes()
         raw = read_powerunits_coverage_snapshot_v1(
-            country_codes=["DE"],
+            country_codes=countries,
             window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
             window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
             version="v1",
         )
         snap = json.loads(raw)
         if snap.get("success") and snap.get("http_status_from_repo_b") == 200:
+            detail = snap.get("baseline_readiness_detail") or {}
+            ready: list[str] = []
+            not_ready: list[str] = []
+            if isinstance(detail, dict):
+                for cc, row in detail.items():
+                    if isinstance(row, dict) and row.get("baseline_ready") is True:
+                        ready.append(str(cc).upper())
+                    elif isinstance(row, dict) and row.get("baseline_ready") is False:
+                        not_ready.append(str(cc).upper())
             out.update(
                 {
-                    "de_baseline_ready": snap.get("baseline_ready"),
-                    "de_baseline_reason": snap.get("baseline_readiness_reason"),
+                    "national_tier1_count": len(countries),
+                    "baseline_ready_aggregate": snap.get("baseline_ready"),
+                    "baseline_ready_count": len(ready),
+                    "baseline_not_ready_countries": sorted(not_ready),
+                    "baseline_ready_countries_sample": sorted(ready)[:6],
                     "http_status_from_repo_b": snap.get("http_status_from_repo_b"),
                     "correlation_id": snap.get("correlation_id"),
-                    "latest_pipeline_runs": snap.get("latest_pipeline_runs"),
                 }
             )
         else:
@@ -590,6 +608,7 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "data_health_fingerprint_de_read_only": data_health_fingerprint,
                 "operator_playbooks_v1": [
                     "skills/productivity/powerunits-data-health-triptychon/SKILL.md",
+                    "skills/productivity/powerunits-multi-country-analyst-read-v1/SKILL.md",
                     "skills/productivity/powerunits-de-outage-repair-playbook/SKILL.md",
                     "skills/productivity/powerunits-stage1-de-bounded-repair-sequence/SKILL.md",
                 ],

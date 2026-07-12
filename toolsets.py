@@ -856,6 +856,17 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_entsoe_empirical_candidate_validate": {
+        "description": (
+            "**Empirical ENTSO-E candidate validate-window (read-only, ADR 045)** — one HTTP POST to "
+            "`/internal/hermes/bounded/v1/entsoe-empirical-candidate/validate-window`. "
+            "ISO2 **`DK`**, **`NO`**, **`IE`** only; **not** Tier-1 promotion. Requires "
+            "`HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED` + bounded execute credentials."
+        ),
+        "tools": ["validate_powerunits_entsoe_empirical_candidate_window_v1"],
+        "includes": [],
+    },
+
     "powerunits_bounded_coverage_inventory": {
         "description": (
             "**Bounded coverage inventory (multi-country read-only)** — one HTTP POST to "
@@ -892,6 +903,16 @@ TOOLSETS = {
             "`HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED` + bounded execute credentials."
         ),
         "tools": ["read_powerunits_worker_country_coverage_freshness_v1"],
+        "includes": [],
+    },
+
+    "powerunits_multi_country_data_health": {
+        "description": (
+            "**Multi-country data-health analyst (read-only orchestrator)** — runs snapshot + inventory + "
+            "worker freshness for national Tier-1 ISO2 (default 11) and returns **`operator_summary_v1`** "
+            "green vs ops-action rollup. Requires all three data-health gates plus bounded execute credentials."
+        ),
+        "tools": ["read_powerunits_multi_country_data_health_v1"],
         "includes": [],
     },
 
