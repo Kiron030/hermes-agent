@@ -20,6 +20,8 @@ _STAGE1_EXECUTE_FAMILIES = (
     "powerunits_de_stack_remediation_planner",
     "powerunits_multi_country_data_health",
     "powerunits_entsoe_empirical_candidate_validate",
+    "powerunits_baseline_layer_preview",
+    "powerunits_bounded_rollout_governance",
 )
 
 

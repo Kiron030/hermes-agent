@@ -66,6 +66,8 @@ TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "powerunits_bounded_coverage_inventory",
     "powerunits_worker_country_coverage_freshness",
     "powerunits_multi_country_data_health",
+    "powerunits_baseline_layer_preview",
+    "powerunits_bounded_rollout_governance",
     "powerunits_era5_weather_bounded_preflight",
     "powerunits_era5_weather_bounded_execute",
     "powerunits_era5_weather_bounded_validate",
