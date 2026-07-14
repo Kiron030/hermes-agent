@@ -29,6 +29,10 @@ TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "memory",
     "session_search",
     "todo",
+    # Hermes core read (no browser/terminal/file write/delegate)
+    "web",
+    "search",
+    "vision",
     "powerunits_docs",
     "powerunits_github_docs",
     "powerunits_operator_posture",

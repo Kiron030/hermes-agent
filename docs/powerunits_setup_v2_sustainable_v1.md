@@ -14,7 +14,7 @@
 | Registrierte Tool-Module (`registry.register`) | **55** |
 | Helper/Slice/Gates (kein Register) | **13** |
 | Powerunits-Toolsets in `toolsets.py` | **54** |
-| In `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` | **51** (nach Overlay-Fix in diesem Branch) |
+| In `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` | **54** (Baseline/Governance + Hermes-Core `web`/`search`/`vision`) |
 | Profil `stage1_read_health` Env-Keys | **26** |
 | Profil `stage1_operator_execute` Env-Keys | **34** |
 
@@ -236,9 +236,13 @@ HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_{VALIDATE,SUMMARY}_ENABLED
 HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED
 ```
 
-### 4.2 Dateien — nicht löschen
+### 4.2 Dateien — Lösch-Inventar (Cleanup v2)
 
-Alle 68 Module behalten. Einzig `powerunits_market_features_bounded_de_slice.py` ist bewusst kein Tool.
+| Ergebnis | Detail |
+|----------|--------|
+| **Gelöscht** | *keine* — alle 54 `*_tool.py` sind in `toolsets.py` registriert |
+| **Nicht löschen** | `powerunits_market_features_bounded_de_slice.py` — **HELPER**, von Execute/Validate/Driver importiert (Audit „DEAD“ war falsch positiv) |
+| **Regel** | Physisches Delete nur bei Zero-Referenzen außerhalb der Datei selbst |
 
 ### 4.3 Toolset-Konsolidierung (Dokumentation only)
 
@@ -335,18 +339,13 @@ Alias: `stage1_analyst_read` = identisch zu `stage1_read_health`.
 | `memory` | Persistent memory |
 | `session_search` | Verlaufssuche |
 | `todo` | Planung |
+| `web` | `web_search`, `web_extract` (kein Browser) |
+| `search` | `web_search` (leichtgewichtig) |
+| `vision` | `vision_analyze` (Screenshots/Diagramme) |
 
 #### Powerunits Read — nach Overlay-Fix vollständig für RH
 
 Triptychon + Baseline + Governance + BZN + Repo-B + Timescale + Multi-Country Health.
-
-#### Empfohlene **zusätzliche** Hermes-Core-Toolsets (PR 2)
-
-| Toolset | Tools | Begründung |
-|---------|-------|------------|
-| `web` | `web_search`, `web_extract` | Externe Docs, ENTSO-E/ERA5-Referenz |
-| `search` | `web_search` | Leichtgewichtig |
-| `vision` | `vision_analyze` | Screenshots / Diagramme |
 
 **Explizit NICHT** für Telegram `first_safe_v1`:
 
@@ -359,7 +358,7 @@ Triptychon + Baseline + Governance + BZN + Repo-B + Timescale + Multi-Country He
 | `cronjob` | Scheduled Execution |
 | `skills` → `skill_manage` | Mutation; Tier 3 observe reicht |
 
-**Implementierung:** `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` um `"web"`, `"vision"` erweitern **oder** dediziertes `powerunits_telegram_hermes_read_v1`-Bundle in `apply_powerunits_runtime_policy.py`.
+**Implementierung:** `web`, `search`, `vision` in `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` (`feature/powerunits-internal-setup-v2-cleanup`).
 
 ---
 
