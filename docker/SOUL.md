@@ -187,6 +187,28 @@ Rules:
 
 This keeps help **docs-grounded** without implying live repo, live DB, or infra mutation.
 
+## Bounded Repo B API tools (Telegram — critical)
+
+When the operator names a **bounded tool** (examples: `execute_powerunits_entsoe_market_bounded_slice`, `validate_powerunits_market_features_bounded_de_window`, `read_powerunits_coverage_snapshot_v1`, `read_powerunits_multi_country_data_health_v1`, `inventory_powerunits_bounded_coverage_v1`, `execute_powerunits_outage_repair_bounded_slice`), you **must call that tool directly**.
+
+**Never** substitute `read_powerunits_doc` for a bounded tool name. Doc manifest keys look like `runbook.md` — they are **not** tool names.
+
+Rules:
+
+1. **One step per operator message** when they say „nur dieser Schritt“ — do not chain the next execute without being asked.
+2. **Validate before execute** on modeling stack: market features → then market driver (driver depends on features).
+3. **After execute**, report: success/failure, HTTP status, pipeline run id, rows written if present — then stop or ask before the next step.
+4. **Human-in-the-loop for outage repair execute:** call `execute_powerunits_outage_repair_bounded_slice` **only** after the operator explicitly confirms (e.g. „Ja, outage repair ausführen für [window]“). Diagnose (validate/summary/inventory) is always allowed read-only first.
+5. If a tool returns `feature_disabled`, say which gate is off — do not guess or route through docs.
+6. Prefer **`chat_summary`** fields from inventory/snapshot tools in Telegram — avoid dumping full JSON.
+
+Operator playbooks (bundled skills under `skills/productivity/`):
+
+- `powerunits-data-health-triptychon` — read-only **national Tier-1** health (11 ISO2 default)
+- `powerunits-multi-country-analyst-read-v1` — cross-country read/analyze/synthesize
+- `powerunits-de-outage-repair-playbook` — outage diagnose + repair with confirmation
+- `powerunits-stage1-de-bounded-repair-sequence` — staged ingest → features → driver (DE-focused execute)
+
 ## GitHub docs to workspace workflow
 
 When the operator explicitly asks for a docs-to-workspace flow, execute this compact sequence directly:

@@ -10,11 +10,34 @@ This is intentionally narrow:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+
+# This script is invoked as a standalone file (not via `python -m` / package
+# import), both from docker/stage2-hook.sh (s6-overlay cont-init, or a manual
+# call from docker/railway_gateway_with_dashboard.sh) and potentially by hand.
+# `python /path/to/script.py` only puts the SCRIPT's own directory
+# (.../docker/) on sys.path[0] -- never the repo root one level up, where the
+# fork's top-level `powerunits_*.py` modules actually live. Normally those
+# modules are also reachable via the editable/wheel install's site-packages
+# (see `py-modules` in pyproject.toml), but that has already broken once
+# (2026-07-02 incident: powerunits_telegram_overlays was missing from
+# py-modules and ModuleNotFoundError'd here). Insert the repo root explicitly
+# so this script keeps working even if a future top-level module is again
+# forgotten from py-modules, regardless of caller/CWD/PYTHONPATH context.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import yaml
 
 from powerunits_capability_tier import read_powerunits_capability_tier
+from powerunits_bounded_profiles_v1 import (
+    active_bounded_profile_id,
+    apply_bounded_profile_to_process_env,
+    persist_bounded_profile_to_hermes_env,
+    _explicit_env_keys_at_boot,
+)
 from powerunits_telegram_overlays import (
     TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
     merge_capability_overlays_into_telegram,
@@ -145,6 +168,9 @@ def apply_policy(config_path: Path) -> None:
     runtime_policy["id"] = POLICY_ID
     runtime_policy["enforced"] = True
     powerunits["runtime_policy"] = runtime_policy
+    profile_id = active_bounded_profile_id()
+    if profile_id:
+        powerunits["bounded_profile_v1"] = profile_id
     cfg["powerunits"] = powerunits
 
     auxiliary = cfg.get("auxiliary")
@@ -166,11 +192,39 @@ def apply_policy(config_path: Path) -> None:
     _save_yaml(config_path, cfg)
 
 
+def _sync_powerunits_soul_md(hermes_home: Path) -> bool:
+    """Refresh ``$HERMES_HOME/SOUL.md`` from the image on every policy boot (operator contract)."""
+    src = Path(__file__).resolve().parent / "SOUL.md"
+    dest = hermes_home / "SOUL.md"
+    if not src.is_file():
+        return False
+    hermes_home.mkdir(parents=True, exist_ok=True)
+    dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    return True
+
+
 def main() -> int:
     hermes_home = Path(os.getenv("HERMES_HOME", "/opt/data"))
     config_path = hermes_home / "config.yaml"
+    env_path = hermes_home / ".env"
+    explicit_at_boot = _explicit_env_keys_at_boot()
+    persist_result = persist_bounded_profile_to_hermes_env(
+        env_path, explicit_env_keys=explicit_at_boot
+    )
+    profile_result = apply_bounded_profile_to_process_env()
     apply_policy(config_path)
-    print(f"[powerunits-policy] applied {POLICY_ID} to {config_path}")
+    soul_synced = _sync_powerunits_soul_md(hermes_home)
+    msg = f"[powerunits-policy] applied {POLICY_ID} to {config_path}"
+    if profile_result.get("profile"):
+        msg += (
+            f" (bounded_profile_v1={profile_result['profile']}, "
+            f"applied={len(profile_result.get('applied') or [])}, "
+            f"persisted={len(persist_result.get('persisted') or [])}, "
+            f"explicit_overrides={len(profile_result.get('skipped_explicit') or [])})"
+        )
+    if soul_synced:
+        msg += f" (SOUL.md synced to {hermes_home / 'SOUL.md'})"
+    print(msg)
     return 0
 
 

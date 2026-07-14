@@ -1,5 +1,12 @@
 # Powerunits Hermes Fork Sync Strategy v1
 
+> **Vor Beginn eines neuen Sync-Schritts ZUERST
+> [`docs/powerunits_fork_sync_preflight_checklist.md`](./powerunits_fork_sync_preflight_checklist.md)
+> lesen.** Kompakte, actionable Checkliste aus den v0.12.0-/v0.13.0-Sync-
+> Vorfällen (Dependency-Sync-Falle, Symbol-/Intra-Funktions-Diff-Check,
+> ProviderProfile-Falle, bekannte Windows-Testartefakte, Ablaufreihenfolge)
+> — spart wiederholtes Neu-Entdecken derselben Fehler.
+
 ## 1) Current repo relationship
 
 - **upstream**: `NousResearch/hermes-agent`
@@ -110,6 +117,22 @@ Mindestens diese Validierung nach jedem Upstream-Sync:
 5. **Telegram smoke**
    - read -> summarize -> save -> read back
    - keine Clarify-Loop/Tool-Narrationsregression
+6. **Symbol-Diff-Check auf Hotspot-Dateien (PFLICHT, seit v0.13-Sync-Vorfall 2026-07-01)**
+   - Ein "clean auto-merge" (kein `<<<<<<<`-Marker) ist bei stark refaktorierten Dateien **kein** Beweis für Vollständigkeit. Git kann bei zeilenbasierten Diffs auf beiden Seiten geänderte Funktionen ohne Konfliktmarker einseitig "gewinnen" lassen und dabei Upstream-Funktionalität stillschweigend verwerfen.
+   - Für jede Datei aus Abschnitt 3 (Hotspots), die im Merge angefasst wurde:
+     1. `git show <merge-base>:<file>` (Basis), `git show <upstream-tag>:<file>` (Upstream-Ziel), Datei im Merge-Ergebnis — je in eine Datei umleiten (kein direktes Pipe von `git show` in andere Befehle verwenden, encoding-anfällig).
+     2. Funktions-/Symbolliste extrahieren (z. B. `^def |^class |^    def `) und die drei Listen vergleichen.
+     3. Jede Funktion/Signatur, die in Upstream-Ziel existiert, aber im Merge-Ergebnis fehlt oder von der Basis-Version übernommen wurde (statt der Upstream-Version), ist ein Kandidat für stillen Verlust — muss geprüft und ggf. nachgetragen werden.
+     4. Zeilenzahl grob vergleichen (Basis + Upstream-Delta ≈ erwartete Ergebniszeilenzahl); große Abweichung nach unten ist ein Warnsignal.
+   - Bei Verdacht auf stillen Verlust: **nicht** einfach die Konfliktmarker "accept theirs/ours" lösen. Stattdessen Datei aus der Upstream-Zielversion neu aufbauen und die Fork-spezifischen Anpassungen (ermittelt via `git diff <merge-base> <fork-branch> -- <file>`) gezielt nachziehen.
+7. **Intra-Funktions-Diff-Check bei Methoden, die auf beiden Seiten strukturell umgebaut wurden (PFLICHT, seit v0.13-Sync chat_completions.py-Vorfall 2026-07-01)**
+   - Der reine Symbol-/Funktionslisten-Vergleich (Punkt 6) prueft nur, ob eine Funktion/Methode **existiert** — nicht, ob ihr **Koerper** noch alle noetigen Zweige enthaelt. Wenn Upstream und Fork **dieselbe** Methode unabhaengig voneinander stark refaktorieren (z. B. weil Upstream eine neue Architektur einfuehrt, die alte Zweige "ueberfluessig" macht), kann Git Teile des Methodenkoerpers **ohne Konfliktmarker** rein nach der Upstream-Seite aufloesen — obwohl die Fork-spezifischen Zweige dort weiterhin gebraucht werden (z. B. weil noch nicht alle Call-Sites auf die neue Architektur migriert sind).
+   - Konkret beobachtet: `agent/transports/chat_completions.py::build_kwargs()` verlor beim v0.13-Merge (upstream fuehrte einen neuen `ProviderProfile`-Pfad ein und vereinfachte den alten "Legacy"-Pfad radikal) mehrere Fork-spezifische Zweige **ersatzlos**, obwohl `build_kwargs` als Symbol unveraendert vorhanden blieb: Qwen-Message-Preprocessing (`qwen_prepare_fn`/`qwen_prepare_inplace_fn`, `is_qwen`-Definition), die komplette `Temperature`-Behandlung (`fixed_temperature`/`omit_temperature`), Qwen-`session_metadata` -> `api_kwargs["metadata"]`, sowie drei `max_tokens`-Sonderfaelle (`is_nvidia_nim` -> 16384, `is_qwen` -> 65536, `is_kimi` -> 32000). Erst ein fehlgeschlagener Testlauf (`NameError: name 'is_qwen' is not defined`) deckte das erste Symptom auf; eine vollstaendige Line-by-Line-Rekonstruktion gegen den Pre-Merge-Stand von `HEAD` war noetig, um alle stillschweigend entfernten Zweige zu finden.
+   - Regel: Wenn eine Methode/Funktion aus den Hotspot-Dateien **beidseitig substanziell umgebaut** wurde (nicht nur additiv erweitert), reicht der Symbol-Diff nicht. Zusaetzlich noetig:
+     1. Vollstaendigen Methodenkoerper aus `HEAD` (Pre-Merge Fork-Stand) extrahieren.
+     2. Jede logische Verzweigung/jeden Parameter-Handling-Block (`if params.get(...)`, providerspezifische Sonderfaelle etc.) einzeln gegen das Merge-Ergebnis abgleichen.
+     3. Bei jedem fehlenden Zweig pruefen, ob die neue (Upstream-)Architektur ihn tatsaechlich funktional ersetzt (z. B. ueber einen neuen Abstraktions-Layer wie `ProviderProfile`) — und ob **alle** relevanten Call-Sites im Fork bereits durch diesen neuen Layer abgedeckt sind. Ist das nicht der Fall (z. B. Call-Sites, die den neuen Layer bewusst umgehen — Summary-/Retry-Pfade, die kein `provider_profile` aufloesen), muss der alte Zweig als expliziter Fallback erhalten bleiben, inkl. Kommentar, der auf den neuen Layer und den Grund fuer den Fallback verweist.
+   - Test-getriebene Absicherung ist hier der zuverlaessigste Fruehindikator: volle Testsuite fuer die betroffene Datei laufen lassen, **bevor** der Merge als geloest gilt, nicht erst am Ende des gesamten Sync-Schritts.
 
 ---
 
@@ -196,6 +219,22 @@ Technisch:
 - Merge kann formal "resolved" sein, obwohl Marker-Reste im File bleiben; daher nach Konfliktloesung immer Marker-Scan (`<<<<<<<`, `=======`, `>>>>>>>`) + Syntax-Check auf kritische Runtime-Dateien.
 - Workflow-Diffs unter `.github/workflows/` und Supply-Chain-sensitive Pfade (z. B. `hermes_cli/setup.py`) brauchen explizite Sichtpruefung, auch wenn kein akuter Fehler sichtbar ist.
 - Tag-first plus kleiner Scope reduziert Konfliktflaeche und vereinfacht Root-Cause-Analyse bei Runtime-Breaks.
+
+### v0.13-Sync-Vorfall (2026-07-01): stiller Funktionsverlust ohne Konfliktmarker
+
+Beim Versuch, `v2026.5.7` (v0.13.0) nach `integration/hermes-runtime-v0.13-bump` zu mergen, meldete Git nur 5 echte Konflikte (`AGENTS.md`, `agent/transports/chat_completions.py`, `gateway/config.py`, `model_tools.py` x2, `toolsets.py`). Eine Symbol-Diff-Pruefung (siehe Abschnitt 4, Punkt 6 — neu eingefuehrt als direkte Konsequenz) zeigte aber: **`model_tools.py` verlor beim Merge stillschweigend vier Upstream-Funktionen** (`_clear_tool_defs_cache`, `_compute_tool_definitions`-Refactor, `_schema_allows_null`, `_coerce_json`) sowie einen Bugfix fuer `disabled_toolsets`-Handling (Upstream-Issue #17309: `elif disabled_toolsets` -> `if disabled_toolsets` als unbedingter Subtraktions-Schritt), **ohne dass Git dafuer einen Konfliktmarker gesetzt hat**. Zeilenzahl-Check haette es fruehzeitig gezeigt: Basis (Upstream v0.12.0) 811 Zeilen, Merge-Ergebnis nur 670 — deutlich zu wenig fuer eine Datei, die eigentlich Basis + Upstream-Delta + Fork-Delta enthalten sollte.
+
+Zusaetzlicher Befund: Der `disabled_toolsets`-Bug existierte bereits **vor** diesem Sync-Versuch im Fork-Stand (`elif disabled_toolsets:` statt `if disabled_toolsets:` in `get_tool_definitions()`) — vermutlich bereits beim v0.12.0-Merge stillschweigend verloren gegangen, ohne dass es bis jetzt aufgefallen ist. Sicherheitsrelevanz: `run_agent.py` ruft `get_tool_definitions(enabled_toolsets=..., disabled_toolsets=...)` mit beiden Parametern gleichzeitig auf; mit der `elif`-Logik wird `disabled_toolsets` ignoriert, sobald `enabled_toolsets` gesetzt ist. Reale Exposure zum Fundzeitpunkt: gering, da der Powerunits-Gateway-Pfad (`platform_toolsets`) ausschliesslich mit `enabled_toolsets`-Allowlisting arbeitet und `disabled_toolsets` im Live-Pfad nicht gesetzt wird — aber ein latenter Defekt, der bei zukuenftiger Nutzung von `agent.disabled_toolsets` in `config.yaml` als zusaetzliche Absicherung schweigend nicht greifen wuerde.
+
+**Konsequenz fuer den Prozess:** "Kein Konfliktmarker" != "sicher gemergt" bei Dateien, die auf beiden Seiten (Upstream und Fork) substanziell refaktoriert wurden. Ab sofort verpflichtend: Symbol-Diff-Check (Abschnitt 4.6) fuer alle Hotspot-Dateien, bevor ein Merge als "konfliktfrei geloest" gilt — unabhaengig davon, ob Git Konfliktmarker gesetzt hat oder nicht.
+
+### v0.13-Sync-Vorfall Teil 2 (2026-07-01): stiller Zweig-Verlust *innerhalb* einer unveraendert vorhandenen Methode
+
+Direkt im Anschluss an obigen Vorfall, beim Aufloesen des (diesmal echten, mit Konfliktmarkern versehenen) Konflikts in `agent/transports/chat_completions.py`: Upstream v0.13.0 fuehrte einen komplett neuen `ProviderProfile`-Architektur-Layer ein (`providers/` Package, `_build_kwargs_from_profile()`), der die Provider-Sonderfaelle (Nous, Qwen, Ollama, Kimi, NVIDIA...) aus der alten `build_kwargs()`-Methode in profilspezifische Objekte auslagert. `run_agent.py` versucht seit v0.13 zuerst `get_provider_profile(self.provider)` und delegiert bei Treffer vollstaendig dorthin; nur bei unbekanntem Provider (oder bei Call-Sites, die diesen Lookup gar nicht durchfuehren — z. B. die Retry-/Summary-Pfade `_tsum.build_kwargs()` / `_tretry.build_kwargs()` in `run_agent.py`) wird der alte "Legacy"-Zweig von `build_kwargs()` erreicht.
+
+Der Konflikt selbst betraf nur einen kleinen Hunk (die `extra_body["reasoning"]`-Zuweisung). Die Entscheidung, dort die volle Fork-Logik (Nous-Sonderfall, Ollama-Guard) zu behalten statt Upstreams Ein-Zeiler zu uebernehmen, war richtig — aber ein direkt daneben liegender, **nicht als Konflikt markierter** Teil derselben Methode (Qwen-Preprocessing, Temperature-Handling, Qwen-Metadata, `max_tokens`-Sonderfaelle fuer NVIDIA/Qwen/Kimi) wurde von Git klammheimlich komplett durch Upstreams vereinfachte Version ersetzt, weil Upstream diese Zeilen ebenfalls entfernt hatte und der umgebende Kontext auf beiden Seiten weit genug auseinanderlief, dass kein Konfliktmarker gesetzt wurde. Erst der volle Testlauf von `tests/agent/transports/` deckte es auf (`NameError: name 'is_qwen' is not defined`, danach 30 weitere Folgefehler).
+
+**Konsequenz fuer den Prozess:** Abschnitt 4, Punkt 7 (Intra-Funktions-Diff-Check) wurde direkt als Ergebnis dieses Vorfalls eingefuehrt. Zusaetzliche Lehre: nach Aufloesen *jedes* Merge-Konflikts in einer Datei mit stark umgebauten Methoden sofort die volle Testsuite fuer diese Datei laufen lassen — nicht erst am Ende, wenn alle vier/fuenf Konfliktdateien geloest sind. Ausserdem waehrend derselben Untersuchung entdeckt (unabhaengig vom Merge, aber durch die tiefe Diff-Analyse aufgedeckt): `toolsets.py`'s `hermes-discord`-Eintrag referenzierte den nicht-existenten Tool-Namen `discord_server` statt der tatsaechlich in `tools/discord_tool.py` registrierten Namen `discord`/`discord_admin` — vermutlich ein Ueberbleibsel eines nie abgeschlossenen internen Umbenennungsversuchs. Dieselbe Inkonsistenz fand sich auch in `model_tools.py`s dynamischer Schema-Rebuild-Logik fuer Discord (toter `if "discord_server" in available_tool_names:`-Zweig, der nie griff). Beides wurde im Rahmen dieses Syncs korrigiert; reale Exposure war gering, da die Discord-Plattform bei Powerunits deaktiviert ist.
 
 Operativ:
 

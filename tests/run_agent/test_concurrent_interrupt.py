@@ -1,9 +1,8 @@
 """Tests for interrupt handling in concurrent tool execution."""
 
-import concurrent.futures
 import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -53,6 +52,11 @@ def _make_agent(monkeypatch):
             self._tool_worker_threads: set = set()
             self._tool_worker_threads_lock = threading.Lock()
             self._active_children_lock = threading.Lock()
+            # New in v0.13 (ToolCallGuardrailController): production
+            # AIAgent.__init__ always sets this; before_call()/after_call()
+            # are called unconditionally in the tool-execution path.
+            from agent.tool_guardrails import ToolCallGuardrailController
+            self._tool_guardrails = ToolCallGuardrailController()
 
         def _touch_activity(self, desc):
             self._last_activity = time.time()
@@ -82,6 +86,15 @@ def _make_agent(monkeypatch):
     # fanout, not steer injection.
     stub._apply_pending_steer_to_tool_results = lambda *a, **kw: None
     stub._invoke_tool = MagicMock(side_effect=lambda *a, **kw: '{"ok": true}')
+    # New in v0.13 (ToolCallGuardrailController): _run_tool() calls this
+    # unconditionally after every tool result. Stubbed as a passthrough —
+    # this test exercises interrupt fanout, not guardrail decisions.
+    stub._append_guardrail_observation = lambda name, args, result, failed=False: result
+    # New in v0.14: _run_tool() calls this on every tool result to strip
+    # multimodal content the active model can't consume. Stubbed as a
+    # passthrough — these tests use plain string tool results, not the
+    # multimodal-image-block path.
+    stub._tool_result_content_for_active_model = lambda name, result: result
     return stub
 
 
@@ -107,7 +120,7 @@ def test_concurrent_interrupt_cancels_pending(monkeypatch):
 
     original_invoke = agent._invoke_tool
 
-    def slow_tool(name, args, task_id, call_id=None):
+    def slow_tool(name, args, task_id, call_id=None, **_kw):
         if name == "slow_one":
             # Block until the test sets the interrupt
             barrier.wait(timeout=10)
@@ -184,7 +197,7 @@ def test_running_concurrent_worker_sees_is_interrupted(monkeypatch):
     observed = {"saw_true": False, "poll_count": 0, "worker_tid": None}
     worker_started = threading.Event()
 
-    def polling_tool(name, args, task_id, call_id=None, messages=None):
+    def polling_tool(name, args, task_id, call_id=None, messages=None, **_kw):
         observed["worker_tid"] = threading.current_thread().ident
         worker_started.set()
         deadline = time.monotonic() + 5.0

@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.registry import ToolRegistry, discover_builtin_tools
+from tools.registry import ToolRegistry, _module_registers_tools, discover_builtin_tools
 
 
 def _dummy_handler(args, **kwargs):
@@ -289,94 +289,24 @@ class TestCheckFnExceptionHandling:
 
 
 class TestBuiltinDiscovery:
-    def test_matches_previous_manual_builtin_tool_set(self):
-        # Snapshot of ``tools/*.py`` that contain a module-level ``registry.register`` call.
-        # Intentionally explicit: add new builtins here when merging tool PRs —
-        # do not widen discovery to hide regressions.
-        expected = {
-            "tools.browser_cdp_tool",
-            "tools.browser_dialog_tool",
-            "tools.browser_tool",
-            "tools.clarify_tool",
-            "tools.code_execution_tool",
-            "tools.cronjob_tools",
-            "tools.delegate_tool",
-            "tools.discord_tool",
-            "tools.feishu_doc_tool",
-            "tools.feishu_drive_tool",
-            "tools.file_tools",
-            "tools.homeassistant_tool",
-            "tools.image_generation_tool",
-            "tools.memory_tool",
-            "tools.mixture_of_agents_tool",
-            "tools.powerunits_baseline_layer_preview_tool",
-            "tools.powerunits_bounded_coverage_inventory_tool",
-            "tools.powerunits_bounded_rollout_governance_tool",
-            "tools.powerunits_de_stack_remediation_planner_tool",
-            "tools.powerunits_docs_tool",
-            "tools.powerunits_entsoe_bzn_price_readiness_tool",
-            "tools.powerunits_entsoe_bzn_prices_tool",
-            "tools.powerunits_entsoe_forecast_bounded_execute_tool",
-            "tools.powerunits_entsoe_forecast_bounded_preflight_tool",
-            "tools.powerunits_entsoe_forecast_bounded_summary_tool",
-            "tools.powerunits_entsoe_forecast_bounded_validate_tool",
-            "tools.powerunits_entsoe_market_bounded_campaign_tool",
-            "tools.powerunits_entsoe_market_bounded_coverage_scan_tool",
-            "tools.powerunits_entsoe_market_bounded_execute_tool",
-            "tools.powerunits_entsoe_market_bounded_preflight_tool",
-            "tools.powerunits_entsoe_market_bounded_summary_tool",
-            "tools.powerunits_entsoe_market_bounded_validate_tool",
-            "tools.powerunits_era5_weather_bounded_campaign_tool",
-            "tools.powerunits_era5_weather_bounded_coverage_scan_tool",
-            "tools.powerunits_era5_weather_bounded_execute_tool",
-            "tools.powerunits_era5_weather_bounded_preflight_tool",
-            "tools.powerunits_era5_weather_bounded_summary_tool",
-            "tools.powerunits_era5_weather_bounded_validate_tool",
-            "tools.powerunits_github_docs_tool",
-            "tools.powerunits_market_driver_features_bounded_de_execute_tool",
-            "tools.powerunits_market_driver_features_bounded_de_readiness_tool",
-            "tools.powerunits_market_driver_features_bounded_de_summary_tool",
-            "tools.powerunits_market_driver_features_bounded_de_validate_tool",
-            "tools.powerunits_market_features_bounded_de_execute_tool",
-            "tools.powerunits_market_features_bounded_de_readiness_tool",
-            "tools.powerunits_market_features_bounded_de_summary_tool",
-            "tools.powerunits_market_features_bounded_de_validate_tool",
-            "tools.powerunits_operator_posture_tool",
-            "tools.powerunits_option_d_execute_tool",
-            "tools.powerunits_option_d_preflight_tool",
-            "tools.powerunits_option_d_readiness_tool",
-            "tools.powerunits_option_d_summary_tool",
-            "tools.powerunits_option_d_validate_tool",
-            "tools.powerunits_outage_awareness_bounded_summary_tool",
-            "tools.powerunits_outage_awareness_bounded_validate_tool",
-            "tools.powerunits_outage_repair_bounded_execute_tool",
-            "tools.powerunits_repo_b_read_tool",
-            "tools.powerunits_tier1_workspace_analysis_tool",
-            "tools.powerunits_tier2_allowlisted_locals_tool",
-            "tools.powerunits_tier3_skills_integration_tool",
-            "tools.powerunits_tier4a_skill_draft_proposals_tool",
-            "tools.powerunits_tier4b_review_governance_tool",
-            "tools.powerunits_tier5a_bounded_workflow_tool",
-            "tools.powerunits_timescale_read_tool",
-            "tools.powerunits_workspace_tool",
-            "tools.process_registry",
-            "tools.rl_training_tool",
-            "tools.send_message_tool",
-            "tools.session_search_tool",
-            "tools.skill_manager_tool",
-            "tools.skills_tool",
-            "tools.terminal_tool",
-            "tools.todo_tool",
-            "tools.tts_tool",
-            "tools.vision_tools",
-            "tools.web_tools",
-            "tools.yuanbao_tools",
-        }
+    def test_discovers_all_real_self_registering_builtin_tool_modules(self):
+        # Behavioral check, not a hardcoded snapshot (see AGENTS.md "Don't
+        # write change-detector tests"): scans tools/*.py and compares
+        # discover_builtin_tools() against the same
+        # module-registers-tools predicate it uses internally, so adding a
+        # new tools/powerunits_*.py file doesn't require updating a list here.
+        tools_dir = Path(__file__).resolve().parents[2] / "tools"
+        expected = [
+            f"tools.{path.stem}"
+            for path in sorted(tools_dir.glob("*.py"))
+            if path.name not in {"__init__.py", "registry.py", "mcp_tool.py"}
+            and _module_registers_tools(path)
+        ]
 
         with patch("tools.registry.importlib.import_module"):
-            imported = discover_builtin_tools(Path(__file__).resolve().parents[2] / "tools")
+            imported = discover_builtin_tools(tools_dir)
 
-        assert set(imported) == expected
+        assert imported == expected
 
     def test_imports_only_self_registering_modules(self, tmp_path):
         tools_dir = tmp_path / "tools"
@@ -652,3 +582,189 @@ class TestRequiresEnvBindingFingerprint:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = backup
+
+
+class TestToolsetAvailabilityAggregation:
+    def test_mixed_toolset_available_when_general_tool_passes(self):
+        """Desktop-only helpers must not hide general-purpose tools from doctor."""
+        reg = ToolRegistry()
+        reg.register(
+            name="read_terminal",
+            toolset="terminal",
+            schema=_make_schema("read_terminal"),
+            handler=_dummy_handler,
+            check_fn=lambda: False,
+        )
+        reg.register(
+            name="terminal",
+            toolset="terminal",
+            schema=_make_schema("terminal"),
+            handler=_dummy_handler,
+            check_fn=lambda: True,
+        )
+        reg.register(
+            name="process",
+            toolset="terminal",
+            schema=_make_schema("process"),
+            handler=_dummy_handler,
+        )
+
+        available, unavailable = reg.check_tool_availability()
+
+        assert "terminal" in available
+        assert unavailable == []
+        assert reg.is_toolset_available("terminal")
+        assert reg.get_available_toolsets()["terminal"]["available"] is True
+
+    def test_mixed_toolset_unavailable_when_every_tool_is_gated(self):
+        reg = ToolRegistry()
+        reg.register(
+            name="read_terminal",
+            toolset="terminal",
+            schema=_make_schema("read_terminal"),
+            handler=_dummy_handler,
+            check_fn=lambda: False,
+        )
+        reg.register(
+            name="terminal",
+            toolset="terminal",
+            schema=_make_schema("terminal"),
+            handler=_dummy_handler,
+            check_fn=lambda: False,
+        )
+
+        available, unavailable = reg.check_tool_availability()
+
+        assert "terminal" not in available
+        assert any(item["name"] == "terminal" for item in unavailable)
+
+
+class TestDeregisterAuthorization:
+    """deregister() must apply the same plugin opt-in gate as register().
+
+    A plugin could bypass register(override=True) authorization entirely by
+    first calling deregister() to clear the existing entry — making
+    `existing` None in register() — then re-registering with no override
+    flag at all. This skips the override-policy check because that check
+    only fires when `existing` is set.
+    """
+
+    def _reg(self):
+        reg = ToolRegistry()
+        reg.register(
+            name="protected",
+            toolset="terminal",
+            schema={"name": "protected", "description": "", "parameters": {"type": "object", "properties": {}}},
+            handler=lambda *a, **k: "built-in",
+        )
+        return reg
+
+    def test_plugin_cannot_deregister_unowned_tool_without_opt_in(self):
+        reg = self._reg()
+        reg.register_plugin_override_policy("hermes_plugins.evil", False)
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.evil"):
+            import pytest
+            with pytest.raises(PermissionError, match="allow_tool_override"):
+                reg.deregister("protected")
+        assert reg._tools.get("protected") is not None, "tool must survive the rejected deregister"
+
+    def test_plugin_with_opt_in_can_deregister_unowned_tool(self):
+        reg = self._reg()
+        reg.register_plugin_override_policy("hermes_plugins.allowed", True)
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.allowed"):
+            reg.deregister("protected")
+        assert reg._tools.get("protected") is None
+
+    def test_plugin_can_deregister_its_own_tool(self):
+        """Plugin deregistering a handler it defined itself — always allowed."""
+        reg = ToolRegistry()
+        reg.register_plugin_override_policy("hermes_plugins.myplug", False)
+        handler = eval("lambda *a, **k: 'own'", {"__name__": "hermes_plugins.myplug"})
+        reg.register(
+            name="own_tool", toolset="myplug-ts",
+            schema={"name": "own_tool", "description": "", "parameters": {"type": "object", "properties": {}}},
+            handler=handler,
+        )
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.myplug"):
+            reg.deregister("own_tool")
+        assert reg._tools.get("own_tool") is None
+
+    def test_plugin_root_module_can_deregister_submodule_handler(self):
+        """Plugin root cleaning up a tool whose handler lives in a submodule.
+
+        hermes_plugins.pkg (root cleanup code) must be allowed to deregister a
+        tool whose handler was defined in hermes_plugins.pkg.handlers.  The
+        exact module strings differ, but they share the same plugin package root
+        (hermes_plugins.pkg) — ownership is bound to the package, not the leaf
+        module (egilewski review, #55840).
+        """
+        reg = ToolRegistry()
+        reg.register_plugin_override_policy("hermes_plugins.pkg", False)
+        handler = eval("lambda *a, **k: 'sub'", {"__name__": "hermes_plugins.pkg.handlers"})
+        reg.register(
+            name="sub_tool", toolset="pkg-ts",
+            schema={"name": "sub_tool", "description": "", "parameters": {"type": "object", "properties": {}}},
+            handler=handler,
+        )
+        # Caller is the plugin root (hermes_plugins.pkg), handler is in a
+        # submodule (hermes_plugins.pkg.handlers) — must be allowed.
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.pkg"):
+            reg.deregister("sub_tool")
+        assert reg._tools.get("sub_tool") is None
+
+    def test_opted_in_plugin_submodule_can_deregister(self):
+        """An opted-in plugin calling deregister() from a submodule must succeed.
+
+        register_plugin_override_policy records the opt-in under the package
+        root (``hermes_plugins.allowed``).  If the caller is a submodule
+        (``hermes_plugins.allowed.cleanup``), the old code looked up
+        ``_plugin_override_policy.get("hermes_plugins.allowed.cleanup")`` →
+        False and wrongly raised PermissionError.  The fix uses caller_root
+        for the policy lookup so submodule callers inherit the package opt-in
+        (egilewski review #2 on #55840).
+        """
+        reg = ToolRegistry()
+        reg.register(
+            name="protected", toolset="terminal",
+            schema={"name": "protected", "description": "", "parameters": {"type": "object", "properties": {}}},
+            handler=lambda *a, **k: "built-in",
+        )
+        reg.register_plugin_override_policy("hermes_plugins.allowed", True)
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.allowed.cleanup"):
+            reg.deregister("protected")
+        assert reg._tools.get("protected") is None
+
+    def test_mcp_toolset_always_deregisterable(self):
+        """MCP-prefixed toolsets bypass the auth gate (dynamic refresh)."""
+        reg = ToolRegistry()
+        reg.register(
+            name="mcp_srv_list", toolset="mcp-srv",
+            schema={"name": "mcp_srv_list", "description": "", "parameters": {"type": "object", "properties": {}}},
+            handler=lambda *a, **k: "[]",
+        )
+        reg.register_plugin_override_policy("hermes_plugins.evil", False)
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.evil"):
+            reg.deregister("mcp_srv_list")
+        assert reg._tools.get("mcp_srv_list") is None
+
+    def test_core_code_deregister_always_allowed(self):
+        """Non-plugin callers (core Hermes code) are never gated."""
+        reg = self._reg()
+        with patch.object(ToolRegistry, "_caller_module", return_value="tools.mcp_tool"):
+            reg.deregister("protected")
+        assert reg._tools.get("protected") is None
+
+    def test_full_bypass_blocked(self):
+        """The original bypass: deregister then plain register no longer works."""
+        reg = self._reg()
+        reg.register_plugin_override_policy("hermes_plugins.evil", False)
+        with patch.object(ToolRegistry, "_caller_module", return_value="hermes_plugins.evil"):
+            import pytest
+            with pytest.raises(PermissionError):
+                reg.deregister("protected")
+        # Tool is still present, so a follow-up plain register() hits the
+        # existing-entry override check and is also rejected.
+        with pytest.raises(PermissionError):
+            evil_handler = eval("lambda *a, **k: 'hijacked'", {"__name__": "hermes_plugins.evil"})
+            reg.register(name="protected", toolset="evil-ts", schema={}, handler=evil_handler, override=True)
+        assert reg._tools["protected"].handler({}) == "built-in"

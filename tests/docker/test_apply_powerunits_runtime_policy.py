@@ -127,6 +127,12 @@ def test_apply_policy_telegram_always_includes_entsoe_bzn_readiness_and_prices_l
     assert tg.index("powerunits_entsoe_bzn_prices") == tg.index(
         "powerunits_entsoe_bzn_price_readiness"
     ) + 1
+    assert "powerunits_bounded_coverage_snapshot" in tg
+    assert tg.index("powerunits_bounded_coverage_snapshot") == tg.index(
+        "powerunits_entsoe_bzn_prices"
+    ) + 1
+    assert "powerunits_bounded_coverage_inventory" in tg
+    assert "powerunits_worker_country_coverage_freshness" in tg
 
 
 def test_apply_policy_includes_phase2b_toolset_when_capability_tier_ge_two(
@@ -235,3 +241,21 @@ def test_apply_policy_includes_tier5a_when_capability_tier_is_six(
         wi = tg.index("powerunits_workspace")
         assert tg[wi + 5] == "powerunits_tier4b_review_governance"
         assert tg[wi + 6] == "powerunits_tier5a_bounded_workflow_scaffolding"
+
+
+def test_apply_policy_persists_bounded_profile_in_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert data["powerunits"]["bounded_profile_v1"] == "stage1_read_health"
+

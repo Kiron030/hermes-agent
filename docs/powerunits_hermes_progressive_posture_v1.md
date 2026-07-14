@@ -43,6 +43,7 @@
 | [**`powerunits_tier4a_skill_draft_proposals_overlay_v1.md`**](powerunits_tier4a_skill_draft_proposals_overlay_v1.md) | **Tier 4A** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 4`**) bounded workspace skill **draft** artifacts — watch signals, rollback. |
 | [**`powerunits_tier4b_review_governance_overlay_v1.md`**](powerunits_tier4b_review_governance_overlay_v1.md) | **Tier 4B** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 5`**) review-state workflow + **`governance/`** scaffolding — rollback = tier 4. |
 | [**`powerunits_tier5a_bounded_workflow_scaffolding_overlay_v1.md`**](powerunits_tier5a_bounded_workflow_scaffolding_overlay_v1.md) | **Tier 5A** (**`HERMES_POWERUNITS_CAPABILITY_TIER = 6`**) bounded **workflow run records** + operator notes — rollback = tier 5. |
+| [**`powerunits_platform_evolution_backlog_v1.md`**](powerunits_platform_evolution_backlog_v1.md) | **When-ready** platform/SaaS evolution backlog (Repo A slice + quick wins); canonical **P/K** themes in Repo B [`saas_ai_evolution_backlog_v1.md`](../../EU-PP-Database/docs/architecture/saas_ai_evolution_backlog_v1.md). |
 
 **Capability-tier env (**`HERMES_POWERUNITS_CAPABILITY_TIER`):** **`0`**–**`6`**. Policy merge (after **`powerunits_workspace`**): strip overlay toolsets not implied by tier; **`≥ 1`** inserts **2A**; **`≥ 2`** inserts **2B** after **2A**; **`≥ 3`** inserts **Tier 3** **`powerunits_tier3_skills_integration`** after **2B**; **`≥ 4`** inserts **Tier 4A** **`powerunits_tier4a_skill_draft_proposals`** after **Tier 3**; **`≥ 5`** inserts **Tier 4B** **`powerunits_tier4b_review_governance`** after **Tier 4A**; **`≥ 6`** inserts **Tier 5A** **`powerunits_tier5a_bounded_workflow_scaffolding`** after **Tier 4B**. Tool **`check_fn`** gates align. **`powerunits_capability_tier.py`**.
 
@@ -313,6 +314,7 @@ Phase 1A **adds:** export posture documentation + non-invasive read-only summari
 
 ## Next roadmap steps (after Tier 5A workflow lane)
 
+- **When-ready platform upgrades:** skim [**`powerunits_platform_evolution_backlog_v1.md`**](powerunits_platform_evolution_backlog_v1.md) (Repo A) with Repo B [**`saas_ai_evolution_backlog_v1.md`](../../EU-PP-Database/docs/architecture/saas_ai_evolution_backlog_v1.md)** before tier uplift or major upstream merge — provenance, coverage API, contracts, Repo B orchestration, customer intelligence path.
 - **Later:** scripted promotion helpers **behind explicit human gates** (not silent merge); integration with **`skill_manage`** only with separate sign-off.
 - **Conceptual LLM routing (`tier2`)** remains **deferred**.
 - **Full workflow engine / multi-agent control plane** remains **deferred** — Tier 5A is **artifact-first scaffolding** only (no autonomous orchestration).

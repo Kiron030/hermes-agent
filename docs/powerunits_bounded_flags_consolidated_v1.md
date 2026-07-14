@@ -120,6 +120,18 @@ Recommended primary:
 
 Hermes **`inventory_powerunits_bounded_coverage_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`** (same credentials as **`POWERUNITS_INTERNAL_EXECUTE_*`**). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Turning it **off** disables only this tool — it does **not** disable outage awareness reads, outage repair, ENTSO‑E forecast executes, etc. Turning it **on** still performs **zero** writes and stores **no** canonical matrix in Hermes (JSON **`repo_b_inventory`** in the reply is ephemeral). **`export_format=csv`** derives UTF-8 **`csv_export`** inline from embedded **`rows`**; optional **`exports_csv_workspace_filename`** writes the same CSV to **`exports/*.csv`** on the bounded workspace volume, or use **`save_hermes_workspace_note`** with a **`.csv`** name — **no** Repo B CSV endpoint.
 
+### Bounded coverage snapshot v1 (read-only data health)
+
+Hermes **`read_powerunits_coverage_snapshot_v1`** is a **thin** POST to Repo B **`POST /internal/hermes/bounded/v1/coverage-snapshot`** (same **`POWERUNITS_INTERNAL_EXECUTE_*`** bearer stack). **Separate gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED`**. Telegram leaf toolset **`powerunits_bounded_coverage_snapshot`** is in **`first_safe_v1`** base overlays (persisted by **`docker/apply_powerunits_runtime_policy.py`** on deploy restart). Returns expand-style **layer coverage**, **`baseline_ready`**, and latest **`data_pipeline_runs`** for core ingest jobs — same backend contract as the product **`GET /api/v1/market-data/trust-snapshot`** precursor. **Not** the family matrix inventory tool; Hermes stores **no** canonical snapshot (rerun after bounded repairs).
+
+### Bounded coverage inventory v1 (read-only family matrix)
+
+Hermes **`inventory_powerunits_bounded_coverage_v1`** → Repo B **`POST /internal/hermes/bounded/v1/coverage-inventory`**. **Gate:** **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`**. Telegram toolset **`powerunits_bounded_coverage_inventory`** is in **`first_safe_v1`** base overlays. Optional inline **`csv_export`** only — **no** Hermes-side canonical matrix.
+
+### Worker country coverage freshness v1 (read-only post-deploy rollup)
+
+Hermes **`read_powerunits_worker_country_coverage_freshness_v1`** → Repo B **`POST /internal/hermes/bounded/v1/worker-country-coverage/freshness/read`**. **Gate:** **`HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED`**. Telegram toolset **`powerunits_worker_country_coverage_freshness`** is in **`first_safe_v1`** base overlays. Complements post-deploy worker smoke docs in Repo B.
+
 ### DE bounded stack remediation planner (read-only)
 
 Single Hermes gate: **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`**. Enables **`plan_powerunits_de_stack_remediation`** (**one** HTTP POST to Repo B **`…/remediation/de-stack-plan`**). Independent of ENTSO‑E / ERA5 / forecast / market‑features execute primaries; still requires **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** + **`POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`**. **No job execution** on this surface — JSON **`tool_hint_hermes`** values are manual operator hints only.
@@ -156,3 +168,29 @@ HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_SUMMARY_ENABLED
 ---
 
 **Canonical code:** `tools/powerunits_bounded_family_gates.py`
+
+---
+
+## Bounded env profiles (v1)
+
+Instead of setting ~25 individual gates on Railway, set **one** profile:
+
+```text
+HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
+```
+
+| Profile | Purpose |
+|---------|---------|
+| `stage1_read_health` | Data-health triptychon + bounded reads/validates — **no primary execute** |
+| `stage1_operator_execute` | Above + market features, **market driver**, ENTSO-E, ERA5, outage repair execute |
+
+**Mechanics:** `docker/apply_powerunits_runtime_policy.py` persists profile gates into `$HERMES_HOME/.env` (gateway loads them via `load_hermes_dotenv()`). Profile keys fill **only missing** env vars — explicit Railway values **always win**.
+
+**Posture:** `summarize_powerunits_operator_posture` exposes `bounded_profile_v1_read_only` (alignment drift) and optional `data_health_fingerprint_de_read_only`.
+
+**Operator cheat sheet:** `docs/powerunits_operator_env_cheat_sheet_v1.md`
+
+**Canonical code:** `powerunits_bounded_profiles_v1.py`
+
+**Skills:** `skills/productivity/powerunits-data-health-triptychon/`, `skills/productivity/powerunits-de-outage-repair-playbook/`
+

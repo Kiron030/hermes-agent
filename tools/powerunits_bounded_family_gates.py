@@ -344,6 +344,38 @@ def bounded_coverage_inventory_requirement_text() -> str:
     )
 
 
+# Cross-cutting read-only **coverage snapshot** (layer coverage + pipeline freshness).
+BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED"
+
+
+def bounded_coverage_snapshot_enabled() -> bool:
+    return _truthy(BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV)
+
+
+def bounded_coverage_snapshot_requirement_text() -> str:
+    return (
+        f"{BOUNDED_COVERAGE_SNAPSHOT_PRIMARY_ENV} must be truthy (read-only Repo B snapshot; "
+        "same contract as product trust-snapshot precursor — Hermes stores no canonical state)"
+    )
+
+
+# Cross-cutting read-only **worker country coverage freshness** rollup.
+WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV = (
+    "HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED"
+)
+
+
+def worker_country_coverage_freshness_enabled() -> bool:
+    return _truthy(WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV)
+
+
+def worker_country_coverage_freshness_requirement_text() -> str:
+    return (
+        f"{WORKER_COUNTRY_COVERAGE_FRESHNESS_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "worker-country-coverage freshness rollup; no jobs or Tier-1 promotion)"
+    )
+
+
 # Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
 BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
 
@@ -356,4 +388,21 @@ def bounded_rollout_governance_requirement_text() -> str:
     return (
         f"{BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV} must be truthy; plus "
         "POWERUNITS_INTERNAL_EXECUTE_BASE_URL and POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET (same bounded internal bearer stack)."
+    )
+
+
+# Empirical ENTSO-E candidate validate (ADR 045 — DK/NO/IE read-only, not Tier-1 promotion).
+ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV = (
+    "HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED"
+)
+
+
+def entsoe_empirical_candidate_validate_enabled() -> bool:
+    return _truthy(ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV)
+
+
+def entsoe_empirical_candidate_validate_requirement_text() -> str:
+    return (
+        f"{ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "empirical candidate validate-window; no jobs or Tier-1 promotion)"
     )
