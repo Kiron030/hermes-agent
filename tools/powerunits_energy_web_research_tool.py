@@ -29,6 +29,10 @@ import logging
 import os
 from typing import Any, Callable
 
+from powerunits_telegram_overlays import (
+    energy_web_research_telegram_overlay_instructions,
+)
+
 logger = logging.getLogger(__name__)
 
 _FEATURE_ENV = "HERMES_POWERUNITS_ENERGY_WEB_RESEARCH_ENABLED"
@@ -81,6 +85,53 @@ _HERMES_NOTE_V1 = (
     "Powerunits HTTP call, no Repo B access, no jobs, no ingestion, no "
     "writes. external_web_context is always true on this tool's output."
 )
+
+# Always-present guardrails (independent of `topic_type`), added after prior
+# advisor feedback from Telegram smoke-testing: operators repeatedly
+# quoted this tool's web content as if it were Repo B data, confused
+# web-branded "GEM" products with Repo B's own GEM asset layer, and did not
+# see an explicit disclaimer in the Telegram reply itself. These strings are
+# deliberately duplicated into both `warnings` (machine-readable, one entry
+# each) and `operator_notice` (a single consolidated block meant to be
+# surfaced to the operator verbatim) so the guardrail survives even if a
+# caller only reads one of the two fields.
+_GEM_NAMING_WARNING = (
+    "Web results may reference organizations or products named 'GEM' (e.g. Global "
+    "Energy Monitor's 'GEM Energy Analytics', or similarly named commercial tools). "
+    "These are NOT Repo B's own GEM asset layer (gem_units) — do not conflate a web "
+    "'GEM' hit with a confirmed Repo B plant record when summarizing to the operator."
+)
+_NUMERIC_CROSSCHECK_WARNING = (
+    "Any numeric figures in this tool's output (prices, capacities, demand, output, "
+    "dates, percentages, etc.) come from the external web and are NOT authoritative. "
+    "Cross-check via a bounded Repo B tool (e.g. an ENTSO-E/BZN price or "
+    "market_features_hourly tool) before quoting a figure from this tool to the "
+    "operator in any ops-facing context."
+)
+
+_DISCLAIMER_DE = (
+    "\u26a0\ufe0f Hinweis: Diese Angaben stammen aus einer externen Web-Recherche "
+    "(Tavily) und NICHT aus den eigenen Repo-B-Datenquellen (ENTSO-E/ERA5/GEM) von "
+    "Powerunits. Zahlen sind ungepr\u00fcft \u2014 bitte vor Verwendung im Ops-Kontext mit "
+    "einem bounded Repo-B-Tool gegenchecken. Namen wie \u201eGEM Energy Analytics\u201c aus "
+    "dem Web sind NICHT identisch mit der Repo-B GEM-Asset-Schicht (gem_units)."
+)
+
+
+def _build_operator_notice(topic_guardrail: str) -> str:
+    return (
+        f"{topic_guardrail} {_GEM_NAMING_WARNING} {_NUMERIC_CROSSCHECK_WARNING} "
+        "This entire notice, plus the sources below, must be disclosed to the "
+        "operator whenever this tool's results are used in a reply — see "
+        "`disclaimer_de` for the Telegram-facing short form."
+    )
+
+
+def _build_sources_markdown(sources: list[dict[str, Any]]) -> str:
+    if not sources:
+        return "_No web sources were returned for this query._"
+    lines = [f"- [{s.get('title') or s.get('url')}]({s.get('url')})" for s in sources if s.get("url")]
+    return "\n".join(lines) if lines else "_No web sources were returned for this query._"
 
 
 def _truthy_env(name: str) -> bool:
@@ -191,7 +242,11 @@ def research_powerunits_energy_web_v1(
         extract_top_urls, default=_DEFAULT_EXTRACT_TOP_URLS, cap=_EXTRACT_TOP_URLS_CAP, floor=0
     )
 
-    warnings: list[str] = [_TOPIC_GUARDRAILS[ttype]]
+    warnings: list[str] = [
+        _TOPIC_GUARDRAILS[ttype],
+        _GEM_NAMING_WARNING,
+        _NUMERIC_CROSSCHECK_WARNING,
+    ]
 
     try:
         raw_search = search_fn(q, effective_max_results)
@@ -277,8 +332,11 @@ def research_powerunits_energy_web_v1(
         "query": q,
         "topic_type": ttype,
         "sources": sources,
+        "sources_markdown": _build_sources_markdown(sources),
         "extracted": extracted,
         "warnings": warnings,
+        "operator_notice": _build_operator_notice(_TOPIC_GUARDRAILS[ttype]),
+        "disclaimer_de": _DISCLAIMER_DE,
         "caps_applied": {
             "max_results_cap": _MAX_RESULTS_CAP,
             "extract_top_urls_cap": _EXTRACT_TOP_URLS_CAP,
@@ -305,7 +363,8 @@ ENERGY_WEB_RESEARCH_SCHEMA_V1 = {
         "Optionally extracts bounded content from the top N of its own search results "
         "(never arbitrary caller-supplied URLs). "
         f"Gate **{_FEATURE_ENV}** plus **{_TAVILY_KEY_ENV}**. No jobs, no ingestion, no writes, "
-        "no Repo B HTTP call."
+        "no Repo B HTTP call. "
+        f"**Operator-facing requirement:** {energy_web_research_telegram_overlay_instructions()}"
     ),
     "parameters": {
         "type": "object",

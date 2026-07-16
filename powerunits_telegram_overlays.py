@@ -5,6 +5,8 @@ Single source for:
 - ``docker/apply_powerunits_runtime_policy`` merged ``platform_toolsets.telegram``
 - ``model_tools.get_tool_definitions`` hard-cap allowlist sync
 - optional posture comparisons
+- Telegram overlay instruction text for individual tools (e.g. the
+  external-web disclaimer requirement for ``research_powerunits_energy_web_v1``)
 
 Overlays are inserted **immediately after** ``powerunits_workspace`` (Tier 1 … 5A).
 """
@@ -21,6 +23,30 @@ TIER_OVERLAY_TOOLSETS_ORDERED: tuple[str, ...] = (
 )
 
 OVERLAY_NAMES: frozenset[str] = frozenset(TIER_OVERLAY_TOOLSETS_ORDERED)
+
+# Telegram-facing overlay instructions for `research_powerunits_energy_web_v1`
+# (toolset `powerunits_energy_web_research`). Single source of truth for what
+# the model must always do with this tool's output — imported into the tool's
+# own schema description (`tools/powerunits_energy_web_research_tool.py`) so
+# the instruction reaches the model on every surface the tool is available on,
+# Telegram included. Do not duplicate this text elsewhere; import it instead.
+ENERGY_WEB_RESEARCH_TELEGRAM_OVERLAY_INSTRUCTIONS_V1: str = (
+    "Whenever `research_powerunits_energy_web_v1` returns a result to you, ALWAYS "
+    "surface to the operator, verbatim and in full: (1) the `disclaimer_de` string "
+    "from the tool output, and (2) the `sources_markdown` block so sources render as "
+    "clickable links in Telegram. Never omit the disclaimer, even if the operator did "
+    "not explicitly ask for sourcing or did not ask in German. Never present this "
+    "tool's web-sourced figures as confirmed Repo B data — see `operator_notice` and "
+    "`warnings` in the tool output for the 'GEM' naming-collision and numeric "
+    "cross-check guardrails, and repeat their substance to the operator before "
+    "quoting any number from this tool in an ops-facing context."
+)
+
+
+def energy_web_research_telegram_overlay_instructions() -> str:
+    """Telegram-facing overlay instruction text for `research_powerunits_energy_web_v1`."""
+
+    return ENERGY_WEB_RESEARCH_TELEGRAM_OVERLAY_INSTRUCTIONS_V1
 
 # Base Telegram toolsets for ``first_safe_v1`` **before** progressive tier inserts.
 # Keep ``powerunits_operator_posture`` before ``powerunits_workspace`` so tier

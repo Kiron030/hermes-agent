@@ -71,6 +71,24 @@ def test_search_only_success_and_topic_guardrail(monkeypatch: pytest.MonkeyPatch
     assert out["caps_applied"]["effective_max_results"] == 5
     assert out["caps_applied"]["effective_extract_top_urls"] == 0
 
+    # Always-present guardrails (independent of topic_type): GEM naming
+    # collision + numeric cross-check reminder, in both warnings and the
+    # consolidated operator_notice.
+    assert any("gem_units" in w.lower() for w in out["warnings"])
+    assert any("not authoritative" in w.lower() for w in out["warnings"])
+    assert "gem_units" in out["operator_notice"].lower()
+    assert "not authoritative" in out["operator_notice"].lower()
+
+    # German Telegram-facing disclaimer is always present and non-empty.
+    assert out["disclaimer_de"]
+    assert "gem_units" in out["disclaimer_de"].lower()
+    assert "tavily" in out["disclaimer_de"].lower()
+
+    # sources_markdown renders each source as a clickable markdown link.
+    assert out["sources_markdown"] == (
+        "- [A](https://a.example.com)\n- [B](https://b.example.com)"
+    )
+
 
 def test_unknown_topic_type_falls_back_to_general(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(mod._FEATURE_ENV, "1")
@@ -181,6 +199,29 @@ def test_no_results_adds_warning(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["success"] is True
     assert out["sources"] == []
     assert any("no web results" in w.lower() for w in out["warnings"])
+    # Even with zero sources, the disclaimer/notice/markdown fields are present
+    # and sources_markdown falls back to an explicit "no sources" placeholder.
+    assert out["disclaimer_de"]
+    assert out["operator_notice"]
+    assert "no web sources" in out["sources_markdown"].lower()
+
+
+def test_disclaimer_and_operator_notice_present_regardless_of_topic_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(mod._FEATURE_ENV, "1")
+    monkeypatch.setenv(mod._TAVILY_KEY_ENV, "tvly-test")
+    for ttype in mod._TOPIC_TYPES:
+        out = json.loads(
+            mod.research_powerunits_energy_web_v1(
+                query="x",
+                topic_type=ttype,
+                _search_fn=lambda q, n: {"results": []},
+            )
+        )
+        assert out["disclaimer_de"], f"missing disclaimer_de for topic_type={ttype}"
+        assert out["operator_notice"], f"missing operator_notice for topic_type={ttype}"
+        assert "gem_units" in out["operator_notice"].lower()
 
 
 def test_schema_declares_topic_type_enum_and_external_web_context() -> None:
@@ -189,6 +230,21 @@ def test_schema_declares_topic_type_enum_and_external_web_context() -> None:
     assert set(props["topic_type"]["enum"]) == set(mod._TOPIC_TYPES)
     assert "external_web_context" in schema["description"]
     assert "query" in schema["parameters"]["required"]
+
+
+def test_schema_description_carries_telegram_overlay_instructions() -> None:
+    """The model must see the disclaimer/sources overlay instruction on every
+    surface (Telegram included) that reads this tool's schema description —
+    not only via a separate, possibly-unread overlay file."""
+    from powerunits_telegram_overlays import (
+        energy_web_research_telegram_overlay_instructions,
+    )
+
+    schema = mod.ENERGY_WEB_RESEARCH_SCHEMA_V1
+    instructions = energy_web_research_telegram_overlay_instructions()
+    assert instructions in schema["description"]
+    assert "disclaimer_de" in instructions
+    assert "sources_markdown" in instructions
 
 
 def test_tool_source_has_no_repo_b_or_db_binding() -> None:
@@ -224,3 +280,16 @@ def test_telegram_first_safe_base_toolsets_include_energy_web_research() -> None
     from powerunits_telegram_overlays import TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1
 
     assert "powerunits_energy_web_research" in TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1
+
+
+def test_energy_web_research_telegram_overlay_instructions_mention_required_fields() -> None:
+    from powerunits_telegram_overlays import (
+        ENERGY_WEB_RESEARCH_TELEGRAM_OVERLAY_INSTRUCTIONS_V1,
+        energy_web_research_telegram_overlay_instructions,
+    )
+
+    text = energy_web_research_telegram_overlay_instructions()
+    assert text == ENERGY_WEB_RESEARCH_TELEGRAM_OVERLAY_INSTRUCTIONS_V1
+    for required in ("disclaimer_de", "sources_markdown", "operator_notice"):
+        assert required in text
+    assert "always" in text.lower()
