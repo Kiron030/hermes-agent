@@ -268,6 +268,52 @@ def apply_bounded_profile_to_process_env() -> dict[str, Any]:
     }
 
 
+def profile_gated_toolsets_missing_from_telegram_v1(
+    *, toolset_requirements: dict[str, dict] | None = None
+) -> list[str]:
+    """
+    Read-only cross-check: toolsets whose ``requires_env`` overlaps the **active**
+    bounded profile's env keys (:data:`PROFILE_ENV_EXPANSIONS_V1`) but are **not**
+    present in ``powerunits_telegram_overlays.TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1``
+    (or a progressive tier overlay toolset).
+
+    A profile can flip a family's env gate on without the corresponding tool ever
+    reaching the Telegram surface if its toolset name was never added to the base
+    list — this catches that drift by deriving the env->toolset relationship from
+    ``tools.registry`` instead of maintaining a second manual mapping.
+
+    ``toolset_requirements`` is injectable (same shape as
+    ``tools.registry.registry.get_toolset_requirements()``) for deterministic unit
+    tests that do not want to depend on which built-in tool modules happen to be
+    imported in-process; production callers should omit it.
+    """
+    profile = active_bounded_profile_id()
+    if not profile:
+        return []
+    expansion = PROFILE_ENV_EXPANSIONS_V1.get(profile)
+    if not expansion:
+        return []
+
+    if toolset_requirements is None:
+        from tools.registry import registry
+
+        toolset_requirements = registry.get_toolset_requirements()
+
+    from powerunits_telegram_overlays import (
+        OVERLAY_NAMES,
+        TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
+    )
+
+    profile_keys = set(expansion.keys())
+    base = set(TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1) | OVERLAY_NAMES
+    missing = {
+        toolset
+        for toolset, meta in toolset_requirements.items()
+        if (set(meta.get("env_vars") or ()) & profile_keys) and toolset not in base
+    }
+    return sorted(missing)
+
+
 def evaluate_bounded_profile_alignment() -> dict[str, Any]:
     """Compare active profile (if any) against current process env."""
     profile = active_bounded_profile_id()

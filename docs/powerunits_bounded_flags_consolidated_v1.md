@@ -194,3 +194,19 @@ HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
 
 **Skills:** `skills/productivity/powerunits-data-health-triptychon/`, `skills/productivity/powerunits-de-outage-repair-playbook/`
 
+## 7. Posture caution checks — read-only, no new gates
+
+Two additional `summarize_powerunits_operator_posture` cross-checks. Both are purely observational: they add `caution_flags` entries and a readout key, and introduce **no new env gate** of their own — they only read existing bounded-family / profile env vars listed above.
+
+### ERA5 vs ENTSO‑E default scope asymmetry
+
+Readout key: `era5_entsoe_scope_asymmetry_read_only`. Canonical code: `era5_entsoe_scope_asymmetry_caution_flags_v1()` in `powerunits_operator_country_scope_v1.py`.
+
+Per §6, an **unset** `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` narrows bounded ERA5 to **DE only**, while an **unset** `HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES` / `..._FORECAST_BOUNDED_ALLOWED_COUNTRIES` leaves the ENTSO‑E bounded family open across the **full national Tier‑1 mirror** (11 ISO2). An operator who enables ENTSO‑E bounded reads broadly while leaving ERA5 on its unset default gets a silent asymmetry — weather features stay DE-only while market/forecast reads span Tier‑1. This check flags that combination (`era5_entsoe_scope_asymmetry:entsoe_{market|forecast}_bounded_open_across_national_tier1_11_iso2_via_unset_...`) only when **both** allowlists are left unset; an explicit allowlist on either side (even `DE` alone) is treated as an intentional choice and is not flagged.
+
+### Profile-gated toolsets missing from the Telegram base surface
+
+Readout key: `profile_gated_toolsets_overlay_alignment_read_only`. Canonical code: `profile_gated_toolsets_missing_from_telegram_v1()` in `powerunits_bounded_profiles_v1.py`.
+
+Derives the env→toolset relationship from `tools.registry.get_toolset_requirements()` (no manual mapping to keep in sync): for the **active** `HERMES_POWERUNITS_BOUNDED_PROFILE`, any registered toolset whose `requires_env` overlaps that profile's env keys but is **not** present in `powerunits_telegram_overlays.TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` (or a progressive tier overlay) is flagged as `profile_gated_toolset_missing_from_telegram:<toolset>`. Catches the case where a future profile turns on a family's gate without the corresponding toolset ever having been added to the Telegram base list.
+

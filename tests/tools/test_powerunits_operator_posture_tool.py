@@ -337,6 +337,44 @@ def test_posture_includes_exports_subset(posture_mod, tmp_path: Path) -> None:
     assert int(exp.get("file_count") or 0) >= 1
 
 
+def test_posture_era5_entsoe_scope_asymmetry_clean_by_default(posture_mod) -> None:
+    out = json.loads(posture_mod.summarize_powerunits_operator_posture())
+    asym = out["era5_entsoe_scope_asymmetry_read_only"]
+    assert asym["checked"] is True
+    assert asym["caution_flags"] == []
+    assert not any(x.startswith("era5_entsoe_scope_asymmetry") for x in out["caution_flags"])
+
+
+def test_posture_era5_entsoe_scope_asymmetry_surfaces_caution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_POWERUNITS_RUNTIME_POLICY", "first_safe_v1")
+    monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "0")
+    monkeypatch.setenv("HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ENABLED", "1")
+    monkeypatch.delenv("HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES", raising=False)
+    monkeypatch.setenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ENABLED", "1")
+    monkeypatch.delenv("HERMES_POWERUNITS_ENTSOE_MARKET_BOUNDED_ALLOWED_COUNTRIES", raising=False)
+    from tools import powerunits_operator_posture_tool as m
+
+    out = json.loads(m.summarize_powerunits_operator_posture())
+    asym = out["era5_entsoe_scope_asymmetry_read_only"]
+    assert asym["checked"] is True
+    assert len(asym["caution_flags"]) == 1
+    assert any(
+        x.startswith("era5_entsoe_scope_asymmetry:entsoe_market_bounded_open")
+        for x in out["caution_flags"]
+    )
+
+
+def test_posture_profile_overlay_alignment_no_profile(posture_mod) -> None:
+    out = json.loads(posture_mod.summarize_powerunits_operator_posture())
+    gap = out["profile_gated_toolsets_overlay_alignment_read_only"]
+    assert gap["checked"] is True
+    assert gap["profile"] is None
+    assert gap["missing_toolsets"] == []
+
+
 def test_posture_includes_bounded_profile_and_playbooks(posture_mod) -> None:
     out = json.loads(posture_mod.summarize_powerunits_operator_posture())
     assert "bounded_profile_v1_read_only" in out

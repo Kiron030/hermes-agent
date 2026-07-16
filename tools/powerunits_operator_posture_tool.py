@@ -151,6 +151,38 @@ def _telegram_toolset_observation(hermes_home: Path, tier_effective: int) -> dic
     return snap
 
 
+def _era5_entsoe_scope_asymmetry_v1() -> dict[str, Any]:
+    """Read-only ERA5-vs-ENTSO-E default scope comparison; see country_scope_v1."""
+    try:
+        from powerunits_operator_country_scope_v1 import (
+            era5_entsoe_scope_asymmetry_caution_flags_v1,
+        )
+
+        return {"checked": True, "caution_flags": era5_entsoe_scope_asymmetry_caution_flags_v1()}
+    except Exception as exc:
+        return {"checked": False, "error": str(exc)[:240]}
+
+
+def _profile_gated_toolsets_missing_from_telegram_v1() -> dict[str, Any]:
+    """Read-only overlay-alignment lite check; see powerunits_bounded_profiles_v1."""
+    try:
+        from powerunits_bounded_profiles_v1 import (
+            active_bounded_profile_id,
+            profile_gated_toolsets_missing_from_telegram_v1,
+        )
+
+        profile = active_bounded_profile_id()
+        if not profile:
+            return {"checked": True, "profile": None, "missing_toolsets": []}
+        return {
+            "checked": True,
+            "profile": profile,
+            "missing_toolsets": profile_gated_toolsets_missing_from_telegram_v1(),
+        }
+    except Exception as exc:
+        return {"checked": False, "error": str(exc)[:240]}
+
+
 def _data_health_fingerprint_v1() -> dict[str, Any]:
     """Optional lightweight national Tier-1 snapshot when coverage-snapshot gate is on."""
     out: dict[str, Any] = {"fetch_attempted": False}
@@ -549,6 +581,24 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 f"data_health_fingerprint_failed:{data_health_fingerprint['fetch_error'][:80]}"
             )
 
+        era5_entsoe_scope_asymmetry = _era5_entsoe_scope_asymmetry_v1()
+        for flag in era5_entsoe_scope_asymmetry.get("caution_flags") or []:
+            caution.append(flag)
+        if era5_entsoe_scope_asymmetry.get("error"):
+            caution.append(
+                f"era5_entsoe_scope_asymmetry_check_failed:{era5_entsoe_scope_asymmetry['error'][:80]}"
+            )
+
+        profile_overlay_gap = _profile_gated_toolsets_missing_from_telegram_v1()
+        for missing_toolset in profile_overlay_gap.get("missing_toolsets") or []:
+            caution.append(
+                f"profile_gated_toolset_missing_from_telegram:{missing_toolset}"
+            )
+        if profile_overlay_gap.get("error"):
+            caution.append(
+                f"profile_overlay_alignment_check_failed:{profile_overlay_gap['error'][:80]}"
+            )
+
         bounded_assumptions = [
             "Repo B stays canonical HTTP/product truth — Hermes is thin operator.",
             "Telegram/tool surface: first_safe_v1 allowlist + capability overlays 2A / 2B / Tier 3 (tier>=3) / Tier 4A (tier>=4) / Tier 4B (tier>=5) / Tier 5A (tier>=6).",
@@ -605,6 +655,8 @@ def summarize_powerunits_operator_posture(**_: Any) -> str:
                 "tier5a_workflow_watch_read_only": tier5a_watch,
                 "phase_1a_exports_signals_read_only": exports_signals,
                 "bounded_profile_v1_read_only": bounded_profile_readout,
+                "profile_gated_toolsets_overlay_alignment_read_only": profile_overlay_gap,
+                "era5_entsoe_scope_asymmetry_read_only": era5_entsoe_scope_asymmetry,
                 "data_health_fingerprint_de_read_only": data_health_fingerprint,
                 "operator_playbooks_v1": [
                     "skills/productivity/powerunits-data-health-triptychon/SKILL.md",
