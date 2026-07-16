@@ -460,6 +460,17 @@ Redeploy abwarten → Posture-Tool prüfen → bei Bedarf temporär auf OE für 
 
 ---
 
+## 7a. Merging Pattern für neue Tools (Verweis)
+
+Für neue externe/interne Bounded-Tools (Web-Provider, weitere Repo-B-Slices) gilt ab
+sofort das kanonische, wiederholbare Muster in
+`docs/powerunits_hermes_integration_pattern_v1.md` (Doppel-Gate, Herkunfts-Markierung,
+Guardrails/Disclaimer, Telegram-Overlay-Instruktionen, Caps, Registrierung in
+`toolsets.py` + `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1`, `ACCESS_MATRIX.md`-Zeile,
+gemockte Tests) — extrahiert aus der Tavily-Integration (`research_powerunits_energy_web_v1`).
+Neue Tool-PRs sollten die dortige Checklist referenzieren, statt das Muster erneut
+herzuleiten.
+
 ## 7. Referenzen
 
 - `powerunits_bounded_profiles_v1.py` — Profil-Expansion
