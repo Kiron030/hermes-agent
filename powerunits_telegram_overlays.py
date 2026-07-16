@@ -33,6 +33,7 @@ TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "web",
     "search",
     "vision",
+    "powerunits_energy_web_research",
     "powerunits_docs",
     "powerunits_github_docs",
     "powerunits_operator_posture",
