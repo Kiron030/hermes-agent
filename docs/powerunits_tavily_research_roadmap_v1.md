@@ -90,6 +90,19 @@ Run: `pytest tests/tools/test_powerunits_energy_web_research_tool.py -v`
 
 ---
 
+## Changelog — smoke-test refinements (post-#55)
+
+Live Telegram smoke-testing of the Stage 2 slice surfaced four gaps, all addressed in this follow-up pass (no behavioral change to `success`/`error_code`/`sources`/`extracted`/`caps_applied` — additive only):
+
+- **Disclaimer visibility.** The external-web disclaimer lived only in `hermes_operator_note_v1` (Hermes-internal, English) and was easy for the model to drop from the Telegram reply. Added `operator_notice` (consolidated, always present on success) and `disclaimer_de` (short, German, Telegram-facing, meant to be shown verbatim) to the response envelope, plus a new `energy_web_research_telegram_overlay_instructions()` constant in `powerunits_telegram_overlays.py` that is folded into `ENERGY_WEB_RESEARCH_SCHEMA_V1`'s own description, so the "always surface the disclaimer + sources" instruction reaches the model on every surface the tool is registered on, Telegram included.
+- **Clickable sources.** Added `sources_markdown` — a ready-to-paste `- [Title](url)` block (falls back to an explicit "no sources" placeholder when `sources` is empty) — so the model does not have to hand-format Telegram markdown from the `sources` array itself.
+- **GEM naming confusion.** Operators conflated web-branded "GEM" tools (e.g. Global Energy Monitor's "GEM Energy Analytics") with Repo B's own GEM asset layer (`gem_units`). Added an always-present (not just `asset_project`-scoped) warning plus matching text in `operator_notice` and `disclaimer_de`.
+- **Numeric cross-check.** The cross-check reminder previously only fired for `topic_type="market_news"`. It is now an always-present `warnings` entry (any topic can surface a number) reinforced in `operator_notice`.
+
+No parameter, `error_code`, or cap changed. Existing consumers reading only `sources`/`extracted`/`warnings[0]` remain unaffected; `warnings` now has two additional fixed entries appended after the topic guardrail.
+
+---
+
 ## Part F — Deferred / not done in this pass
 
 - **Live Telegram smoke test** (recorded parameters + observed response, in the style of the BZN-prices "Operator note — verified Telegram smoke" section in `ACCESS_MATRIX.md`). Requires an operator with `TAVILY_API_KEY` + the feature flag set on the actual Railway service; not something this pass can execute from Repo A alone.
