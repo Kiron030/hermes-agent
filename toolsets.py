@@ -929,6 +929,20 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_energy_web_research": {
+        "description": (
+            "**Energy-scoped external web research (read-only, Tavily, v1)** — thin envelope around the existing "
+            "Tavily search/extract adapter with `external_web_context: true`, bounded `sources`, and a "
+            "`topic_type`-driven guardrail note in `warnings` so results are not confused with Repo B's own "
+            "ENTSO-E/ERA5/GEM data. **No** Repo B HTTP call, **no** jobs, **no** ingestion, **no** writes — the only "
+            "outbound call is Tavily's own API. Distinct from the generic `web`/`search` toolsets: those remain the "
+            "default for non-energy-scoped browsing. Requires `HERMES_POWERUNITS_ENERGY_WEB_RESEARCH_ENABLED` plus "
+            "`TAVILY_API_KEY`."
+        ),
+        "tools": ["research_powerunits_energy_web_v1"],
+        "includes": [],
+    },
+
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
         "tools": ["execute_code"],
