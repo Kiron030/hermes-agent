@@ -70,6 +70,60 @@ def test_persist_profile_skips_explicit_railway_override(
     assert profiles.ENV_MANAGED_BEGIN not in (env_path.read_text(encoding="utf-8") if env_path.exists() else "")
 
 
+def test_profile_gated_toolsets_missing_returns_empty_without_active_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HERMES_POWERUNITS_BOUNDED_PROFILE", raising=False)
+    assert profiles.profile_gated_toolsets_missing_from_telegram_v1() == []
+
+
+def test_profile_gated_toolsets_missing_flags_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
+    fake_requirements = {
+        "powerunits_worker_country_coverage_freshness": {
+            "env_vars": ["HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED"],
+        },
+        "powerunits_some_new_family_not_yet_on_telegram": {
+            "env_vars": ["HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED"],
+        },
+        "powerunits_unrelated_toolset": {
+            "env_vars": ["HERMES_SOME_UNRELATED_ENV"],
+        },
+    }
+    missing = profiles.profile_gated_toolsets_missing_from_telegram_v1(
+        toolset_requirements=fake_requirements
+    )
+    assert missing == ["powerunits_some_new_family_not_yet_on_telegram"]
+
+
+def test_profile_gated_toolsets_missing_empty_when_all_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
+    fake_requirements = {
+        "powerunits_worker_country_coverage_freshness": {
+            "env_vars": ["HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED"],
+        },
+        "powerunits_bounded_coverage_snapshot": {
+            "env_vars": ["HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED"],
+        },
+    }
+    missing = profiles.profile_gated_toolsets_missing_from_telegram_v1(
+        toolset_requirements=fake_requirements
+    )
+    assert missing == []
+
+
+def test_profile_gated_toolsets_missing_unknown_profile_returns_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "totally_unknown_profile")
+    assert (
+        profiles.profile_gated_toolsets_missing_from_telegram_v1(toolset_requirements={})
+        == []
+    )
+
+
 def test_persist_not_suppressed_after_apply_in_same_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
