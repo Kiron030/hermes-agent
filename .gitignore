@@ -108,7 +108,10 @@ models-dev-upstream/
 
 # Local editor / agent tooling (machine-specific; keep in global config, not the repo)
 .codex/
-.cursor/
+# Ignore local Cursor state; keep shared project rules tracked.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 .gemini/
 .zed/
 .mcp.json

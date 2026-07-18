@@ -1,0 +1,12 @@
+---
+description: Powerunits first-safe boundaries for Hermes Repo A
+alwaysApply: true
+---
+
+# Powerunits first-safe (Repo A)
+
+- This repo is Hermes **runtime**, not product DB/schema truth (that is Repo B).
+- Read-first; no infra mutation (Railway/DNS/secrets) via commits; never commit `.env`.
+- Timescale / Repo B tools are env-gated allowlists only — not general DB or free-path browse.
+- Preserve prompt-cache invariants (no mid-conversation toolset/prompt rebuilds).
+- Full guide: `docs/agent_context/hermes_development_guide.md`. Map: `docs/agent_context/repo_map.md`.
