@@ -1,0 +1,30 @@
+# Semantic index exclusions — still readable on explicit open
+
+# Docs site + marketing/static weight
+website/**
+infographic/**
+
+# Binary / media assets
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.webp
+**/*.icns
+**/*.ico
+
+# Lockfiles
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+**/uv.lock
+
+# Heavy optional reference dumps
+optional-skills/mlops/training/unsloth/references/**
+
+# Desktop public/pr assets
+apps/desktop/public/**
+apps/desktop/pr-assets/**
+
+# Achievement plugin image docs
+plugins/hermes-achievements/docs/assets/**

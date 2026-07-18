@@ -1,0 +1,24 @@
+﻿# Fully inaccessible — secrets and local junk only
+.env
+.env.*
+*.pem
+*.key
+*.ppk
+secrets/
+credentials/
+.hermes-docker/
+cli-config.yaml
+
+# Caches / envs
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+logs/
+tmp/
+temp/
+wandb/
+.pip-cache/
+.uv-cache/
