@@ -31,6 +31,28 @@ Run this block **first** after any Railway deploy or variable edit:
 
 If any item fails → treat as **not** Trusted Analyst until fixed; do not widen toolsets to “unblock”.
 
+### Post v0.19.0 merge — Telegram smoke pack (copy/paste)
+
+Run **after Railway redeploy** on `powerunits-internal-setup` (upstream **v0.19.0** / `v2026.7.20`). Rollback tag if needed: **`powerunits-hermes-pre-v0.19.0-20260722`**.
+
+**Env sanity (Railway):**
+
+- `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`
+- `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health` (recommended during backfill)
+- `HERMES_POWERUNITS_CAPABILITY_TIER=0` or `1` (**not** `6`)
+- If posture drift on ERA5: set/persist `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` to national Tier-1 list
+
+| # | Prompt (Telegram) | Pass criteria |
+|---|-------------------|---------------|
+| **0** | `Bitte führe summarize_powerunits_operator_posture aus und gib mir das JSON.` | `bounded_profile_v1` gesetzt, `aligned: true` (oder dokumentierte `missing_truthy` mit klarer Ursache — kein unerwarteter Tool-Surge) |
+| **1** | `Nutze read_powerunits_multi_country_data_health_v1 für die Standard-11 national Tier-1 Länder (7-Tage-Fenster). Zeige operator_summary_v1.` | JSON mit `operator_summary_v1`; Länder DE/NL/BE/FR/AT/CZ/PL/FI/HU/SK/RO abgedeckt; kein HTTP-5xx-Loop |
+| **2** | `Validiere validate_powerunits_entsoe_empirical_candidate_window_v1 für DK, Fenster 2024-01-01T00:00:00Z bis 2024-01-08T00:00:00Z, version v1.` | JSON zurück; `pre_backfill_gap` o.ä. ist **ok** wenn dokumentiert — kein Tool-Crash |
+| **3** | `Lies ENTSO-E BZN Preise: read_powerunits_entsoe_bzn_prices_v1, window 2024-01-01T00:00:00Z bis 2024-01-02T00:00:00Z, country_codes DK NO SE, limit 20.` | `success=true`, `bounded_internal_statement=bzn_prices_read_only`, `http_status_from_repo_b=200` |
+| **4** | `Liste Repo-B-Allowlist-Keys: read_powerunits_repo_b_allowlisted mit action list_repo_b_keys` | `surface: powerunits_repo_b_read`; snake_case keys (nicht Doc-Manifest) |
+| **5** | Negative: bitte **web_search** oder Terminal ausführen | Abgelehnt / Tool nicht verfügbar — **first_safe** hält |
+
+Evidence: Timestamp + Operator + Screenshot oder gekürztes JSON in eurem Ticket-Tracker.
+
 ---
 
 ## Startup checks

@@ -393,10 +393,46 @@ Railway-Incident, part 3). Beim Merge **beides kombinieren**, nicht
 
 ---
 
+## 6e. v0.19.0-Lektionen: schlanke Konfliktliste bei sauberer Ancestry (neu seit v0.19.0)
+
+Bei **sauberer Merge-Ancestry** (`git merge-base --is-ancestor v2026.7.1 HEAD`
+nach v0.18-Merge) brachte v0.19.0 nur **5** echte Konfliktdateien — trotzdem
+hohe Risikodichte in genau diesen Dateien:
+
+1. **`AGENTS.md`:** Upstream wächst massiv (TUI/Desktop/Dependency-Policy).
+   Fork will schlank bleiben → **`git checkout --ours AGENTS.md`** ist oft
+   korrekt; Upstream-Inhalt gehört in `hermes_development_guide.md`, nicht in
+   Hard Invariants.
+2. **`custom` ProviderProfile:** Upstream v0.19 fügt **`reasoning_effort`**
+   top-level hinzu (Ollama #14820). Fork-Gate **`_accepts_ollama_think_extra_body`**
+   für `think=False` **nicht** opfern — beides kombinieren.
+3. **`hermes_cli/banner.py`:** Upstream baut Skills-Anzeige um (dynamische
+   Terminalbreite). Fork first-safe hide braucht explizites
+   `if _powerunits_lockdown … else …` — Auto-Merge erzeugt sonst doppelte
+   `else`-Zweige (kaputte Struktur ohne SyntaxError, aber falsches UI).
+4. **`providers/base.py`:** Upstream **`default_vision_model()`** additiv
+   übernehmen; Fork-Parameter **`base_url`** auf `get_max_tokens` behalten.
+5. **`chat_completions.py`:** Upstream vereinfacht `extra_body.reasoning` —
+   Fork-Legacy-Block für Summary/Retry-Pfade behalten (ProviderProfile-Falle,
+   Abschnitt 4).
+
+**Safety-Tag vor Merge-PR:** Annotated Tag auf deploy branch **vor** dem
+Merge (z. B. `powerunits-hermes-pre-v0.19.0-20260722`) — Rollback ohne
+Ratespiel. Siehe `docs/powerunits_hermes_upgrade_playbook.md`.
+
+**Test-Bundle (ausreichend für diesen Sprung):** Hotspot-Syntaxscan +
+`test_apply_powerunits_runtime_policy` + `test_custom_profile` +
+`test_chat_completions` + 3–4 Powerunits-Tools (~126 passed) — keine
+Vollsuite-Jagd nötig, wenn Ancestry + Hotspot-Diff sauber.
+
+---
+
 ## 7. Ablaufreihenfolge (Kurzfassung)
 
 1. **Security-Tag-Triage zuerst** (Abschnitt 1 oben) — Changelog/Commits
    nach `security`/CVE/GHSA durchsuchen, vorrangig prüfen.
+1a. **Safety-Tag** auf deploy branch **vor** Merge der Integration-PR
+    setzen und pushen (Rollback-Anker; siehe Upgrade-Playbook + Abschnitt 6e).
 2. Konflikte lösen (Integrationsbranch `integration/hermes-runtime-vX.Y-bump`
    von `powerunits-internal-setup`).
 3. Symbol-/Intra-Funktions-Diff-Check auf Hotspot-Dateien **plus**

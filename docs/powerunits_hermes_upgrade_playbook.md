@@ -39,6 +39,7 @@
 
 ## Before merging upstream Hermes
 
+- [ ] **Safety tag** on the current deploy branch **before** merging the integration PR (rollback anchor). Example: `powerunits-hermes-pre-v0.19.0-20260722` on `powerunits-internal-setup` @ pre-merge SHA — annotated, pushed to `origin`.
 - [ ] Target is a **tag** (e.g. `v2026.4.30` for v0.12.0) unless a **specific untagged fix** is justified — then **record the SHA** in deploy notes.
 - [ ] `git fetch upstream --tags` — merge **`vX.Y.Z`**, not anonymous `main` tip, for reproducibility.
 - [ ] Conflict hotspots mentally loaded: [`gateway/run.py`](../gateway/run.py), [`model_tools.py`](../model_tools.py), [`docker/apply_powerunits_runtime_policy.py`](../docker/apply_powerunits_runtime_policy.py), CLI/Docker/workflows.
@@ -69,6 +70,22 @@ Hermes ≥ v0.12 adds **Curator** and stronger self-improve paths upstream. For 
 **Fix:** Only inject `think` for custom endpoints that accept Ollama’s extension — **omit** on `api.openai.com` / `*.openai.azure.com`. Implemented in **`agent/transports/chat_completions.py`** (`_custom_base_url_accepts_ollama_think_extra_body`).
 
 **Related doc:** Responses vs Chat Completions / `include` issues: [`powerunits_openai_request_compatibility_v1.md`](powerunits_openai_request_compatibility_v1.md).
+
+---
+
+## Lesson: v0.19.0 merge — five recurring conflict patterns
+
+**Context:** Upstream **v0.19.0** (`v2026.7.20`) had only **5** conflict files when merge ancestry was clean (contrast v0.17 ancestry bug → hundreds of spurious conflicts). Safety tag before merge: **`powerunits-hermes-pre-v0.19.0-20260722`**.
+
+| File | Pattern | Resolution |
+|------|---------|------------|
+| `AGENTS.md` | Upstream injects large TUI/Desktop/dependency blocks into Hard Invariants | Keep **fork slim `AGENTS.md`**; upstream detail stays in `docs/agent_context/hermes_development_guide.md` (`git checkout --ours AGENTS.md` is valid) |
+| `plugins/model-providers/custom/__init__.py` | Upstream adds top-level `reasoning_effort="none"` (Ollama #14820); fork had `_accepts_ollama_think_extra_body` gate | **Combine:** always emit `reasoning_effort`; gate `extra_body["think"]=False` behind host check |
+| `hermes_cli/banner.py` | Upstream dynamic skills grid vs fork first-safe hide | Explicit `if _powerunits_lockdown: hidden … else: upstream grid` — auto-merge left a broken duplicate `else` branch |
+| `providers/base.py` | Upstream adds `default_vision_model()`; may drop `base_url` on `get_max_tokens` | Keep **both** upstream hook and fork `get_max_tokens(..., base_url=…)` |
+| `agent/transports/chat_completions.py` | Upstream simplifies `extra_body.reasoning` | Keep fork legacy fallback block until **all** call sites use `ProviderProfile` (summary/retry paths still bypass profile lookup) |
+
+**Rollback:** `git checkout powerunits-hermes-pre-v0.19.0-20260722` (or redeploy Railway image pinned to that SHA) → re-run [`RUNBOOK.hermes-stage1-validation.md`](../RUNBOOK.hermes-stage1-validation.md) post v0.19 smoke pack.
 
 ---
 

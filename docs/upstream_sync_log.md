@@ -16,9 +16,13 @@
 
 **Testlage (gezielt):** `tests/docker/test_apply_powerunits_runtime_policy.py`, `tests/plugins/model_providers/test_custom_profile.py`, `tests/agent/transports/test_chat_completions.py`, `tests/test_powerunits_bounded_profiles_v1.py`, `tests/test_powerunits_capability_tier.py`, `tests/tools/test_powerunits_multi_country_data_health_tool.py` — **126 passed, 11 skipped** in 7.3s.
 
-**Offene Punkte:** Nach Merge → Railway Redeploy + Telegram-Smokes (`RUNBOOK.hermes-stage1-validation.md`); `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` im Profil persistieren falls Posture-Drift.
+**Offene Punkte:** Nach Merge → Railway Redeploy + Telegram-Smokes (`RUNBOOK.hermes-stage1-validation.md` § *Post v0.19.0 merge*); `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` im Profil persistieren falls Posture-Drift.
 
-**Branches:** Committet auf `integration/hermes-runtime-v0.19-bump`, PR → `powerunits-internal-setup`.
+**Safety tag (pre-merge):** `powerunits-hermes-pre-v0.19.0-20260722` @ `0d8dcc4ca` (deploy branch vor PR #60).
+
+**Merged:** PR #60 → `powerunits-internal-setup` @ `55fd2f15f` (2026-07-22).
+
+**Branches:** Committet auf `integration/hermes-runtime-v0.19-bump`, gemerged nach `powerunits-internal-setup`.
 
 ---
 
