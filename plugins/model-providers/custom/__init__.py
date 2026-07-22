@@ -1,9 +1,15 @@
 """Custom / Ollama (local) provider profile.
 
 Covers any endpoint registered as provider="custom", including local
-Ollama instances. Key quirks:
+Ollama instances and OpenAI-compatible reasoning endpoints (GLM-5.2 on
+Volcengine ARK, vLLM, llama.cpp). Key quirks:
   - ollama_num_ctx → extra_body.options.num_ctx (local context window)
-  - reasoning_config disabled → extra_body.think = False
+  - reasoning_config disabled → top-level reasoning_effort="none"
+    (Ollama /v1/chat/completions ignores think=False — ollama#14820)
+    + extra_body.think = False when the backend accepts it
+  - reasoning_config enabled + effort → top-level reasoning_effort
+    (the native OpenAI-compatible format GLM/ARK expect; unset omits it
+    so the endpoint's server default applies)
   - max_tokens capped to real per-model limits when base_url is actually
     OpenAI's hosted API rather than a local/Ollama-style relay
 """
@@ -64,6 +70,7 @@ class CustomProfile(ProviderProfile):
         **ctx: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         extra_body: dict[str, Any] = {}
+        top_level: dict[str, Any] = {}
 
         # Ollama context window
         if ollama_num_ctx:
@@ -71,16 +78,30 @@ class CustomProfile(ProviderProfile):
             options["num_ctx"] = ollama_num_ctx
             extra_body["options"] = options
 
-        # Disable thinking when reasoning is turned off — but not against
-        # backends that reject the unknown "think" key (see
-        # _accepts_ollama_think_extra_body docstring).
-        if reasoning_config and isinstance(reasoning_config, dict) and _accepts_ollama_think_extra_body(base_url):
+        # Reasoning / thinking control for custom OpenAI-compatible endpoints
+        # (GLM-5.2 on Volcengine ARK, vLLM, Ollama, llama.cpp, …).
+        #
+        #   - disabled  → top-level reasoning_effort="none" plus
+        #     extra_body.think = False when the backend accepts it
+        #   - enabled + effort set → TOP-LEVEL reasoning_effort string
+        #   - enabled + no effort  → omit both, server default applies
+        if reasoning_config and isinstance(reasoning_config, dict):
             _effort = (reasoning_config.get("effort") or "").strip().lower()
             _enabled = reasoning_config.get("enabled", True)
             if _effort == "none" or _enabled is False:
-                extra_body["think"] = False
+                # Ollama's /v1/chat/completions silently ignores
+                # extra_body.think (only /api/chat honours it — ollama#14820)
+                # but respects the top-level reasoning_effort field, so both
+                # are needed to actually stop a thinking-capable model from
+                # reasoning (#25758). Gate think=False to backends that accept
+                # it — official OpenAI/Azure reject the unknown key (HTTP 400).
+                top_level["reasoning_effort"] = "none"
+                if _accepts_ollama_think_extra_body(base_url):
+                    extra_body["think"] = False
+            elif _effort:
+                top_level["reasoning_effort"] = _effort
 
-        return extra_body, {}
+        return extra_body, top_level
 
     def fetch_models(
         self,

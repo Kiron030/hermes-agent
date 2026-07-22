@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-07-22 — v0.19.0-Merge (Tag `v2026.7.20`) auf `integration/hermes-runtime-v0.19-bump`
+
+**Gemerged:** Upstream v0.19.0 / Quicksilver Release (~2838 Commits ggü. v0.18.0 / `v2026.7.1`). Security-Tag-Triage zuerst: Bereich `v2026.7.1..v2026.7.20` gesichtet — u. a. Ollama `reasoning_effort`-Fix (#25758 / ollama#14820), ProviderProfile `default_vision_model()`, Desktop/Electron-Serve-Pfad, JS-Test-CI-Split, Lockfile-Diff-Workflow. Alle additiv; keine Fork-Kollision mit `first_safe_v1`/Powerunits-Telegram-Overlays.
+
+**Konfliktauflösungen (5 Dateien):** `AGENTS.md` (Fork-Schlankversion beibehalten — Upstreams TUI/Desktop/Dependency-Blöcke bleiben in `docs/agent_context/hermes_development_guide.md`), `agent/transports/chat_completions.py` (Fork-Reasoning-/Nous-/Ollama-`think=false`-Guard + Qwen beibehalten), `hermes_cli/banner.py` (first-safe: Skills hidden; sonst Upstreams dynamisches Terminal-Width-Grid), `plugins/model-providers/custom/__init__.py` (Upstreams `reasoning_effort="none"` **plus** Fork-Gate `_accepts_ollama_think_extra_body` für `think=False`), `providers/base.py` (Upstreams `default_vision_model()` **plus** Fork `get_max_tokens(..., base_url=...)`).
+
+**Fork-Fix-Verlust-Check:** `gateway/run.py`, `gateway/config.py`, `model_tools.py`, `docker/apply_powerunits_runtime_policy.py`, `powerunits_*`-Module per Symbol-Grep verifiziert — alle `first_safe_v1`-Gates intakt. Pflicht-Syntaxscan auf Hotspots grün; kein `base_url`-Duplikat in `chat_completions.py`.
+
+**Testlage (gezielt):** `tests/docker/test_apply_powerunits_runtime_policy.py`, `tests/plugins/model_providers/test_custom_profile.py`, `tests/agent/transports/test_chat_completions.py`, `tests/test_powerunits_bounded_profiles_v1.py`, `tests/test_powerunits_capability_tier.py`, `tests/tools/test_powerunits_multi_country_data_health_tool.py` — **126 passed, 11 skipped** in 7.3s.
+
+**Offene Punkte:** Nach Merge → Railway Redeploy + Telegram-Smokes (`RUNBOOK.hermes-stage1-validation.md`); `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` im Profil persistieren falls Posture-Drift.
+
+**Branches:** Committet auf `integration/hermes-runtime-v0.19-bump`, PR → `powerunits-internal-setup`.
+
+---
+
 ## 2026-07-04 — v0.18.0-Merge (Tag `v2026.7.1`) auf `integration/hermes-runtime-v0.18-bump`
 
 **Gemerged:** Upstream v0.18.0 (1953 Commits ggü. v0.17.0 / `v2026.6.19`). Security-Tag-Triage zuerst: zahlreiche sicherheitsgetaggte Commits im Bereich `v2026.6.19..v2026.7.1` — u. a. IDOR-Härtung für persisted `/resume`/`/sessions` (Chat-/Thread-Origin-Proof), Browser private-network/CDP-Guards, Cron-`base_url`-Credential-Exfiltration-Block, Dashboard-Plugin-Backend-Import auf bundled Plugins beschränkt (#43719), aiohttp 3.14.1 + cryptography-Floor, `/proc`-Read-Leak-Blocker, Tool-Override-Opt-in-Sink. Alle additiv; keine Fork-Kollision mit `first_safe_v1`/Telegram-first. Managed-scope/Relay weiterhin inaktiv im Powerunits-Deploy (kein `GATEWAY_RELAY_URL`, kein `/etc/hermes`).
