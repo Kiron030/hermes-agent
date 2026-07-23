@@ -63,7 +63,7 @@ Rollback to Tier 3: set `CAPABILITY_TIER=3`.
 **Parallel track (not capability tier):** bounded **execute** profile  
 `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_operator_execute` — only for short repair campaigns after backfill maturity. Rollback = switch back to `stage1_read_health`.
 
-**Deferred / separate decision:** model upgrade (`gpt-4.1`), Curator on, public dashboard, multi-region (blocked by volume).
+**Deferred / separate decision:** Curator on, public dashboard, multi-region (blocked by volume). Model: **`gpt-4.1`** (policy default as of 2026-07-23 uplift from mini).
 
 ---
 
@@ -186,8 +186,33 @@ Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=4`):
 2. **Done (docs):** Telegram fenced-JSON habit + SOUL brevity / no invented promotion.
 3. **Done:** Nested-path reject on write + summarize/review caution + `hygiene_hints`.
 4. **Operator (manual):** prune legacy nested/unmarked drafts on volume — see overlay hygiene section.
-5. **Deferred:** Model bump (`gpt-4.1`) — separate deploy; see OpenAI compatibility doc model table.
+5. **Done (2026-07-23):** Model bump to **`gpt-4.1`** via `POWERUNITS_PRIMARY_MODEL_DEFAULT` (redeploy applies). Rollback = mini.
 6. **Deferred:** Tier 4B (`=5`) after quiet soak.
+
+### Legacy draft prune on Railway volume (operator)
+
+**Not** the OpenAI UI tab „Legacy“ (API keys). This is **disk hygiene** under Hermes `$HERMES_HOME`.
+
+**Why:** Old files under `hermes_workspace/drafts/powerunits_skill_proposals/` without Tier‑4A frontmatter, or mistakenly nested as `drafts/powerunits_skill_proposals/...` *inside* that folder, trip posture cautions and clutter the review board. They are inert (not live skills) but noisy.
+
+**How (Railway → hermes-agent → Console / Shell):**
+
+```bash
+# Inspect
+ls -la /opt/data/hermes_workspace/drafts/powerunits_skill_proposals
+find /opt/data/hermes_workspace/drafts/powerunits_skill_proposals -type f | sort
+
+# Remove the mistaken nested tree only (safe, common smoke finding)
+rm -rf /opt/data/hermes_workspace/drafts/powerunits_skill_proposals/drafts
+
+# Keep README_POWERUNITS_TIER4A.txt and dated smoke drafts you still want
+# Optional unmarked leftovers (only if you do not need them):
+# rm -f /opt/data/hermes_workspace/drafts/powerunits_skill_proposals/small_helper_summarize_rollout_governance.md
+
+# Re-check via Telegram after: summarize_powerunits_skill_draft_proposals
+```
+
+Do **not** delete `/opt/data/skills` (live skills). Do **not** rotate OpenAI keys for this prune.
 
 ### Step 6 — Tier 4B / later
 

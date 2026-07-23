@@ -70,7 +70,7 @@ DISABLED_PLATFORMS = [
 
 # Deterministic short-term primary LLM route for Powerunits internal spike:
 # use direct OpenAI-compatible endpoint instead of implicit OpenRouter fallback.
-POWERUNITS_PRIMARY_MODEL_DEFAULT = "gpt-4.1-mini"
+POWERUNITS_PRIMARY_MODEL_DEFAULT = "gpt-4.1"
 POWERUNITS_PRIMARY_PROVIDER = "custom"
 POWERUNITS_PRIMARY_BASE_URL = "https://api.openai.com/v1"
 

@@ -66,7 +66,7 @@ Im Powerunits Runtime-Policy-Applier wurde die Primary-Route explizit und determ
 
 - Datei: `docker/apply_powerunits_runtime_policy.py`
 - Erzwingt in `config.yaml`:
-  - `model.default = "gpt-4.1-mini"`
+  - `model.default = "gpt-4.1"`
   - `model.provider = "custom"`
   - `model.base_url = "https://api.openai.com/v1"`
 
@@ -140,7 +140,7 @@ Nach erfolgreichem Boot (kein `PermissionError`, kein `ModuleNotFoundError`) mel
 
 ```
 WARNING agent.conversation_loop: API call failed (attempt 1/3) error_type=BadRequestError
-provider=custom base_url=https://api.openai.com/v1 model=gpt-4.1-mini
+provider=custom base_url=https://api.openai.com/v1 model=gpt-4.1
 summary=HTTP 400: max_tokens is too large: 65536. This model supports at most
 32768 completion tokens, whereas you provided 65536.
 ```

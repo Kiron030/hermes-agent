@@ -6,7 +6,7 @@ Telegram funktioniert.
 
 Runtime-Safety funktioniert.
 
-Provider-Routing funktioniert jetzt (OpenAI-first, `custom` + `https://api.openai.com/v1` + `gpt-4.1-mini`).
+Provider-Routing funktioniert jetzt (OpenAI-first, `custom` + `https://api.openai.com/v1` + `gpt-4.1`).
 
 Der verbleibende Blocker war OpenAI-Request-Kompatibilitaet: HTTP 400 mit Parameter `include` / Meldung zu **encrypted content**, weil der Responses-Pfad Felder sendete, die das gewaehlte Modell nicht unterstuetzt.
 
@@ -95,7 +95,7 @@ an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
 
 ## Model upgrade candidates (Powerunits OpenAI-direct setup)
 
-**Current default:** `gpt-4.1-mini` via `provider=custom` + `https://api.openai.com/v1` (`POWERUNITS_PRIMARY_MODEL_DEFAULT` in `apply_powerunits_runtime_policy.py`).
+**Current default:** `gpt-4.1` via `provider=custom` + `https://api.openai.com/v1` (`POWERUNITS_PRIMARY_MODEL_DEFAULT` in `apply_powerunits_runtime_policy.py`). Prior default was `gpt-4.1-mini`.
 
 **Practical rule:** change **model only** (not tier + profile in the same deploy). Prefer Chat Completions–friendly GPT‑4.1 family first; GPT‑5* may auto-switch to Responses API and needs a separate compatibility soak.
 
@@ -104,14 +104,16 @@ Prices below are **OpenAI list** (~2026-07, USD per 1M tokens). Multiply by your
 | Model id | Practical on our setup? | Vs `gpt-4.1-mini` (quality) | What you gain | Cost vs mini (approx) | Notes |
 |----------|-------------------------|----------------------------|---------------|------------------------|-------|
 | **`gpt-4.1-nano`** | Yes (same Chat Completions path) | **Worse** for synthesis / long tool chains (~noticeably thinner) | Lower latency + bill | **~0.25×** ($0.10 / $0.40) | Only if cost/latency dominate |
-| **`gpt-4.1-mini`** *(current)* | Yes | Baseline | Best cost/quality for Stage‑1 ops | **1×** ($0.40 / $1.60) | Keep for soak |
-| **`gpt-4.1`** | Yes (same path; recommended uplift) | **Clearly better** instruction/tool fidelity (~“one step up”) | Tighter summaries, fewer missed tool args, better German structure | **~5×** ($2.00 / $8.00) | Best next lever after Tier‑4A soak |
+| **`gpt-4.1-mini`** | Yes (rollback) | Baseline | Best cost/quality for Stage‑1 ops | **1×** ($0.40 / $1.60) | Rollback if full 4.1 too spendy |
+| **`gpt-4.1`** *(current default)* | Yes | **Clearly better** instruction/tool fidelity | Tighter summaries, fewer missed tool args, better German structure | **~5×** ($2.00 / $8.00) | Applied 2026-07-23 model-only uplift |
 | **`gpt-4o`** / **`gpt-4o-mini`** | Possible, not preferred | Mixed; 4o often older/legacy vs 4.1 | Little unique win for text+tools here | 4o ~**6×+** mini; 4o-mini cheaper but weaker than 4.1-mini for this stack | Prefer stay on 4.1 family |
 | **`gpt-5` / `gpt-5-mini` / `gpt-5-nano`** | Possible later | Potentially stronger reasoning | Better hard multi-step reasoning | Varies; often ≠ simple 4.1 pricing | May force **Responses API**; re-validate OpenAI compat gates first |
 
+**Hard facts (public benches):** IFEval ~**87.4% vs 84.1%** (mini); SWE-Bench Verified ~**54.6% vs 23.6%** (~**2.3×** on that coding-agent bench). Same ~1M context / 32k max out. List price ~**5×** mini.
+
 **Operator cost sketch (order of magnitude):** if a busy day is ~2M input + 0.4M output tokens on mini ≈ **$0.80 + $0.64 ≈ $1.4/day**, then **`gpt-4.1` ≈ ~$5–7/day** at the same volume (very rough).
 
-**Recommendation:** stay on **`gpt-4.1-mini`** during Tier‑4A soak; when ready for a **model-only** deploy, try **`gpt-4.1`** for 3–7 days with the same Telegram smoke pack (posture + one write + one negative).
+**Switch procedure:** repo sets `POWERUNITS_PRIMARY_MODEL_DEFAULT=gpt-4.1` → Railway redeploy → policy boot rewrites `$HERMES_HOME/config.yaml` `model.default`. **OpenAI platform:** no model picker — same project API key (`railway-prod-backend` or Hermes key). Rollback: set default back to `gpt-4.1-mini` + redeploy.
 
 ---
 
