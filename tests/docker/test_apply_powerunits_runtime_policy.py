@@ -259,3 +259,41 @@ def test_apply_policy_persists_bounded_profile_in_config(
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         assert data["powerunits"]["bounded_profile_v1"] == "stage1_read_health"
 
+
+def test_apply_policy_gpt54_trial_uses_codex_responses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.delenv("HERMES_POWERUNITS_PRIMARY_MODEL", raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert data["model"]["default"] == "gpt-5.4"
+        assert data["model"]["api_mode"] == "codex_responses"
+        assert data["model"]["provider"] == "custom"
+        assert data["model"]["base_url"] == "https://api.openai.com/v1"
+
+
+def test_apply_policy_primary_model_env_override_gpt41(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.setenv("HERMES_POWERUNITS_PRIMARY_MODEL", "gpt-4.1")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert data["model"]["default"] == "gpt-4.1"
+        assert data["model"]["api_mode"] == "chat_completions"
+

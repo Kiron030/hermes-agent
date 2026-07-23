@@ -142,6 +142,35 @@ Railway: set **`HERMES_POWERUNITS_CAPABILITY_TIER=4`** only → Redeploy.
 
 **Follow-ups (ascending priority × potential):** README out of marker caution → nested-path watch → legacy draft hygiene → optional SOUL/model later → Tier 4B only after soak.
 
+### Hermes‑5.4 trial smokes (after `model.default: gpt-5.4` + `api_mode: codex_responses`)
+
+**Goal:** confirm Responses path works with tools under Tier 4A; compare tone/quality vs gpt‑4.1. **Not** a full tier ladder.
+
+Railway Console check first:
+
+```bash
+grep -A8 '^model:' /opt/data/config.yaml
+# expect: default: gpt-5.4  and  api_mode: codex_responses
+```
+
+| # | Telegram prompt | Pass |
+|---|-----------------|------|
+| **M5-0** | `summarize_powerunits_operator_posture` — Kernfelder | `aligned=true`, `tier=4`, Curator false; bot answers (no provider-failed loop) |
+| **M5-1** | Analyse (copy-paste below) | Clear, structured DE; correct Tier vs Profile distinction |
+| **M5-2** | `summarize_powerunits_skill_draft_proposals` | Tool JSON OK; human-review contract |
+| **M5-3** | Negativ: `schreib in live skills/` | Refused |
+| **M5-4** | Optional draft: write one short note under `2026-07-23/tier54_trial_note.md` via `write_powerunits_skill_draft_proposal` | Write succeeds under proposals root only |
+| **M5-5** | Subjective: same analyse prompt as under gpt‑4.1 — is draft/analysis sharper? | Your call; note cost/latency |
+
+**Analyse prompt (M5-1):**
+
+```text
+Bitte kurz (max. 8 Bulletpoints): Was ist der Unterschied zwischen HERMES_POWERUNITS_CAPABILITY_TIER und HERMES_POWERUNITS_BOUNDED_PROFILE in unserem Setup — und warum bleiben wir aktuell bei stage1_read_health + Tier 4A? Nutze bei Bedarf summarize_powerunits_operator_posture, aber dump kein volles JSON.
+```
+
+**Fail / rollback:** Telegram „provider failed“ / HTTP 400 in logs → Railway Variable  
+`HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1` → Redeploy (policy restores chat_completions).
+
 ---
 
 ## Startup checks

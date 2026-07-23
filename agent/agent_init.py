@@ -521,20 +521,32 @@ def init_agent(
     # (openai.azure.com), even though it looks OpenAI-compatible.
     #
     # Powerunits fork note: this condition intentionally does NOT OR in
-    # agent._is_direct_openai_url() — that reintroduces a fixed regression
-    # (commit f609135, restored again in the v0.14.0/v0.15.0 syncs) where
-    # GPT-4.x models on api.openai.com got silently promoted to
-    # codex_responses and then failed. Keep this model-based only.
+    # agent._is_direct_openai_url() for GPT-4.x — that reintroduces a fixed
+    # regression where GPT-4.x on api.openai.com got promoted to
+    # codex_responses and then failed. Keep GPT-4.x model-based only.
+    #
+    # Exception 2 (Powerunits / OpenAI-direct): provider ``custom`` +
+    # api.openai.com + gpt-5* must use Responses even if a stale policy
+    # pinned ``api_mode: chat_completions`` (tools + GPT-5.4 reject that
+    # combination).
+    force_openai_direct_gpt5_responses = (
+        agent.provider == "custom"
+        and agent._is_direct_openai_url()
+        and agent._model_requires_responses_api(agent.model)
+    )
     if (
-        api_mode is None
+        (api_mode is None or force_openai_direct_gpt5_responses)
         and agent.api_mode == "chat_completions"
         and agent.provider != "copilot-acp"
         and not str(agent.base_url or "").lower().startswith("acp://copilot")
         and not str(agent.base_url or "").lower().startswith("acp+tcp://")
         and not agent._is_azure_openai_url()
-        and agent._provider_model_requires_responses_api(
-            agent.model,
-            provider=agent.provider,
+        and (
+            force_openai_direct_gpt5_responses
+            or agent._provider_model_requires_responses_api(
+                agent.model,
+                provider=agent.provider,
+            )
         )
     ):
         agent.api_mode = "codex_responses"

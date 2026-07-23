@@ -6,7 +6,7 @@ Telegram funktioniert.
 
 Runtime-Safety funktioniert.
 
-Provider-Routing funktioniert jetzt (OpenAI-first, `custom` + `https://api.openai.com/v1` + `gpt-4.1`).
+Provider-Routing funktioniert jetzt (OpenAI-first, `custom` + `https://api.openai.com/v1` + `gpt-5.4` trial / Responses).
 
 Der verbleibende Blocker war OpenAI-Request-Kompatibilitaet: HTTP 400 mit Parameter `include` / Meldung zu **encrypted content**, weil der Responses-Pfad Felder sendete, die das gewaehlte Modell nicht unterstuetzt.
 
@@ -95,25 +95,22 @@ an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
 
 ## Model upgrade candidates (Powerunits OpenAI-direct setup)
 
-**Current default:** `gpt-4.1` via `provider=custom` + `https://api.openai.com/v1` (`POWERUNITS_PRIMARY_MODEL_DEFAULT` in `apply_powerunits_runtime_policy.py`). Prior default was `gpt-4.1-mini`.
+**Current default (Hermes‑5.4 trial):** `gpt-5.4` via `provider=custom` + `https://api.openai.com/v1` + **`api_mode: codex_responses`**.  
+Override / rollback env: **`HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`** (policy then pins `chat_completions`).
 
-**Practical rule:** change **model only** (not tier + profile in the same deploy). Prefer Chat Completions–friendly GPT‑4.1 family first; GPT‑5* may auto-switch to Responses API and needs a separate compatibility soak.
+**Practical rule:** change **model only** (not tier + profile in the same deploy). GPT‑5* needs Responses; GPT‑4.1* stays Chat Completions.
 
 Prices below are **OpenAI list** (~2026-07, USD per 1M tokens). Multiply by your Telegram tool-call volume; Hermes turns often burn more **input** (history + tool JSON) than output.
 
-| Model id | Practical on our setup? | Vs `gpt-4.1-mini` (quality) | What you gain | Cost vs mini (approx) | Notes |
-|----------|-------------------------|----------------------------|---------------|------------------------|-------|
-| **`gpt-4.1-nano`** | Yes (same Chat Completions path) | **Worse** for synthesis / long tool chains (~noticeably thinner) | Lower latency + bill | **~0.25×** ($0.10 / $0.40) | Only if cost/latency dominate |
-| **`gpt-4.1-mini`** | Yes (rollback) | Baseline | Best cost/quality for Stage‑1 ops | **1×** ($0.40 / $1.60) | Rollback if full 4.1 too spendy |
-| **`gpt-4.1`** *(current default)* | Yes | **Clearly better** instruction/tool fidelity | Tighter summaries, fewer missed tool args, better German structure | **~5×** ($2.00 / $8.00) | Applied 2026-07-23 model-only uplift |
-| **`gpt-4o`** / **`gpt-4o-mini`** | Possible, not preferred | Mixed; 4o often older/legacy vs 4.1 | Little unique win for text+tools here | 4o ~**6×+** mini; 4o-mini cheaper but weaker than 4.1-mini for this stack | Prefer stay on 4.1 family |
-| **`gpt-5` / `gpt-5-mini` / `gpt-5-nano`** | Possible later | Potentially stronger reasoning | Better hard multi-step reasoning | Varies; often ≠ simple 4.1 pricing | May force **Responses API**; re-validate OpenAI compat gates first |
+| Model id | Practical on our setup? | Notes |
+|----------|-------------------------|-------|
+| **`gpt-4.1`** | Yes — stable rollback | `chat_completions` |
+| **`gpt-5.4`** *(trial default)* | Yes — needs Responses | `codex_responses`; tools + stronger drafts/analysis |
+| **`gpt-5.4-mini`** | Possible | cheaper 5.4-family; still Responses |
 
-**Hard facts (public benches):** IFEval ~**87.4% vs 84.1%** (mini); SWE-Bench Verified ~**54.6% vs 23.6%** (~**2.3×** on that coding-agent bench). Same ~1M context / 32k max out. List price ~**5×** mini.
+**Hard facts (public):** `gpt-5.4` is the stronger/newer family vs `gpt-4.1`. List price (In/Out per 1M): 5.4 ≈ **$2.50 / $15** vs 4.1 ≈ **$2 / $8**.
 
-**Operator cost sketch (order of magnitude):** if a busy day is ~2M input + 0.4M output tokens on mini ≈ **$0.80 + $0.64 ≈ $1.4/day**, then **`gpt-4.1` ≈ ~$5–7/day** at the same volume (very rough).
-
-**Switch procedure:** repo sets `POWERUNITS_PRIMARY_MODEL_DEFAULT=gpt-4.1` → Railway redeploy → policy boot rewrites `$HERMES_HOME/config.yaml` `model.default`. **OpenAI platform:** no model picker — same project API key (`railway-prod-backend` or Hermes key). Rollback: set default back to `gpt-4.1-mini` + redeploy.
+**Switch procedure:** redeploy image with policy default **or** set Railway `HERMES_POWERUNITS_PRIMARY_MODEL`. Verify: `grep -A8 '^model:' /opt/data/config.yaml`. Telegram smoke pack in RUNBOOK (Hermes‑5.4 trial).
 
 ---
 

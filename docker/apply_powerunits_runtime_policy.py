@@ -70,9 +70,29 @@ DISABLED_PLATFORMS = [
 
 # Deterministic short-term primary LLM route for Powerunits internal spike:
 # use direct OpenAI-compatible endpoint instead of implicit OpenRouter fallback.
-POWERUNITS_PRIMARY_MODEL_DEFAULT = "gpt-4.1"
+# Override with HERMES_POWERUNITS_PRIMARY_MODEL (e.g. gpt-4.1 rollback).
+POWERUNITS_PRIMARY_MODEL_FALLBACK = "gpt-5.4"
 POWERUNITS_PRIMARY_PROVIDER = "custom"
 POWERUNITS_PRIMARY_BASE_URL = "https://api.openai.com/v1"
+
+
+def _resolve_primary_model() -> str:
+    raw = (os.getenv("HERMES_POWERUNITS_PRIMARY_MODEL") or "").strip()
+    return raw or POWERUNITS_PRIMARY_MODEL_FALLBACK
+
+
+def _api_mode_for_primary_model(model: str) -> str:
+    """GPT-5.x on api.openai.com needs Responses; GPT-4.x stays on chat completions."""
+    m = (model or "").strip().lower()
+    if "/" in m:
+        m = m.rsplit("/", 1)[-1]
+    if m.startswith("gpt-5"):
+        return "codex_responses"
+    return "chat_completions"
+
+
+# Back-compat alias for docs/tests that import the constant name.
+POWERUNITS_PRIMARY_MODEL_DEFAULT = _resolve_primary_model()
 
 
 def _load_yaml(path: Path) -> dict:
@@ -99,19 +119,21 @@ def apply_policy(config_path: Path) -> None:
 
     # Enforce deterministic primary model/provider routing to match
     # OPENAI_API_KEY-only Railway environments.
+    primary_model = _resolve_primary_model()
     model_cfg = cfg.get("model")
     if not isinstance(model_cfg, dict):
         model_cfg = {}
-    model_cfg["default"] = POWERUNITS_PRIMARY_MODEL_DEFAULT
+    model_cfg["default"] = primary_model
     model_cfg["provider"] = POWERUNITS_PRIMARY_PROVIDER
     model_cfg["base_url"] = POWERUNITS_PRIMARY_BASE_URL
-    # Pin OpenAI wire mode: GPT-4.x on api.openai.com must not use the
-    # Responses path with reasoning.encrypted_content (400 from provider).
-    model_cfg["api_mode"] = "chat_completions"
+    # GPT-4.x: chat_completions (Responses encrypted_content → 400).
+    # GPT-5.x: codex_responses (tools + reasoning require /v1/responses).
+    model_cfg["api_mode"] = _api_mode_for_primary_model(primary_model)
     cfg["model"] = model_cfg
 
     # Belt-and-suspenders: disable Hermes "reasoning effort" for this phase so
     # auxiliary Responses-shaped calls do not request encrypted reasoning.
+    # GPT-5.4 still runs on Responses with tools when effort is off/none.
     agent_cfg = cfg.get("agent")
     if not isinstance(agent_cfg, dict):
         agent_cfg = {}
