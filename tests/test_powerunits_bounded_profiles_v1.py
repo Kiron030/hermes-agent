@@ -37,6 +37,18 @@ def test_evaluate_profile_alignment_missing(monkeypatch: pytest.MonkeyPatch) -> 
     assert "HERMES_POWERUNITS_BOUNDED_COVERAGE_SNAPSHOT_ENABLED" in out["missing_truthy"]
 
 
+def test_evaluate_profile_alignment_csv_allowlist_not_missing_truthy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ERA5 allowlist is CSV, not 1/true — must not false-flag posture drift."""
+    monkeypatch.setenv("HERMES_POWERUNITS_BOUNDED_PROFILE", "stage1_read_health")
+    for key, value in profiles.STAGE1_READ_HEALTH.items():
+        monkeypatch.setenv(key, value)
+    out = profiles.evaluate_bounded_profile_alignment()
+    assert out["aligned"] is True
+    assert out["missing_truthy"] == []
+
+
 def test_persist_profile_writes_managed_block_to_hermes_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

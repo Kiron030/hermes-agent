@@ -98,6 +98,18 @@ def _truthy(val: str | None) -> bool:
     return (val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+# Profile keys whose values are CSV allowlists (non-empty string), not boolean gates.
+_PROFILE_CSV_ALLOWLIST_KEYS: Final[frozenset[str]] = frozenset(
+    {"HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES"}
+)
+
+
+def _profile_env_satisfied(key: str, raw: str | None) -> bool:
+    if key in _PROFILE_CSV_ALLOWLIST_KEYS:
+        return bool((raw or "").strip())
+    return _truthy(raw)
+
+
 def active_bounded_profile_id() -> str | None:
     raw = (os.getenv(PROFILE_ENV) or "").strip().lower()
     return raw or None
@@ -332,7 +344,7 @@ def evaluate_bounded_profile_alignment() -> dict[str, Any]:
 
     missing: list[str] = []
     for key in expansion:
-        if not _truthy(os.getenv(key)):
+        if not _profile_env_satisfied(key, os.getenv(key)):
             missing.append(key)
 
     return {
