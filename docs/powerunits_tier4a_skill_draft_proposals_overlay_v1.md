@@ -90,3 +90,17 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 4`**.
 1. Hermes writes draft under dated subfolder, e.g. **`drafts/powerunits_skill_proposals/2026-04-30/my-skill-draft.md`**.
 2. Operator reviews content + frontmatter in IDE or **`read_powerunits_skill_draft_proposal`**.
 3. Promotion = **human** copy/edit into the real **`$HERMES_HOME/skills/.../SKILL.md`** or a **git PR** — **never** an automatic Hermes apply from this overlay.
+
+---
+
+## Operator uplift evidence (2026-07-23)
+
+Telegram review window **passed** at `CAPABILITY_TIER=4`: posture overlays 1–4A + `aligned`; manifest correct; smoke write `2026-07-23/tier4a_smoke_operator_note.md` with full frontmatter; list/read/review OK; path escape blocked; promote-to-live **refused** with human path; Curator off.
+
+**Soft findings (not fail):**
+- Posture caution: some files missing Tier‑4A marker in head (README pointer + legacy drafts).
+- List showed a nested legacy relative path that re-includes `drafts/powerunits_skill_proposals/…`.
+
+Tag: **`powerunits-tier4a-uplift-20260723`**.
+
+**Adaptation ideas (ascending priority × potential):** exclude README from marker caution → nested-path watcher → prune/relabel legacy drafts → optional SOUL brevity → model bump only as separate decision → Tier 4B after soak.

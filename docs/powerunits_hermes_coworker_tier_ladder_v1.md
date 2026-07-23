@@ -4,9 +4,9 @@
 **Canonical capability roadmap (technical):** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md).  
 **This file:** **operating plan** — how we climb tiers toward a strong, still-bounded co-worker without losing `first_safe_v1`.
 
-**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=3`** (skills observer) — **smoke green**, soak.  
-Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**, **`powerunits-tier2-uplift-20260723`**, **`powerunits-tier3-uplift-20260723`**.  
-Curator remains **off**; Tier 3 is observe/propose-only.
+**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=4`** (Tier 4A drafts) — **smoke green**, soak.  
+Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**, **`powerunits-tier2-uplift-20260723`**, **`powerunits-tier3-uplift-20260723`**, **`powerunits-tier4a-uplift-20260723`**.  
+Curator **off**. Soft watch: older drafts / README may lack Tier‑4A frontmatter markers.
 
 ---
 
@@ -36,15 +36,15 @@ Hermes should become an **increasingly capable internal analyst / operator assis
 
 ---
 
-## Current recommended Railway env (Tier 3 soak)
+## Current recommended Railway env (Tier 4A soak)
 
 ```text
 HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
-HERMES_POWERUNITS_CAPABILITY_TIER=3
+HERMES_POWERUNITS_CAPABILITY_TIER=4
 ```
 
-Rollback to Tier 2: set `CAPABILITY_TIER=2`.
+Rollback to Tier 3: set `CAPABILITY_TIER=3`.
 
 ---
 
@@ -56,7 +56,7 @@ Rollback to Tier 2: set `CAPABILITY_TIER=2`.
 | **T1** | `1` | Phase **2A**: workspace full summary + bounded text/path search under `hermes_workspace` | Use for session notes / export hygiene | **Done** — path-search smoke green; tag `powerunits-tier1-uplift-20260723` |
 | **T2** | `2` | Phase **2B**: allowlisted locals + JSON/YAML workspace reads + optional `powerunits_local_reference` | Curate refs (no secrets); extended reads | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier2-uplift-20260723` |
 | **T3** | `3` | Skills **observer** (diagnose/propose JSON, SKILL preview) | Triage proposals; Curator still off | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier3-uplift-20260723` |
-| **T4** | `4` | Skill **drafts** under `hermes_workspace/drafts/...` only | Human review drafts; never auto-promote to live `skills/` | Draft volume watchers green |
+| **T4** | `4` | Skill **drafts** under `hermes_workspace/drafts/...` only | Human review drafts; never auto-promote to live `skills/` | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier4a-uplift-20260723` |
 | **T5** | `5` | Review **governance** + `governance/` notes | Accept/reject drafts via review_status | Clear promotion ritual |
 | **T6** | `6` | Bounded **workflow scaffolding** (run records) | Operator still triggers Repo B execute | Records ≠ HTTP truth |
 
@@ -162,11 +162,39 @@ Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=3`):
 
 **Operator:** soak on Tier 3; use observer weekly if useful; **do not** enable Curator; **do not** jump to Tier 4 until a second review window.
 
-### Step 5 — Tier 4A (skill draft proposals) — **next after soak**
+### Step 5 — Tier 4A (skill draft proposals) — **done (soak)**
 
-Only after Tier‑3 soak feels quiet. Adds **draft files** under `hermes_workspace/drafts/powerunits_skill_proposals/` — still **no** live `skills/` writes. Needs another short review window (`CAPABILITY_TIER=4`).
+Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=4`):
 
-Detail: [`powerunits_tier4a_skill_draft_proposals_overlay_v1.md`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md).
+| Smoke | Result |
+|-------|--------|
+| Posture | `tier=4`, overlays 1–4A observed, `aligned=true`, Curator `false` |
+| Soft caution | `tier4a_drafts_some_files_missing_marker_in_head` (legacy/README without Tier‑4A header) — expected hygiene, not fail |
+| Manifest | Root `drafts/powerunits_skill_proposals`; live skills never written; human-review contract OK |
+| Write smoke | `2026-07-23/tier4a_smoke_operator_note.md` (345 B) with full frontmatter |
+| List / read / review | Smoke + legacy drafts visible; review board human-only |
+| Boundaries | Path escape / Terminal blocked; **promote to live skills refused** with human path explained |
+| Decision | Curator off; smoke not for promotion |
+
+**Character read (ops):** Safety-first, structured, repeats governance contracts from tool JSON — good Stage‑1 Trusted Analyst voice. Soft UX: Telegram message drop occasionally (operator re-ask). Soft data hygiene: one nested legacy path under proposals (`…/drafts/powerunits_skill_proposals/improve_…`) and unmarked README/legacy files.
+
+**Operator:** soak on Tier 4A; do **not** open Tier 4B (`=5`) until draft hygiene + triage feel quiet.
+
+### Adaptation backlog (from Tier‑4A smoke; ascending priority × potential)
+
+See § below and overlay doc. Do **not** treat as immediate must-ship.
+
+1. **Low:** Exclude `README_POWERUNITS_TIER4A.txt` from “missing marker” caution (pointer file by design).
+2. **Low:** Telegram stability / “repeat last tool JSON in code fence” operator habit (not a fork change).
+3. **Medium:** Detect / warn on **nested** relative paths that re-include `drafts/powerunits_skill_proposals/`.
+4. **Medium:** One-shot operator prune or relocate legacy drafts without markers.
+5. **Higher (later):** Optional SOUL one-liner: “narrate tool JSON tightly; don’t invent promotion paths.”
+6. **Higher (later, separate decision):** Model bump `gpt-4.1` for synthesis quality — **not** during tier uplift.
+7. **Highest only if needed:** Tier 4B governance when you want formal `review_status` workflow — after soak.
+
+### Step 6 — Tier 4B / later
+
+Only after Tier‑4A soak. Detail: [`powerunits_tier4b_review_governance_overlay_v1.md`](powerunits_tier4b_review_governance_overlay_v1.md).
 
 ### Repo B track (parallel, not Hermes tier)
 
