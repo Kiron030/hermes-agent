@@ -431,6 +431,8 @@ def search_powerunits_allowlisted_local_text(
         matches: list[dict[str, Any]] = []
         files_scanned = 0
         skipped_large = 0
+        path_match_count = 0
+        content_match_count = 0
 
         for fp, surface in files:
             if len(matches) >= hits_cap:
@@ -443,6 +445,27 @@ def search_powerunits_allowlisted_local_text(
             if sz > _MAX_SEARCH_FILE_BYTES:
                 skipped_large += 1
                 continue
+
+            if surface == "hermes_workspace":
+                rel = fp.relative_to(ws_root).as_posix()
+                display = f"hermes_workspace/{rel}"
+            else:
+                rel = fp.relative_to(ref_root).as_posix()
+                display = f"{_REFERENCE_ROOT_SEGMENT}/{rel}"
+
+            # Path/basename first — parity with Tier-1 search (smoke: EXPORTS_*).
+            if needle in rel.casefold() or needle in fp.name.casefold():
+                matches.append(
+                    {
+                        "path": display,
+                        "match_kind": "path",
+                        "line_preview": f"[path] {display}",
+                        "match_index_in_file": None,
+                    }
+                )
+                path_match_count += 1
+                continue
+
             try:
                 text = fp.read_text(encoding="utf-8", errors="replace")
             except OSError:
@@ -459,18 +482,15 @@ def search_powerunits_allowlisted_local_text(
             if len(line) > 400:
                 line = line[:397] + "..."
 
-            if surface == "hermes_workspace":
-                display = f"hermes_workspace/{fp.relative_to(ws_root).as_posix()}"
-            else:
-                display = f"{_REFERENCE_ROOT_SEGMENT}/{fp.relative_to(ref_root).as_posix()}"
-
             matches.append(
                 {
                     "path": display,
+                    "match_kind": "content",
                     "line_preview": line,
                     "match_index_in_file": pos - line_start,
                 }
             )
+            content_match_count += 1
 
         if skipped_large:
             caution.append(f"skipped_oversized_files:{skipped_large}")
@@ -487,6 +507,8 @@ def search_powerunits_allowlisted_local_text(
                 "hit_cap": hits_cap,
                 "matches": matches,
                 "match_count": len(matches),
+                "path_match_count": path_match_count,
+                "content_match_count": content_match_count,
                 "files_scanned": files_scanned,
                 "caution_flags": sorted(set(caution)),
                 "doc_hint": "docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md",
@@ -631,7 +653,8 @@ SEARCH_SCHEMA = {
     "name": "search_powerunits_allowlisted_local_text",
     "description": (
         "Phase 2B (tier>=2): bounded substring search across tier-2 text extensions; "
-        "root_scope all|hermes_workspace|powerunits_local_reference."
+        "root_scope all|hermes_workspace|powerunits_local_reference. Matches "
+        "**file path/basename** first (`match_kind=path`), then **content** (`match_kind=content`)."
     ),
     "parameters": {
         "type": "object",

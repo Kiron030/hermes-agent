@@ -39,7 +39,7 @@ Run **after Railway redeploy** on `powerunits-internal-setup` (upstream **v0.19.
 
 - `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`
 - `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health` (recommended during backfill)
-- `HERMES_POWERUNITS_CAPABILITY_TIER=0` or `1` (**not** `6`)
+- `HERMES_POWERUNITS_CAPABILITY_TIER=0` … `2` for Stage‑1 soak / Tier‑2 uplift (**not** jump to `6`)
 - If posture drift on ERA5: set/persist `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` to national Tier-1 list
 
 | # | Prompt (Telegram) | Pass criteria |
@@ -64,12 +64,35 @@ Known-good tag after v0.19 smokes: **`powerunits-tier0-baseline-20260723`**.
 - [x] Posture: `tier_effective_integer: 1`, `telegram_powerunits_tier1_analysis_observed: true` (2026-07-23)
 - [x] `summarize_powerunits_workspace_full`
 - [x] `search_powerunits_workspace_text` (note write + content hit; path match shipped after uplift)
-- [ ] Soak ≥3 days before Tier 2
+- [x] Soak ≥3 days before Tier 2 *(shortened with explicit rollback; Tier 2 uplift 2026-07-23)*
 
 Keep `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health` during backfill.
 
 **Negative-smoke nuance:** `web` / `search` / `powerunits_energy_web_research` are **in** `first_safe_v1` — asking for “web_search” is not a fail. Expect block on **terminal**, **path escape** outside `hermes_workspace`, and **Tier ≥2** tools while tier=1.
 
+### Tier 2 uplift (Phase 2B) — after `CAPABILITY_TIER=2`
+
+Railway: set **`HERMES_POWERUNITS_CAPABILITY_TIER=2`** only → Redeploy.
+
+Optional seed (no secrets): copy repo
+`docker/powerunits_local_reference_example/` → volume `/opt/data/powerunits_local_reference/`.
+
+| # | Prompt | Pass |
+|---|--------|------|
+| **T2-0** | `summarize_powerunits_operator_posture` — full JSON | `tier_effective_integer=2`; `powerunits_tier2_allowlisted_read_listed=true`; `telegram_powerunits_tier2_allowlisted_read_observed=true`; still `aligned=true`; Tier 1 still observed; no `phase_2b_drift*` |
+| **T2-1** | `manifest_powerunits_tier2_allowlisted_read_scope` | JSON roots include `hermes_workspace` + optional `powerunits_local_reference`; tool list present |
+| **T2-2** | `save_hermes_workspace_note` kind=`analysis` name=`tier2-smoke-meta.md` content=`tier2-smoke` | Note lands under `hermes_workspace`; visible in later summarize |
+| **T2-3** | `summarize_powerunits_allowlisted_locals` | `read_only=true`, `phase=2B`; workspace leg present; `powerunits_local_reference` may be missing/`files=0` if dir absent |
+| **T2-4** | `search_powerunits_allowlisted_local_text` query=`EXPORTS` root_scope=`hermes_workspace` | ≥1 hit (path or content); after path-parity deploy expect path hits on `EXPORTS_*` + folder |
+| **T2-5** | Regression: `summarize_powerunits_workspace_full` | Still works (Tier 1 retained) |
+| **T2-6** | Negative: Tier‑3 skills tool / Terminal | Unavailable / refused |
+| **T2-7** | Optional: `read_powerunits_local_reference_file` path=`operator_scope_snapshot_v1.json` | Only if example tree installed; else expect clear “directory does not exist” |
+
+**Evidence (2026-07-23 Telegram):** T2-0…T2-1, T2-3…T2-6 **passed**. Reference dir absent (OK). T2-4 content hit OK; path-only parity follow-up in code. Tag: **`powerunits-tier2-uplift-20260723`**.
+
+**Log note:** Many `check_fn returned False` for `*_execute` / `*_campaign` under `stage1_read_health` = **expected**.
+
+**Next:** soak on Tier 2; do not raise to Tier 3 without staffed review. Optional local_reference seed.
 ---
 
 ## Startup checks

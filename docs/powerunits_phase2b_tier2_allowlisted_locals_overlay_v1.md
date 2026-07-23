@@ -60,3 +60,19 @@
 
 1. **`HERMES_POWERUNITS_CAPABILITY_TIER=1`** (**keeps Tier 1 / 2A only**) or **`0`** (baseline) per operational choice.
 2. Re-run **`apply_policy`** on boot path + restart gateway (**no migration**).
+
+---
+
+## Operator uplift evidence (2026-07-23)
+
+**Preconditions met:** Tier‑1 path-search smoke (`EXPORTS` → 3 path hits under `exports/`) after `bb75a8c60`; posture aligned; `stage1_read_health` + `first_safe_v1`.
+
+**Uplift:** Railway **`HERMES_POWERUNITS_CAPABILITY_TIER=2`** → Redeploy → RUNBOOK Tier‑2 smoke pack.
+
+**Telegram evidence:** Posture `tier_effective_integer=2` + Tier‑2 observed + `aligned`; manifest OK; allowlisted summarize 9 files (reference absent OK); EXPORTS search ≥1 content hit; Tier‑1 regression OK; path escape / Tier‑3 blocked. Tag: **`powerunits-tier2-uplift-20260723`**.
+
+**Follow-up:** `search_powerunits_allowlisted_local_text` gained path/basename parity (`match_kind=path|content`) so filename-only queries match T1 behavior.
+
+**Expected log noise:** `check_fn … returned False` for execute/campaign/preflight families under `stage1_read_health` is **not** a Tier‑2 failure.
+
+**Optional seed:** `docker/powerunits_local_reference_example/` → `/opt/data/powerunits_local_reference/` (no secrets).

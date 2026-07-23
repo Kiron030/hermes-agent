@@ -55,4 +55,4 @@
 
 ## Uplift evidence (2026-07-23)
 
-Telegram smokes after `CAPABILITY_TIER=1` + v0.19: posture overlay observed, workspace full summary clean (8 files), search content OK; filename-only queries previously returned 0 hits — addressed by path/basename matching in `search_powerunits_workspace_text`. Tag: **`powerunits-tier1-uplift-20260723`**. See [`powerunits_hermes_coworker_tier_ladder_v1.md`](powerunits_hermes_coworker_tier_ladder_v1.md).
+Telegram smokes after `CAPABILITY_TIER=1` + v0.19: posture overlay observed, workspace full summary clean (8 files), search content OK; filename-only `EXPORTS` → **3 path hits** after `bb75a8c60` (Tier‑1 uplift evidence). Tag: **`powerunits-tier1-uplift-20260723`**. Next: Tier **2** (`CAPABILITY_TIER=2`) — see [`powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md`](powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md) + RUNBOOK T2 pack. Ladder: [`powerunits_hermes_coworker_tier_ladder_v1.md`](powerunits_hermes_coworker_tier_ladder_v1.md).

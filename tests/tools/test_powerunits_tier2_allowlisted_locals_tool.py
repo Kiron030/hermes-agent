@@ -74,8 +74,28 @@ def test_search_across_roots(t2, tmp_path: Path) -> None:
         t2.search_powerunits_allowlisted_local_text(query="token-beta-unique")
     )
     assert out["match_count"] >= 1
+    assert any(m.get("match_kind") == "content" for m in out["matches"])
     paths_upper = "|".join(m["path"] for m in out["matches"]).upper()
     assert "POWERUNITS_LOCAL_REFERENCE" in paths_upper
+
+
+def test_search_matches_filename(t2, tmp_path: Path) -> None:
+    """Parity with Tier-1: filename-only queries must hit path matches."""
+    ws = tmp_path / "hermes_workspace"
+    (ws / "exports").mkdir(parents=True, exist_ok=True)
+    (ws / "exports" / "EXPORTS_smoke_probe.txt").write_text("no-keyword-here\n", encoding="utf-8")
+    (ws / "exports" / "other.csv").write_text("a,b\n", encoding="utf-8")
+
+    out = json.loads(
+        t2.search_powerunits_allowlisted_local_text(
+            query="EXPORTS",
+            root_scope="hermes_workspace",
+            subdir="exports",
+        )
+    )
+    assert out["match_count"] >= 1
+    assert out["path_match_count"] >= 1
+    assert any(m.get("match_kind") == "path" for m in out["matches"])
 
 
 def test_read_reference_file(t2, tmp_path: Path) -> None:

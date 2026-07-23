@@ -1,0 +1,12 @@
+{
+  "schema": "powerunits_local_reference_operator_scope_v1",
+  "read_only": true,
+  "note": "Non-secret operator snapshot for Tier-2 local_reference demos. Repo B remains authoritative.",
+  "national_tier1_iso2": ["AT", "BE", "CZ", "DE", "FI", "FR", "HU", "NL", "PL", "RO", "SK"],
+  "bzn_advisory_iso2": ["DK", "NO", "SE", "IT", "IE"],
+  "empirical_candidate_iso2": ["DK", "NO", "IE"],
+  "docs": [
+    "docs/powerunits_phase2b_tier2_allowlisted_locals_overlay_v1.md",
+    "docs/powerunits_hermes_coworker_tier_ladder_v1.md"
+  ]
+}

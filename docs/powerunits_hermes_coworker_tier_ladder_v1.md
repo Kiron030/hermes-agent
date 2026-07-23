@@ -4,9 +4,9 @@
 **Canonical capability roadmap (technical):** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md).  
 **This file:** **operating plan** — how we climb tiers toward a strong, still-bounded co-worker without losing `first_safe_v1`.
 
-**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=1`** (Phase 2A).  
-Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**.  
-**Soak:** stay on Tier 1 ≥3 days before Tier 2.
+**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=2`** (Phase 2B) — **smoke green**, soak.  
+Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**, **`powerunits-tier2-uplift-20260723`**.  
+Tier‑2 follow-up: path/basename parity in `search_powerunits_allowlisted_local_text` (smoke showed 1 content hit vs 3 path hits on T1).
 
 ---
 
@@ -36,15 +36,15 @@ Hermes should become an **increasingly capable internal analyst / operator assis
 
 ---
 
-## Current recommended Railway env (Tier 1 soak)
+## Current recommended Railway env (Tier 2 soak)
 
 ```text
 HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
-HERMES_POWERUNITS_CAPABILITY_TIER=1
+HERMES_POWERUNITS_CAPABILITY_TIER=2
 ```
 
-Tier 0 (conservative rollback) uses `CAPABILITY_TIER=0` instead.
+Rollback to Tier 1: set `CAPABILITY_TIER=1`.
 
 ---
 
@@ -53,8 +53,8 @@ Tier 0 (conservative rollback) uses `CAPABILITY_TIER=0` instead.
 | Step | Env `CAPABILITY_TIER` | What Hermes gains | Human role | Soak / gate |
 |------|----------------------|-------------------|------------|-------------|
 | **T0** | `0` | Trusted Analyst: triptychon, posture, BZN/Repo-B/Timescale reads, empirical validate, first_safe | Daily driver; ask Hermes for health/posture | **Done** — tag `powerunits-tier0-baseline-20260723` |
-| **T1** | `1` | Phase **2A**: workspace full summary + bounded text/path search under `hermes_workspace` | Use for session notes / export hygiene | **Live soak** — uplift evidence 2026-07-23; tag `powerunits-tier1-uplift-20260723` |
-| **T2** | `2` | Phase **2B**: allowlisted local reference reads | Drop curated local refs; Hermes searches them | ≥1 week on T1; no secrets under local_reference |
+| **T1** | `1` | Phase **2A**: workspace full summary + bounded text/path search under `hermes_workspace` | Use for session notes / export hygiene | **Done** — path-search smoke green; tag `powerunits-tier1-uplift-20260723` |
+| **T2** | `2` | Phase **2B**: allowlisted locals + JSON/YAML workspace reads + optional `powerunits_local_reference` | Curate refs (no secrets); extended reads | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier2-uplift-20260723` |
 | **T3** | `3` | Skills **observer** (diagnose/propose JSON, SKILL preview) | Triage proposals; Curator still off | Explicit staffed review window |
 | **T4** | `4` | Skill **drafts** under `hermes_workspace/drafts/...` only | Human review drafts; never auto-promote to live `skills/` | Draft volume watchers green |
 | **T5** | `5` | Review **governance** + `governance/` notes | Accept/reject drafts via review_status | Clear promotion ritual |
@@ -116,9 +116,22 @@ Evidence (Telegram 2026-07-23):
 
 **Operator:** soak ≥3 days on Tier 1; use workspace notes for ops diary; optional `/sethome` in the one Telegram chat.
 
-### Step 3 — Tier 2 (allowlisted locals) — next after soak
+### Step 3 — Tier 2 (allowlisted locals) — **done (soak)**
 
-Only after T1 soak. Prepare `powerunits_local_reference` content deliberately (no secrets).
+Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=2`):
+
+| Smoke | Result |
+|-------|--------|
+| Posture | `tier_effective_integer=2`, Tier‑2 overlay observed, `aligned=true`, no `phase_2b_drift*`, `caution_flags=[]` |
+| Manifest | Roots `hermes_workspace` + optional `powerunits_local_reference`; 5 Tier‑2 tools listed |
+| `summarize_powerunits_allowlisted_locals` | 9 files / ~8KB workspace; reference dir absent (`files=0`) — OK |
+| `search_powerunits_allowlisted_local_text` EXPORTS | ≥1 content hit (`EXPORTS_PHASE1_OPERATOR.txt`); path-only CSV hits incomplete vs T1 → **path match parity** shipped in follow-up |
+| Regression `summarize_powerunits_workspace_full` | Still works (Tier 1 retained) |
+| Negatives | Path escape blocked; Tier‑3 tools unavailable; web search allowed under first_safe (expected) |
+
+**Operator:** soak on Tier 2; optional seed `docker/powerunits_local_reference_example/` → `/opt/data/powerunits_local_reference/`. Do **not** open Tier 3 until soak + staffed review window.
+
+**Expected log noise:** `check_fn … returned False` for **execute/campaign/preflight** under `stage1_read_health` is **normal**.
 
 ### Step 4+ — Skills / drafts / governance / workflow
 
