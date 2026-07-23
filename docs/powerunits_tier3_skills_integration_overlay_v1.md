@@ -84,11 +84,19 @@ Quick consistency check (canonical numbers live in [`powerunits_hermes_progressi
 
 ## Watchers — before uplift to capability tier `3`
 
-- Baseline tag + **`HERMES_HOME`** snapshot (skills + `.usage.json`).
-- Tier **2** posture clean (no **`phase_2b_drift*`**).
-- Decide **explicitly** whether **`auxiliary.curator`** may ever flip **true** on this gateway; if yes, document who reviews Curator deltas.
+- Baseline tag + **`HERMES_HOME`** snapshot (skills + `.usage.json`) if practical.
+- Tier **2** posture clean (no **`phase_2b_drift*`**) — **met 2026-07-23** (`powerunits-tier2-uplift-20260723`, path-parity re-smoke green).
+- Decide **explicitly** whether **`auxiliary.curator`** may ever flip **true** on this gateway; default for Powerunits: **keep false**. Who reviews proposal JSON? → **Ron** in the review window (Telegram + optional Cursor).
 
-## Watchers — after uplift
+## Review-Fenster (operator meaning)
+
+A short **staffed** session after `CAPABILITY_TIER=3`: run RUNBOOK **T3-0…T3-7**, read observer/diagnose/propose output, confirm nothing was auto-merged, keep Curator off. Not a calendar product — just deliberate human attention.
+
+## Operator uplift evidence (2026-07-23)
+
+Telegram review window **passed**: posture `tier=3` + Tier‑3 observed + `aligned`; skills observer (~99 `SKILL.md`, 11 active); diagnose clean; propose `count=0` with `explicitly_not_auto_applied=true`; Tier‑2 regression OK; negatives (path escape / no live skill write) OK; browse/preview `research/arxiv` OK; **Curator remains off**.
+
+Tag: **`powerunits-tier3-uplift-20260723`**. Soft note: observer reported curator state “not paused” — treat as state-file hygiene; policy still keeps `auxiliary.curator.enabled: false` and propose path confirms no autonomous merge.## Watchers — after uplift
 
 | Signal | Action |
 |--------|--------|

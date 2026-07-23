@@ -4,9 +4,9 @@
 **Canonical capability roadmap (technical):** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md).  
 **This file:** **operating plan** — how we climb tiers toward a strong, still-bounded co-worker without losing `first_safe_v1`.
 
-**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=2`** (Phase 2B) — **smoke green**, soak.  
-Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**, **`powerunits-tier2-uplift-20260723`**.  
-Tier‑2 follow-up: path/basename parity in `search_powerunits_allowlisted_local_text` (smoke showed 1 content hit vs 3 path hits on T1).
+**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=3`** (skills observer) — **smoke green**, soak.  
+Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**, **`powerunits-tier2-uplift-20260723`**, **`powerunits-tier3-uplift-20260723`**.  
+Curator remains **off**; Tier 3 is observe/propose-only.
 
 ---
 
@@ -36,15 +36,15 @@ Hermes should become an **increasingly capable internal analyst / operator assis
 
 ---
 
-## Current recommended Railway env (Tier 2 soak)
+## Current recommended Railway env (Tier 3 soak)
 
 ```text
 HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
-HERMES_POWERUNITS_CAPABILITY_TIER=2
+HERMES_POWERUNITS_CAPABILITY_TIER=3
 ```
 
-Rollback to Tier 1: set `CAPABILITY_TIER=1`.
+Rollback to Tier 2: set `CAPABILITY_TIER=2`.
 
 ---
 
@@ -55,7 +55,7 @@ Rollback to Tier 1: set `CAPABILITY_TIER=1`.
 | **T0** | `0` | Trusted Analyst: triptychon, posture, BZN/Repo-B/Timescale reads, empirical validate, first_safe | Daily driver; ask Hermes for health/posture | **Done** — tag `powerunits-tier0-baseline-20260723` |
 | **T1** | `1` | Phase **2A**: workspace full summary + bounded text/path search under `hermes_workspace` | Use for session notes / export hygiene | **Done** — path-search smoke green; tag `powerunits-tier1-uplift-20260723` |
 | **T2** | `2` | Phase **2B**: allowlisted locals + JSON/YAML workspace reads + optional `powerunits_local_reference` | Curate refs (no secrets); extended reads | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier2-uplift-20260723` |
-| **T3** | `3` | Skills **observer** (diagnose/propose JSON, SKILL preview) | Triage proposals; Curator still off | Explicit staffed review window |
+| **T3** | `3` | Skills **observer** (diagnose/propose JSON, SKILL preview) | Triage proposals; Curator still off | **Done / soak** — smoke 2026-07-23; tag `powerunits-tier3-uplift-20260723` |
 | **T4** | `4` | Skill **drafts** under `hermes_workspace/drafts/...` only | Human review drafts; never auto-promote to live `skills/` | Draft volume watchers green |
 | **T5** | `5` | Review **governance** + `governance/` notes | Accept/reject drafts via review_status | Clear promotion ritual |
 | **T6** | `6` | Bounded **workflow scaffolding** (run records) | Operator still triggers Repo B execute | Records ≠ HTTP truth |
@@ -129,13 +129,44 @@ Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=2`):
 | Regression `summarize_powerunits_workspace_full` | Still works (Tier 1 retained) |
 | Negatives | Path escape blocked; Tier‑3 tools unavailable; web search allowed under first_safe (expected) |
 
-**Operator:** soak on Tier 2; optional seed `docker/powerunits_local_reference_example/` → `/opt/data/powerunits_local_reference/`. Do **not** open Tier 3 until soak + staffed review window.
+**Operator:** Tier‑2 path-search parity re-smoke **passed** (`EXPORTS` → 3 path hits). Optional seed `docker/powerunits_local_reference_example/` → `/opt/data/powerunits_local_reference/`.
 
 **Expected log noise:** `check_fn … returned False` for **execute/campaign/preflight** under `stage1_read_health` is **normal**.
 
-### Step 4+ — Skills / drafts / governance / workflow
+### What is a “Review-Fenster”?
 
-Follow progressive posture overlay docs; never skip soak; never enable Curator as a shortcut.
+Kein UI und kein Railway-Feature. Es ist eine **bewusste Operator-Phase** nach einem Tier‑Uplift:
+
+1. Du setzt **nur** `CAPABILITY_TIER` (+ Redeploy).
+2. Du läufst die RUNBOOK-Smokes (Posture + neue Tools + ein Negativ).
+3. Du (oder Agent + du) **liest** die Outputs — bei Tier 3: Observer-/Diagnose-/Proposal-JSON — und entscheidet, was (nicht) weitergeht.
+4. **Curator bleibt aus** (`auxiliary.curator.enabled: false`). Tier 3 schreibt **nichts** in live `skills/`.
+5. Wenn Drift/Unruhe: Rollback = Tier wieder auf `2`.
+
+Für Tier 0→2 war “Soak” oft “ein paar Tage ruhig laufen”. Für Tier 3 reicht ein **kurzes, besetztes Fenster** (30–60 Min Telegram), weil das Overlay read-only/propose-only ist — vorausgesetzt Posture bleibt `aligned` und Curator bleibt off.
+
+### Step 4 — Tier 3 (skills observer) — **done (soak)**
+
+Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=3`):
+
+| Smoke | Result |
+|-------|--------|
+| Posture | `tier_effective_integer=3`, Tier‑3 observed, Tier 1+2 retained, `aligned=true`, `caution_flags=[]` |
+| `summarize_powerunits_skills_observer` | ~99 `SKILL.md`; 12 bundled manifests; 11 active; no load errors |
+| `diagnose_powerunits_skills_signals` | no duplicates / stale / injection-like; 0 proposals; clean |
+| `propose_powerunits_skill_integration_actions` | `count=0`, `explicitly_not_auto_applied=true`, `requires_human_review=true` |
+| Regression `summarize_powerunits_allowlisted_locals` | 9 files; Tier 2 OK |
+| Negatives | Path escape / Terminal blocked; no live `skills/` write; Tier‑4 drafts not enabled |
+| Optional browse/preview | `research/*` tree + `research/arxiv` preview OK |
+| Decision | **Curator bleibt aus**; keine auffälligen Proposals |
+
+**Operator:** soak on Tier 3; use observer weekly if useful; **do not** enable Curator; **do not** jump to Tier 4 until a second review window.
+
+### Step 5 — Tier 4A (skill draft proposals) — **next after soak**
+
+Only after Tier‑3 soak feels quiet. Adds **draft files** under `hermes_workspace/drafts/powerunits_skill_proposals/` — still **no** live `skills/` writes. Needs another short review window (`CAPABILITY_TIER=4`).
+
+Detail: [`powerunits_tier4a_skill_draft_proposals_overlay_v1.md`](powerunits_tier4a_skill_draft_proposals_overlay_v1.md).
 
 ### Repo B track (parallel, not Hermes tier)
 

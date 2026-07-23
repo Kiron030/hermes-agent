@@ -88,11 +88,33 @@ Optional seed (no secrets): copy repo
 | **T2-6** | Negative: Tier‑3 skills tool / Terminal | Unavailable / refused |
 | **T2-7** | Optional: `read_powerunits_local_reference_file` path=`operator_scope_snapshot_v1.json` | Only if example tree installed; else expect clear “directory does not exist” |
 
-**Evidence (2026-07-23 Telegram):** T2-0…T2-1, T2-3…T2-6 **passed**. Reference dir absent (OK). T2-4 content hit OK; path-only parity follow-up in code. Tag: **`powerunits-tier2-uplift-20260723`**.
+**Evidence (2026-07-23 Telegram):** T2-0…T2-1, T2-3…T2-6 **passed**. Path-parity re-smoke: `EXPORTS` → **3 path hits**. Reference dir absent (OK). Tag: **`powerunits-tier2-uplift-20260723`**.
 
 **Log note:** Many `check_fn returned False` for `*_execute` / `*_campaign` under `stage1_read_health` = **expected**.
 
-**Next:** soak on Tier 2; do not raise to Tier 3 without staffed review. Optional local_reference seed.
+### Tier 3 uplift (skills observer) — after `CAPABILITY_TIER=3`
+
+**Review-Fenster:** 30–60 Min besetzt (Posture + Observer-Smokes + Negativ). Tier 3 ist **read/propose-only**; Curator bleibt **off**.
+
+Railway: set **`HERMES_POWERUNITS_CAPABILITY_TIER=3`** only → Redeploy.
+
+| # | Prompt | Pass |
+|---|--------|------|
+| **T3-0** | `summarize_powerunits_operator_posture` | `tier_effective_integer=3`; `telegram_powerunits_tier3_skills_integration_observed=true`; Tier 1+2 still observed; `aligned=true`; no `tier3_skills_drift*`; Curator not autonomously enabled |
+| **T3-1** | `summarize_powerunits_skills_observer` | JSON inventory returns without crash; read-only |
+| **T3-2** | `diagnose_powerunits_skills_signals` | JSON diagnoses; advisory only |
+| **T3-3** | `propose_powerunits_skill_integration_actions` | `proposal_items` present or empty; proposals **not** auto-applied |
+| **T3-4** | Optional: `browse_powerunits_skills_tree` / `read_powerunits_skill_body_preview` | Bounded preview; no path escape |
+| **T3-5** | Regression: `summarize_powerunits_allowlisted_locals` | Tier 2 still works |
+| **T3-6** | Negative: Terminal / Tier‑4 draft tool / live skill write | Unavailable / refused |
+| **T3-7** | Decision note | Confirm Curator stays `false`; archive interesting proposals to workspace exports **manually** if useful |
+
+**Rollback:** `CAPABILITY_TIER=2` → Redeploy.
+
+**Evidence (2026-07-23 Telegram):** T3-0…T3-3, T3-5…T3-7 **passed**; T3-4 browse `research` + preview `research/arxiv` **passed**. Curator bleibt aus; `proposal_count=0`. Tag: **`powerunits-tier3-uplift-20260723`**.
+
+**Next:** soak on Tier 3; weekly optional observer/diagnose; Tier 4A only after quiet soak + new review window.
+
 ---
 
 ## Startup checks
