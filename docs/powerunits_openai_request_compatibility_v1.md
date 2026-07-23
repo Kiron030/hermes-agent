@@ -77,6 +77,20 @@ Das Weglassen inkompatibler `include`/`reasoning`-Felder fuer GPT-4.x auf direkt
 - **Keine** zusaetzlichen Railway-Variablen fuer diesen Fix noetig.
 - Bestehendes `OPENAI_API_KEY` + Powerunits-`config.yaml` (Policy) reichen.
 
+### v0.19.0-Regression (2026-07-23): `reasoning_effort` auf OpenAI direct
+
+**Symptom:** Telegram: „The model provider failed after retries“; Logs:
+`HTTP 400: Unrecognized request argument supplied: reasoning_effort` bei
+`provider=custom`, `base_url=https://api.openai.com/v1`, `gpt-4.1-mini`.
+
+**Ursache:** Upstream v0.19 `CustomProfile` sendet `reasoning_effort` top-level
+fuer Ollama/GLM (#25758). Powerunits setzt `agent.reasoning_effort: none` in
+`apply_powerunits_runtime_policy.py` — das wurde als `reasoning_effort="none"`
+an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
+`extra_body.think`).
+
+**Fix:** `plugins/model-providers/custom/__init__.py` — `_accepts_reasoning_effort_top_level()` gate: auf `api.openai.com` / Azure **beides** weglassen (`reasoning_effort` + `think`).
+
 ---
 
 ## Part D — One exact next recommendation

@@ -33,6 +33,25 @@ def _points_at_real_openai(base_url: Any) -> bool:
     return "api.openai.com" in s
 
 
+def _accepts_reasoning_effort_top_level(base_url: Any) -> bool:
+    """Gate top-level reasoning_effort to backends that understand it.
+
+    Official OpenAI Chat Completions (api.openai.com) and Azure OpenAI reject
+    reasoning_effort on standard chat models (HTTP 400 — same class of bug as
+    extra_body.think). Ollama, GLM/ARK, vLLM, and other OpenAI-compatible
+    relays may require it (#25758). Powerunits routes primary chat through
+    provider=custom + api.openai.com — see docs/powerunits_openai_request_compatibility_v1.md.
+    """
+    s = str(base_url or "").strip().lower()
+    if not s:
+        return True
+    if "api.openai.com" in s:
+        return False
+    if "openai.azure.com" in s:
+        return False
+    return True
+
+
 def _accepts_ollama_think_extra_body(base_url: Any) -> bool:
     """Gate extra_body["think"] (Ollama extension) to servers that support it.
 
@@ -88,7 +107,9 @@ class CustomProfile(ProviderProfile):
         if reasoning_config and isinstance(reasoning_config, dict):
             _effort = (reasoning_config.get("effort") or "").strip().lower()
             _enabled = reasoning_config.get("enabled", True)
-            if _effort == "none" or _enabled is False:
+            if not _accepts_reasoning_effort_top_level(base_url):
+                pass  # OpenAI/Azure direct: omit reasoning_effort entirely
+            elif _effort == "none" or _enabled is False:
                 # Ollama's /v1/chat/completions silently ignores
                 # extra_body.think (only /api/chat honours it — ollama#14820)
                 # but respects the top-level reasoning_effort field, so both

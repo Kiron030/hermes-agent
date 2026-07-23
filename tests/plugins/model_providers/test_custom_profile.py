@@ -104,6 +104,42 @@ class TestCustomReasoningWireShape:
         assert eb.get("think") is not True
 
 
+class TestCustomOpenAiDirectGates:
+    """Powerunits primary route: custom + https://api.openai.com/v1 + gpt-4.1-mini."""
+
+    _OPENAI = "https://api.openai.com/v1"
+
+    def test_disabled_reasoning_omits_effort_and_think_on_openai_direct(
+        self, custom_profile
+    ):
+        """agent.reasoning_effort=none must not become HTTP 400 on OpenAI direct."""
+        eb, tl = custom_profile.build_api_kwargs_extras(
+            reasoning_config={"enabled": False},
+            base_url=self._OPENAI,
+            model="gpt-4.1-mini",
+        )
+        assert eb == {}
+        assert tl == {}
+
+    def test_effort_none_omits_both_on_openai_direct(self, custom_profile):
+        eb, tl = custom_profile.build_api_kwargs_extras(
+            reasoning_config={"enabled": True, "effort": "none"},
+            base_url=self._OPENAI,
+            model="gpt-4.1-mini",
+        )
+        assert eb == {}
+        assert tl == {}
+
+    def test_enabled_effort_omits_on_openai_direct(self, custom_profile):
+        eb, tl = custom_profile.build_api_kwargs_extras(
+            reasoning_config={"enabled": True, "effort": "high"},
+            base_url=self._OPENAI,
+            model="gpt-4.1-mini",
+        )
+        assert eb == {}
+        assert tl == {}
+
+
 class TestCustomReasoningWithNumCtx:
     """Ollama num_ctx and reasoning are independent and compose."""
 
