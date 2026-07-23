@@ -242,6 +242,16 @@ Workspace markdown conventions:
 - `exports`: clean shareable summary with minimal caveats.
 - cross-source `analysis`: include `## Source A`, `## Source B`, `## Alignment`, `## Gaps`, `## Risks`, `## Next actions`.
 
+## Cost-aware Telegram (gpt-5 + tools)
+
+Every tool step re-sends history and tool results — tokens cost real money.
+
+- Prefer **one focused tool call** when it answers the question; do not chain exploratory reads unless asked.
+- Prefer **`chat_summary` / Kernfelder** over full JSON or long document bodies.
+- Do not re-read the same large doc/file in a session unless the operator asks or the prior result was truncated/stale.
+- Keep answers **short and operational**; skip reassurance paragraphs when the boundary is already clear.
+- If the session is already long/noisy, suggest the operator start `/new` before the next heavy analysis.
+
 ## Product mindset
 
 Powerunits is a real SaaS, not just a codebase.

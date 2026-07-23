@@ -75,12 +75,32 @@ POWERUNITS_PRIMARY_MODEL_FALLBACK = "gpt-5.4"
 POWERUNITS_PRIMARY_PROVIDER = "custom"
 POWERUNITS_PRIMARY_BASE_URL = "https://api.openai.com/v1"
 
-# GPT-5.4 Responses trial: reasoning on by default (medium). Rollback via
-# HERMES_POWERUNITS_REASONING_EFFORT=none (or model rollback to gpt-4.1).
-POWERUNITS_REASONING_EFFORT_FALLBACK = "medium"
+# GPT-5.4 Responses: reasoning on by default (low — cost/quality compromise after
+# medium trial). Override via HERMES_POWERUNITS_REASONING_EFFORT; model rollback
+# to gpt-4.1 forces none.
+POWERUNITS_REASONING_EFFORT_FALLBACK = "low"
 _ALLOWED_REASONING_EFFORTS = frozenset(
     {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
 )
+
+# Side-task LLM calls inherit the main model when provider=auto; pin thinking off
+# so compression/titles/etc. do not burn gpt-5.4 reasoning tokens.
+_AUX_REASONING_NONE_TASKS = (
+    "compression",
+    "title_generation",
+    "vision",
+    "web_extract",
+    "skills_hub",
+    "approval",
+    "mcp",
+    "memory_query_rewrite",
+)
+
+# Tighter than Hermes defaults (50k/2000/2000) — Telegram tool loops re-send
+# results every step; keep quality for short excerpts, cut huge dumps.
+POWERUNITS_TOOL_OUTPUT_MAX_BYTES = 32000
+POWERUNITS_TOOL_OUTPUT_MAX_LINES = 800
+POWERUNITS_TOOL_OUTPUT_MAX_LINE_LENGTH = 1200
 
 
 def _resolve_primary_model() -> str:
@@ -105,7 +125,7 @@ def _api_mode_for_primary_model(model: str) -> str:
 def _resolve_reasoning_effort(primary_model: str) -> str:
     """Resolve agent.reasoning_effort for Powerunits first_safe_v1.
 
-    - GPT-5*: default ``medium`` (Responses + ``reasoning.effort``).
+    - GPT-5*: default ``low`` (Responses + ``reasoning.effort``).
     - Non-GPT-5: force ``none`` (GPT-4.x rejects encrypted reasoning include).
     - Env ``HERMES_POWERUNITS_REASONING_EFFORT`` overrides on GPT-5* only
       (invalid values fall back to ``none`` fail-closed).
@@ -160,14 +180,24 @@ def apply_policy(config_path: Path) -> None:
     model_cfg["api_mode"] = _api_mode_for_primary_model(primary_model)
     cfg["model"] = model_cfg
 
-    # Reasoning dial (GPT-5 Responses only). Default medium for the 5.4 trial;
-    # set HERMES_POWERUNITS_REASONING_EFFORT=none to roll back without model change.
-    # Non-GPT-5 primary always pins none (encrypted include unsafe on GPT-4.x).
+    # Reasoning dial (GPT-5 Responses only). Default low (cost/quality); override
+    # via HERMES_POWERUNITS_REASONING_EFFORT. Non-GPT-5 primary always pins none.
     agent_cfg = cfg.get("agent")
     if not isinstance(agent_cfg, dict):
         agent_cfg = {}
     agent_cfg["reasoning_effort"] = _resolve_reasoning_effort(primary_model)
+    # Batch independent tools in one turn — fewer round-trips / resent context.
+    agent_cfg["parallel_tool_call_guidance"] = True
     cfg["agent"] = agent_cfg
+
+    # Cap raw tool dumps that inflate every subsequent loop step.
+    tool_output = cfg.get("tool_output")
+    if not isinstance(tool_output, dict):
+        tool_output = {}
+    tool_output["max_bytes"] = POWERUNITS_TOOL_OUTPUT_MAX_BYTES
+    tool_output["max_lines"] = POWERUNITS_TOOL_OUTPUT_MAX_LINES
+    tool_output["max_line_length"] = POWERUNITS_TOOL_OUTPUT_MAX_LINE_LENGTH
+    cfg["tool_output"] = tool_output
 
     # Enforce narrow, explicit platform toolset policy (fail-closed for gateway usage).
     platform_toolsets = cfg.get("platform_toolsets")
@@ -232,6 +262,12 @@ def apply_policy(config_path: Path) -> None:
         curator = {}
     curator.setdefault("enabled", False)
     auxiliary["curator"] = curator
+    for task_name in _AUX_REASONING_NONE_TASKS:
+        task_cfg = auxiliary.get(task_name)
+        if not isinstance(task_cfg, dict):
+            task_cfg = {}
+        task_cfg["reasoning_effort"] = "none"
+        auxiliary[task_name] = task_cfg
     cfg["auxiliary"] = auxiliary
 
     redaction = cfg.get("redaction")

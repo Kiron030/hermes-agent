@@ -279,7 +279,13 @@ def test_apply_policy_gpt54_trial_uses_codex_responses(
         assert data["model"]["api_mode"] == "codex_responses"
         assert data["model"]["provider"] == "custom"
         assert data["model"]["base_url"] == "https://api.openai.com/v1"
-        assert data["agent"]["reasoning_effort"] == "medium"
+        assert data["agent"]["reasoning_effort"] == "low"
+        assert data["agent"]["parallel_tool_call_guidance"] is True
+        assert data["tool_output"]["max_bytes"] == 32000
+        assert data["tool_output"]["max_lines"] == 800
+        assert data["tool_output"]["max_line_length"] == 1200
+        assert data["auxiliary"]["compression"]["reasoning_effort"] == "none"
+        assert data["auxiliary"]["title_generation"]["reasoning_effort"] == "none"
 
 
 def test_apply_policy_primary_model_env_override_gpt41(

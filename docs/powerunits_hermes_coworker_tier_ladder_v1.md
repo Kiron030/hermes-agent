@@ -65,7 +65,7 @@ Rollback to Tier 3: set `CAPABILITY_TIER=3`.
 
 **Deferred / separate decision:** Curator on, public dashboard, multi-region (blocked by volume).  
 **Model trial (2026-07-23):** default **`gpt-5.4`** + Responses (`codex_responses`). Rollback: Railway `HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`.  
-**Reasoning trial (2026-07-23):** default **`agent.reasoning_effort: medium`** on GPT‑5*. Rollback: `HERMES_POWERUNITS_REASONING_EFFORT=none` (or model rollback → forces `none`).
+**Reasoning dial (2026-07-23):** default **`agent.reasoning_effort: low`** on GPT‑5* (medium trial was costly; low = cost/quality soak). Override: `HERMES_POWERUNITS_REASONING_EFFORT`. Model rollback → forces `none`.
 
 ---
 
