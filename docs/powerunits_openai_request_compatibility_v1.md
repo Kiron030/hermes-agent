@@ -93,6 +93,28 @@ an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
 
 ---
 
+## Model upgrade candidates (Powerunits OpenAI-direct setup)
+
+**Current default:** `gpt-4.1-mini` via `provider=custom` + `https://api.openai.com/v1` (`POWERUNITS_PRIMARY_MODEL_DEFAULT` in `apply_powerunits_runtime_policy.py`).
+
+**Practical rule:** change **model only** (not tier + profile in the same deploy). Prefer Chat Completions–friendly GPT‑4.1 family first; GPT‑5* may auto-switch to Responses API and needs a separate compatibility soak.
+
+Prices below are **OpenAI list** (~2026-07, USD per 1M tokens). Multiply by your Telegram tool-call volume; Hermes turns often burn more **input** (history + tool JSON) than output.
+
+| Model id | Practical on our setup? | Vs `gpt-4.1-mini` (quality) | What you gain | Cost vs mini (approx) | Notes |
+|----------|-------------------------|----------------------------|---------------|------------------------|-------|
+| **`gpt-4.1-nano`** | Yes (same Chat Completions path) | **Worse** for synthesis / long tool chains (~noticeably thinner) | Lower latency + bill | **~0.25×** ($0.10 / $0.40) | Only if cost/latency dominate |
+| **`gpt-4.1-mini`** *(current)* | Yes | Baseline | Best cost/quality for Stage‑1 ops | **1×** ($0.40 / $1.60) | Keep for soak |
+| **`gpt-4.1`** | Yes (same path; recommended uplift) | **Clearly better** instruction/tool fidelity (~“one step up”) | Tighter summaries, fewer missed tool args, better German structure | **~5×** ($2.00 / $8.00) | Best next lever after Tier‑4A soak |
+| **`gpt-4o`** / **`gpt-4o-mini`** | Possible, not preferred | Mixed; 4o often older/legacy vs 4.1 | Little unique win for text+tools here | 4o ~**6×+** mini; 4o-mini cheaper but weaker than 4.1-mini for this stack | Prefer stay on 4.1 family |
+| **`gpt-5` / `gpt-5-mini` / `gpt-5-nano`** | Possible later | Potentially stronger reasoning | Better hard multi-step reasoning | Varies; often ≠ simple 4.1 pricing | May force **Responses API**; re-validate OpenAI compat gates first |
+
+**Operator cost sketch (order of magnitude):** if a busy day is ~2M input + 0.4M output tokens on mini ≈ **$0.80 + $0.64 ≈ $1.4/day**, then **`gpt-4.1` ≈ ~$5–7/day** at the same volume (very rough).
+
+**Recommendation:** stay on **`gpt-4.1-mini`** during Tier‑4A soak; when ready for a **model-only** deploy, try **`gpt-4.1`** for 3–7 days with the same Telegram smoke pack (posture + one write + one negative).
+
+---
+
 ## Part D — One exact next recommendation
 
 `Redeploy Hermes after OpenAI request compatibility fix next`

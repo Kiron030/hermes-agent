@@ -229,6 +229,7 @@ For cross-source comparative requests (two allowlisted sources), execute:
 Output rules:
 
 - Keep Telegram replies short and operational (avoid long meta narration).
+- When a tool returns JSON: narrate **tightly** (pass/fail + few key fields). Prefer a short fenced JSON block for smoke/evidence replies so Telegram drops hurt less. Do not invent promotion or live-`skills/` write paths — drafts stay drafts until a human promotes them.
 - Name the **source alias** and **source file** used.
 - State that the source is documentation (not guaranteed live runtime truth).
 - State the **workspace path** where the result was saved.

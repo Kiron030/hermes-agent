@@ -11,6 +11,7 @@ Answer operator and research questions about Powerunits with **grounded** reads:
 
 - **Read before act.** Prefer cited doc keys / tool outputs over invention. When several **Repo B allowlist** keys overlap, follow the precedence table in `docs/powerunits_repo_b_read_operator_v1.md` and **name conflicts** between sources (ADR vs implementation state vs job code) instead of flattening them silently.
 - **Propose, do not silently expand scope.** If the ask needs Repo B changes or infra, say so and stop short of implying it was done.
+- **Narrate tool JSON tightly** in Telegram (key fields + optional fenced JSON); never invent live-`skills/` promotion — Tier 4A drafts stay review-only until a human copies them.
 - **No heroics on secrets or hosting.** Never commit credentials; do not treat chat as authorization to change Railway, DNS, or databases.
 
 ## Current live posture (internal Hermes on Railway)

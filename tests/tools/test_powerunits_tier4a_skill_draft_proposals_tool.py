@@ -140,6 +140,42 @@ def test_review_filters_and_rollups(t4, tmp_path: Path) -> None:
     assert rev["rollup_counts"]["by_target_skill"].get("alpha-skill") == 1
 
 
+def test_reject_workspace_prefixed_write_path(t4) -> None:
+    out = json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="drafts/powerunits_skill_proposals/oops.md",
+            body="# no",
+            proposal_kind="skill_draft_md",
+        )
+    )
+    assert out.get("error_code") == "invalid_path"
+
+
+def test_summarize_flags_nested_and_skips_readme_marker(t4, tmp_path: Path) -> None:
+    proposals = (
+        tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals"
+    )
+    proposals.mkdir(parents=True, exist_ok=True)
+    # Bootstrap pointer (created by ensure) + legacy nested unmarked file.
+    nested = proposals / "drafts" / "powerunits_skill_proposals"
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / "legacy.md").write_text("# old unmarked\n", encoding="utf-8")
+    json.loads(
+        t4.write_powerunits_skill_draft_proposal(
+            relative_file_path="2026-07-23/ok.md",
+            body="# ok",
+            proposal_kind="skill_draft_md",
+        )
+    )
+    s = json.loads(t4.summarize_powerunits_skill_draft_proposals())
+    flags = "|".join(s["caution_flags"])
+    assert "nested_proposals_prefix" in flags
+    assert s["hygiene_hints"]["bootstrap_pointer_excluded_from_marker_scan"] == (
+        "README_POWERUNITS_TIER4A.txt"
+    )
+    assert s["hygiene_hints"]["nested_proposals_prefix_count"] >= 1
+
+
 def test_summarize_missing_marker_probe(t4, tmp_path: Path) -> None:
     root = tmp_path / "hermes_workspace" / "drafts" / "powerunits_skill_proposals"
     root.mkdir(parents=True)

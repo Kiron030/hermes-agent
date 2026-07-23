@@ -61,8 +61,9 @@ All tools **`check_fn`:** **`HERMES_POWERUNITS_CAPABILITY_TIER ≥ 4`**.
 | **`tier4a_draft_churn_24h`** | Many files touched in **24h** → confirm intentional batch work. |
 | **`tier4a_proposals_list_truncated_at_*`** | Listing/summary hit internal caps → narrow prefix or prune. |
 | **`tier4a_draft_review_queue_large`** | Many draft files (review queue) → schedule triage or **`review_powerunits_skill_draft_proposals`** with filters. |
-| **`tier4a_drafts_some_files_missing_marker_in_head`** | Sampled files lack **`powerunits_tier_4a_proposal`** in the first bytes → confirm manual imports / non-Tier-4A text. |
-| **`tier4a_review_*`** (from **`review_powerunits_skill_draft_proposals`**) | Filter had no matches, queue truncated, many unspecified **`target_skill_name`**, or **review overload** heuristic — narrow filters or prune. |
+| **`tier4a_drafts_some_files_missing_marker_in_head`** | Sampled files lack **`powerunits_tier_4a_proposal`** in the first bytes → confirm manual imports / non-Tier-4A text. **`README_POWERUNITS_TIER4A.txt`** is excluded from this scan. |
+| **`tier4a_drafts_nested_proposals_prefix`** | Existing files under a redundant **`drafts/powerunits_skill_proposals/**` nest inside the proposals root → prune/relocate; new writes that re-include that prefix are **rejected**. |
+| **`tier4a_review_*`** (from **`review_powerunits_skill_draft_proposals`**) | Filter had no matches, queue truncated, many unspecified **`target_skill_name`**, nested-prefix leftovers, or **review overload** heuristic — narrow filters or prune. |
 
 ---
 
@@ -104,3 +105,17 @@ Telegram review window **passed** at `CAPABILITY_TIER=4`: posture overlays 1–4
 Tag: **`powerunits-tier4a-uplift-20260723`**.
 
 **Adaptation ideas (ascending priority × potential):** exclude README from marker caution → nested-path watcher → prune/relabel legacy drafts → optional SOUL brevity → model bump only as separate decision → Tier 4B after soak.
+
+### Operator hygiene (Telegram + volume)
+
+1. Prefer important tool JSON in a **fenced code block** (Telegram drop resilience).
+2. Run **`summarize_powerunits_skill_draft_proposals`** — read **`caution_flags`** + **`hygiene_hints`**.
+3. On the Railway volume under `/opt/data/hermes_workspace/drafts/powerunits_skill_proposals/`: delete or move nested `drafts/powerunits_skill_proposals/**` and unmarked legacy files; **keep** `README_POWERUNITS_TIER4A.txt`.
+4. New drafts: paths like `YYYY-MM-DD/name.md` only (not workspace-prefixed).
+
+### Shipped guardrail tweaks (2026-07-23)
+
+- Nested workspace-prefixed writes **rejected**; summarize/review emit **`tier4a_drafts_nested_proposals_prefix`** / review twin.
+- Summarize **`hygiene_hints`** for operator prune.
+- SOUL: tight tool-JSON narration; no invented live-skill promotion.
+- Model bump remains a **separate** lever (see [`powerunits_openai_request_compatibility_v1.md`](powerunits_openai_request_compatibility_v1.md) + ladder).

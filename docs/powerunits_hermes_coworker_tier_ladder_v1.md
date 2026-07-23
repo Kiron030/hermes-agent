@@ -180,17 +180,14 @@ Evidence (Telegram 2026-07-23, after `CAPABILITY_TIER=4`):
 
 **Operator:** soak on Tier 4A; do **not** open Tier 4B (`=5`) until draft hygiene + triage feel quiet.
 
-### Adaptation backlog (from Tier‑4A smoke; ascending priority × potential)
+### Adaptation backlog (from Tier‑4A smoke; status)
 
-See § below and overlay doc. Do **not** treat as immediate must-ship.
-
-1. **Low:** Exclude `README_POWERUNITS_TIER4A.txt` from “missing marker” caution (pointer file by design).
-2. **Low:** Telegram stability / “repeat last tool JSON in code fence” operator habit (not a fork change).
-3. **Medium:** Detect / warn on **nested** relative paths that re-include `drafts/powerunits_skill_proposals/`.
-4. **Medium:** One-shot operator prune or relocate legacy drafts without markers.
-5. **Higher (later):** Optional SOUL one-liner: “narrate tool JSON tightly; don’t invent promotion paths.”
-6. **Higher (later, separate decision):** Model bump `gpt-4.1` for synthesis quality — **not** during tier uplift.
-7. **Highest only if needed:** Tier 4B governance when you want formal `review_status` workflow — after soak.
+1. **Done:** Exclude `README_POWERUNITS_TIER4A.txt` from marker caution (already in summarize; documented).
+2. **Done (docs):** Telegram fenced-JSON habit + SOUL brevity / no invented promotion.
+3. **Done:** Nested-path reject on write + summarize/review caution + `hygiene_hints`.
+4. **Operator (manual):** prune legacy nested/unmarked drafts on volume — see overlay hygiene section.
+5. **Deferred:** Model bump (`gpt-4.1`) — separate deploy; see OpenAI compatibility doc model table.
+6. **Deferred:** Tier 4B (`=5`) after quiet soak.
 
 ### Step 6 — Tier 4B / later
 

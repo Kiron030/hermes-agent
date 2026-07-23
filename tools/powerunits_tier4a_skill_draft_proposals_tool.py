@@ -39,6 +39,11 @@ _CAUTION_REVIEW_QUEUE_ENTRIES = 80
 _MAX_REVIEW_HEAD_BYTES = 24_000
 _MAX_REVIEW_ENTRIES_CAP = 400
 _TIER4A_POINTER_NAME = "README_POWERUNITS_TIER4A.txt"
+# Operators sometimes paste workspace-relative paths; reject nested proposals prefix.
+_NESTED_PROPOSALS_PREFIXES = (
+    "drafts/powerunits_skill_proposals/",
+    "hermes_workspace/drafts/powerunits_skill_proposals/",
+)
 _TIER4A_POINTER_BODY = """Powerunits Hermes — Tier 4A skill draft proposals (operator pointer).
 
 Canonical roadmap (do not fork): docs/powerunits_hermes_progressive_posture_v1.md
@@ -47,6 +52,8 @@ Workspace layout: docs/powerunits_workspace_v1.md
 
 Writes from Tier 4A tools land ONLY under this directory tree (hermes_workspace/drafts/powerunits_skill_proposals).
 They are drafts — requires_human_review / not_auto_applied — and MUST NOT be treated as live skills.
+
+This README is a bootstrap pointer (not a proposal). Watchers exclude it from missing-marker cautions.
 
 Live skills remain under $HERMES_HOME/skills and are not modified by Tier 4A.
 """
@@ -127,6 +134,31 @@ def _normalize_rel(rel: str) -> str:
     return "/".join(parts)
 
 
+def _reject_workspace_prefixed_rel(nrel: str) -> None:
+    """Reject paths that re-include the proposals root (common operator mistake)."""
+    low = nrel.casefold()
+    for pref in _NESTED_PROPOSALS_PREFIXES:
+        if low.startswith(pref.casefold()):
+            raise ValueError(
+                "relative_path_must_be_under_proposals_root_not_workspace_prefixed"
+            )
+    parts = nrel.split("/")
+    for i in range(len(parts) - 1):
+        if parts[i] == "drafts" and parts[i + 1] == "powerunits_skill_proposals":
+            raise ValueError(
+                "relative_path_must_not_nest_drafts_powerunits_skill_proposals"
+            )
+
+
+def _is_nested_proposals_rel(rel: str) -> bool:
+    """True when an existing file sits under a redundant drafts/powerunits_skill_proposals nest."""
+    parts = rel.replace("\\", "/").split("/")
+    for i in range(len(parts) - 1):
+        if parts[i] == "drafts" and parts[i + 1] == "powerunits_skill_proposals":
+            return True
+    return False
+
+
 def _validated_rel_path(rel: str) -> Path:
     """Return a relative Path under proposals root (POSIX-style parts)."""
     try:
@@ -135,6 +167,7 @@ def _validated_rel_path(rel: str) -> Path:
         raise ValueError(str(exc)) from exc
     if not nrel:
         raise ValueError("relative_path_required")
+    _reject_workspace_prefixed_rel(nrel)
     parts = nrel.split("/")
     if len(parts) > _MAX_REL_PARTS:
         raise ValueError("relative_path_too_deep")
@@ -144,7 +177,6 @@ def _validated_rel_path(rel: str) -> Path:
     if not _LEAF_NAME_RE.match(parts[-1]):
         raise ValueError("invalid_leaf_name")
     return Path(*parts)
-
 
 def _safe_target(rel_norm: str, proposals: Path) -> Path:
     """Resolve ``rel_norm`` strictly under ``proposals``."""
@@ -497,19 +529,37 @@ def summarize_powerunits_skill_draft_proposals(**_: Any) -> str:
     largest = largest[:12]
 
     missing_marker_ct = 0
+    nested_path_ct = 0
+    nested_samples: list[str] = []
+    missing_samples: list[str] = []
     sample_cap = 320
     if 0 < len(files) <= sample_cap:
         for fp in files:
+            try:
+                rel = fp.relative_to(proposals).as_posix()
+            except ValueError:
+                continue
+            if _is_nested_proposals_rel(rel):
+                nested_path_ct += 1
+                if len(nested_samples) < 8:
+                    nested_samples.append(rel)
             try:
                 head = fp.read_text(encoding="utf-8", errors="replace")[:4096]
             except OSError:
                 continue
             if "powerunits_tier_4a_proposal" not in head:
                 missing_marker_ct += 1
+                if len(missing_samples) < 8:
+                    missing_samples.append(rel)
         if missing_marker_ct:
             caution.append(
                 f"tier4a_drafts_some_files_missing_marker_in_head:{missing_marker_ct}/"
                 f"{len(files)}_sampled_cap_{sample_cap}"
+            )
+        if nested_path_ct:
+            caution.append(
+                f"tier4a_drafts_nested_proposals_prefix:{nested_path_ct}/"
+                f"{len(files)}_sampled"
             )
 
     if len(files) >= _CAUTION_REVIEW_QUEUE_ENTRIES:
@@ -555,6 +605,19 @@ def summarize_powerunits_skill_draft_proposals(**_: Any) -> str:
             "requires_human_review": True,
             "not_auto_applied": True,
             "caution_flags": sorted(set(caution)),
+            "hygiene_hints": {
+                "bootstrap_pointer_excluded_from_marker_scan": _TIER4A_POINTER_NAME,
+                "missing_marker_count": missing_marker_ct,
+                "missing_marker_samples": missing_samples,
+                "nested_proposals_prefix_count": nested_path_ct,
+                "nested_proposals_prefix_samples": nested_samples,
+                "operator_prune_hint": (
+                    "On the Hermes volume, under hermes_workspace/drafts/powerunits_skill_proposals/: "
+                    "delete or relocate nested drafts/powerunits_skill_proposals/** and unmarked legacy "
+                    "files; keep README_POWERUNITS_TIER4A.txt. New writes must use paths like "
+                    "YYYY-MM-DD/name.md (not workspace-prefixed)."
+                ),
+            },
             "doc_hint": "docs/powerunits_tier4a_skill_draft_proposals_overlay_v1.md",
         },
         ensure_ascii=False,
@@ -692,6 +755,13 @@ def review_powerunits_skill_draft_proposals(
     if missing_marker >= max(3, total_matches // 4) and total_matches >= 4:
         caution.append(
             f"tier4a_review_many_missing_tier4a_marker:{missing_marker}/{total_matches}"
+        )
+    nested_review = sum(
+        1 for row in enriched if _is_nested_proposals_rel(str(row.get("relative_path") or ""))
+    )
+    if nested_review:
+        caution.append(
+            f"tier4a_review_nested_proposals_prefix:{nested_review}/{total_matches}"
         )
 
     return json.dumps(
