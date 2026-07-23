@@ -7,6 +7,9 @@
 
 **Phase 0 (established):** **rollback/tag contract**, **watcher checklist**, **`HERMES_POWERUNITS_CAPABILITY_TIER`** (**`0`** … **`6`** — **`≥ 1`** **2A**, **`≥ 2`** **2B**, **`≥ 3`** **Tier 3 skills overlay**, **`= 4`** **Tier 4A draft proposals**, **`= 5`** **Tier 4B governance/review-state**, **`= 6`** **Tier 5A bounded workflow scaffolding** — see **`powerunits_capability_tier.py`**).
 
+**Operating plan (co-worker ladder, how we climb in practice):** [`powerunits_hermes_coworker_tier_ladder_v1.md`](powerunits_hermes_coworker_tier_ladder_v1.md).  
+**Current prod posture (2026-07-23):** Hermes **v0.19.0**, profile **`stage1_read_health`**, capability tier **`0`**, baseline tag **`powerunits-tier0-baseline-20260723`**. Next approved uplift = **tier `1`** (Phase 2A) only after ladder Step-2 checklist.
+
 **Phase 1A:** structured **`exports/`** posture + read-only summaries — § Phase 1A below.
 
 **Phase 1B:** read-only **`summarize_powerunits_operator_posture`** — § Phase 1B below.

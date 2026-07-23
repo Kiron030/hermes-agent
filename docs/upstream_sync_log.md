@@ -16,7 +16,17 @@
 
 **Testlage (gezielt):** `tests/docker/test_apply_powerunits_runtime_policy.py`, `tests/plugins/model_providers/test_custom_profile.py`, `tests/agent/transports/test_chat_completions.py`, `tests/test_powerunits_bounded_profiles_v1.py`, `tests/test_powerunits_capability_tier.py`, `tests/tools/test_powerunits_multi_country_data_health_tool.py` — **126 passed, 11 skipped** in 7.3s.
 
-**Offene Punkte:** Nach Merge → Railway Redeploy + Telegram-Smokes (`RUNBOOK.hermes-stage1-validation.md` § *Post v0.19.0 merge*); `HERMES_POWERUNITS_ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES` im Profil persistieren falls Posture-Drift.
+**Post-Deploy (2026-07-23) — abgeschlossen mit Hotfixes:**
+
+| Ereignis | Ergebnis |
+|----------|----------|
+| Railway Region | Deploy scheiterte zuerst an ungültigem `multiRegionConfig` (`us-west2`); Volume-Services dürfen **nicht** multi-region. Fix: single region **US West**, **nicht** „Fix region → sfo“-Button wenn Volume attached. |
+| Smoke #0–5 | Posture, Multi-Country Health, Empirical DK (`pre_backfill_gap` ok), BZN prices, Repo-B keys, Negative web/terminal → **bestanden** |
+| Hotfix `ca79bbecd` | `CustomProfile`: `reasoning_effort` auf `api.openai.com` weglassen (HTTP 400 — analog `think`) |
+| Hotfix `433c8e6eb` | Posture-Alignment: ERA5-CSV-Allowlist nicht mit `_truthy()` prüfen (False-Positive `bounded_profile_drift`) |
+| Baseline | Tag **`powerunits-tier0-baseline-20260723`** + Plan [`powerunits_hermes_coworker_tier_ladder_v1.md`](powerunits_hermes_coworker_tier_ladder_v1.md) |
+
+**Offene Punkte:** Operator setzt bei Freigabe `HERMES_POWERUNITS_CAPABILITY_TIER=1` (nur diese Variable) nach Ladder Step 2.
 
 **Safety tag (pre-merge):** `powerunits-hermes-pre-v0.19.0-20260722` @ `0d8dcc4ca` (deploy branch vor PR #60).
 

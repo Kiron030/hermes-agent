@@ -11,6 +11,8 @@
 | Full development guide | [`hermes_development_guide.md`](hermes_development_guide.md) |
 | This map | [`repo_map.md`](repo_map.md) |
 | Progressive posture (canonical staged roadmap) | [`docs/powerunits_hermes_progressive_posture_v1.md`](../powerunits_hermes_progressive_posture_v1.md) |
+| Co-worker tier ladder (ops plan to climb tiers) | [`docs/powerunits_hermes_coworker_tier_ladder_v1.md`](../powerunits_hermes_coworker_tier_ladder_v1.md) |
+| Upstream sync log / preflight | [`docs/upstream_sync_log.md`](../upstream_sync_log.md), [`docs/powerunits_fork_sync_preflight_checklist.md`](../powerunits_fork_sync_preflight_checklist.md) |
 | Access matrix | [`ACCESS_MATRIX.md`](../../ACCESS_MATRIX.md) |
 | Stage 1 soul / runbook | `SOUL.hermes.md`, `RUNBOOK.hermes-trusted-analyst.md` |
 | Repo B allowlist | `config/powerunits_repo_b_read_allowlist.json` |

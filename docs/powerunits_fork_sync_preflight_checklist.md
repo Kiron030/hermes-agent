@@ -425,6 +425,27 @@ Ratespiel. Siehe `docs/powerunits_hermes_upgrade_playbook.md`.
 `test_chat_completions` + 3–4 Powerunits-Tools (~126 passed) — keine
 Vollsuite-Jagd nötig, wenn Ancestry + Hotspot-Diff sauber.
 
+### Post-Deploy-Fallen (v0.19 Produktion, 2026-07-23)
+
+6. **Railway `multiRegionConfig` / ungültige Region-IDs:** Fehler
+   `Unknown region: us-west2` (oder ähnlich) **vor** Build. Services mit
+   **Volume** (`/opt/data`) dürfen **nicht** multi-region. Nicht den
+   Diagnose-Button „Fix region → sfo“ nutzen, wenn das eine zweite Region
+   anlegt — Settings: **eine** Region (bei uns US West), **1 Replica**,
+   Volume gleiche Region. Pending Multi-Region-Changes **Discard**.
+7. **OpenAI-direct + `provider=custom`:** Jedes neue Upstream-Feld
+   (`think`, `reasoning_effort`, …) muss hinter Host-Gates
+   (`api.openai.com` / Azure) — sonst Telegram „provider failed“ bei
+   ansonsten grünem Deploy. Siehe
+   `docs/powerunits_openai_request_compatibility_v1.md`.
+8. **Posture `_truthy` vs. CSV-Allowlists:** Profile-Alignment darf
+   Nicht-Boolean-Keys (ERA5 `ALLOWED_COUNTRIES` CSV) nicht als
+   `missing_truthy` werten — sonst falscher `bounded_profile_drift`.
+9. **Safety-Tag + Tier-0-Baseline-Tag** vor Experimenten: Sync-Pre-Merge
+   (`powerunits-hermes-pre-vX…`) und nach erfolgreichen Smokes
+   (`powerunits-tier0-baseline-YYYYMMDD`). Co-Worker-Plan:
+   `docs/powerunits_hermes_coworker_tier_ladder_v1.md`.
+
 ---
 
 ## 7. Ablaufreihenfolge (Kurzfassung)

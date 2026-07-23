@@ -53,6 +53,21 @@ Run **after Railway redeploy** on `powerunits-internal-setup` (upstream **v0.19.
 
 Evidence: Timestamp + Operator + Screenshot oder gekürztes JSON in eurem Ticket-Tracker.
 
+### Co-worker ladder (after Tier-0 baseline)
+
+Ops plan: **`docs/powerunits_hermes_coworker_tier_ladder_v1.md`**.  
+Known-good tag after v0.19 smokes: **`powerunits-tier0-baseline-20260723`**.
+
+**Next uplift (Tier 1 / Phase 2A):** Railway only change
+`HERMES_POWERUNITS_CAPABILITY_TIER=0` → `1`, redeploy, then:
+
+- [ ] Posture: `tier_effective_integer: 1`, `telegram_powerunits_tier1_analysis_observed: true`
+- [ ] `summarize_powerunits_workspace_full`
+- [ ] `search_powerunits_workspace_text` (known file under `hermes_workspace`)
+- [ ] Soak ≥3 days before Tier 2
+
+Keep `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health` during backfill.
+
 ---
 
 ## Startup checks
