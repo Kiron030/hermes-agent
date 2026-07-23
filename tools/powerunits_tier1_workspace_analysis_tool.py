@@ -222,6 +222,8 @@ def search_powerunits_workspace_text(
         matches: list[dict[str, Any]] = []
         files_scanned = 0
         skipped_large = 0
+        path_match_count = 0
+        content_match_count = 0
 
         for fp in files:
             if len(matches) >= hits_cap:
@@ -233,6 +235,21 @@ def search_powerunits_workspace_text(
                 continue
             if sz > _MAX_SEARCH_FILE_BYTES:
                 skipped_large += 1
+                continue
+
+            rel = fp.relative_to(root).as_posix()
+            # Path/basename match first — operators often search by file name
+            # (smoke lesson 2026-07-23: "EXPORTS"/"powerunits" in names only).
+            if needle in rel.casefold() or needle in fp.name.casefold():
+                matches.append(
+                    {
+                        "path": rel,
+                        "match_kind": "path",
+                        "line_preview": f"[path] {rel}",
+                        "match_index_in_file": None,
+                    }
+                )
+                path_match_count += 1
                 continue
 
             try:
@@ -255,11 +272,13 @@ def search_powerunits_workspace_text(
 
             matches.append(
                 {
-                    "path": fp.relative_to(root).as_posix(),
+                    "path": rel,
+                    "match_kind": "content",
                     "line_preview": line,
                     "match_index_in_file": pos - line_start,
                 }
             )
+            content_match_count += 1
 
         if skipped_large:
             caution.append(f"skipped_oversized_files:{skipped_large}")
@@ -275,6 +294,8 @@ def search_powerunits_workspace_text(
                 "hit_cap": hits_cap,
                 "matches": matches,
                 "match_count": len(matches),
+                "path_match_count": path_match_count,
+                "content_match_count": content_match_count,
                 "files_considered": len(files),
                 "files_scanned": files_scanned,
                 "caution_flags": sorted(set(caution)),
@@ -301,7 +322,8 @@ SEARCH_SCHEMA = {
     "name": "search_powerunits_workspace_text",
     "description": (
         "Phase 2A (tier>=1): bounded case-insensitive substring search across .md/.txt/.csv under "
-        "hermes_workspace analysis|notes|drafts|exports (optional subdir filter)."
+        "hermes_workspace analysis|notes|drafts|exports (optional subdir filter). Matches "
+        "**file path/basename** first (`match_kind=path`), then file **content** (`match_kind=content`)."
     ),
     "parameters": {
         "type": "object",

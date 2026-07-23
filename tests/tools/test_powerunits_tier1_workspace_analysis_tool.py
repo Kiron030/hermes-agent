@@ -66,6 +66,31 @@ def test_workspace_text_search(t1) -> None:
     )
     assert out["match_count"] >= 1
     assert any("analysis/p.md" in m["path"] for m in out["matches"])
+    assert any(m.get("match_kind") == "content" for m in out["matches"])
+
+
+def test_workspace_search_matches_filename(t1) -> None:
+    """Operators often search by name; content-only search missed EXPORTS_* files."""
+    from tools import powerunits_workspace_tool as ws
+
+    json.loads(ws.list_hermes_workspace())
+    json.loads(
+        ws.save_hermes_workspace_note(
+            kind="exports",
+            name="EXPORTS_smoke_probe.txt",
+            content="no-keyword-here\n",
+            overwrite_mode="forbid",
+        )
+    )
+    out = json.loads(
+        t1.search_powerunits_workspace_text(
+            query="EXPORTS",
+            subdir="exports",
+        )
+    )
+    assert out["match_count"] >= 1
+    assert out["path_match_count"] >= 1
+    assert any(m.get("match_kind") == "path" for m in out["matches"])
 
 
 def test_search_rejects_bad_subdir(t1) -> None:

@@ -4,7 +4,9 @@
 **Canonical capability roadmap (technical):** [`powerunits_hermes_progressive_posture_v1.md`](powerunits_hermes_progressive_posture_v1.md).  
 **This file:** **operating plan** — how we climb tiers toward a strong, still-bounded co-worker without losing `first_safe_v1`.
 
-**Status (2026-07-23):** Hermes **v0.19.0** live on Railway; Telegram Stage-1 smokes passed; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=0`**. Baseline tag: **`powerunits-tier0-baseline-20260723`**.
+**Status (2026-07-23):** Hermes **v0.19.0** live; profile `stage1_read_health`; **`HERMES_POWERUNITS_CAPABILITY_TIER=1`** (Phase 2A).  
+Baseline tags: **`powerunits-tier0-baseline-20260723`**, **`powerunits-tier1-uplift-20260723`**.  
+**Soak:** stay on Tier 1 ≥3 days before Tier 2.
 
 ---
 
@@ -34,15 +36,15 @@ Hermes should become an **increasingly capable internal analyst / operator assis
 
 ---
 
-## Current recommended Railway env (Tier 0 co-worker)
+## Current recommended Railway env (Tier 1 soak)
 
 ```text
 HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1
 HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_read_health
-HERMES_POWERUNITS_CAPABILITY_TIER=0
+HERMES_POWERUNITS_CAPABILITY_TIER=1
 ```
 
-Do **not** set empty overrides for profile CSV keys (e.g. ERA5 allowlist) — leave unset so the managed profile block can fill them.
+Tier 0 (conservative rollback) uses `CAPABILITY_TIER=0` instead.
 
 ---
 
@@ -50,8 +52,8 @@ Do **not** set empty overrides for profile CSV keys (e.g. ERA5 allowlist) — le
 
 | Step | Env `CAPABILITY_TIER` | What Hermes gains | Human role | Soak / gate |
 |------|----------------------|-------------------|------------|-------------|
-| **T0** | `0` | Trusted Analyst: triptychon, posture, BZN/Repo-B/Timescale reads, empirical validate, first_safe | Daily driver; ask Hermes for health/posture | **Done** after v0.19 smokes + baseline tag |
-| **T1** | `1` | Phase **2A**: workspace full summary + bounded text search under `hermes_workspace` | Use for session notes / export hygiene | ≥3 days ops; posture `phase_2a` observed; no scan-cap thrash |
+| **T0** | `0` | Trusted Analyst: triptychon, posture, BZN/Repo-B/Timescale reads, empirical validate, first_safe | Daily driver; ask Hermes for health/posture | **Done** — tag `powerunits-tier0-baseline-20260723` |
+| **T1** | `1` | Phase **2A**: workspace full summary + bounded text/path search under `hermes_workspace` | Use for session notes / export hygiene | **Live soak** — uplift evidence 2026-07-23; tag `powerunits-tier1-uplift-20260723` |
 | **T2** | `2` | Phase **2B**: allowlisted local reference reads | Drop curated local refs; Hermes searches them | ≥1 week on T1; no secrets under local_reference |
 | **T3** | `3` | Skills **observer** (diagnose/propose JSON, SKILL preview) | Triage proposals; Curator still off | Explicit staffed review window |
 | **T4** | `4` | Skill **drafts** under `hermes_workspace/drafts/...` only | Human review drafts; never auto-promote to live `skills/` | Draft volume watchers green |
@@ -92,22 +94,29 @@ Do **not** set empty overrides for profile CSV keys (e.g. ERA5 allowlist) — le
 
 ## Immediate next steps (ordered)
 
-### Step 1 — Close Tier 0 (repo + ops) — **in progress / this doc**
+### Step 1 — Close Tier 0 (repo + ops) — **done**
 
 1. Keep image on **v0.19** with hotfixes (`reasoning_effort` OpenAI gate, CSV allowlist alignment).
 2. Confirm Railway redeploy of latest `powerunits-internal-setup` HEAD.
 3. Posture smoke: **`aligned: true`** (ERA5 CSV no longer false-missing).
 4. Annotated tag **`powerunits-tier0-baseline-20260723`** on known-good SHA.
 
-### Step 2 — Tier 1 uplift (first liberation) — **operator action**
+### Step 2 — Tier 1 uplift (Phase 2A) — **done (soak)**
 
-1. Railway Variables: `HERMES_POWERUNITS_CAPABILITY_TIER` **`0` → `1`** (only this change).
-2. Redeploy.
-3. Telegram: posture → `tier_effective_integer: 1`, `telegram_powerunits_tier1_analysis_observed: true`.
-4. Smoke: `summarize_powerunits_workspace_full` + `search_powerunits_workspace_text` on a known note.
-5. Soak ≥3 days; if scan-cap / sprawl → set tier back to `0`.
+Evidence (Telegram 2026-07-23):
 
-### Step 3 — Tier 2 (allowlisted locals) — later
+| Smoke | Result |
+|-------|--------|
+| Posture | `tier_effective_integer=1`, `powerunits_tier1_analysis_listed=true`, `telegram_powerunits_tier1_analysis_observed=true`, `aligned=true`, `caution_flags=[]` |
+| `summarize_powerunits_workspace_full` | 8 files / ~8KB; `caution_flags=[]` |
+| `search_powerunits_workspace_text` | Content search OK after note write; path-only queries initially empty → **fixed** (path/basename match) |
+| Exports summary | 3 files, clean |
+| Multi-country regression | Read-only triptychon OK |
+| Negatives | Path escape / Tier-2 tool expected unavailable; note: **`web`/`search` are allowed** in first_safe (not a fail) |
+
+**Operator:** soak ≥3 days on Tier 1; use workspace notes for ops diary; optional `/sethome` in the one Telegram chat.
+
+### Step 3 — Tier 2 (allowlisted locals) — next after soak
 
 Only after T1 soak. Prepare `powerunits_local_reference` content deliberately (no secrets).
 
