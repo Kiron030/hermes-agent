@@ -84,7 +84,7 @@ Das Weglassen inkompatibler `include`/`reasoning`-Felder fuer GPT-4.x auf direkt
 `provider=custom`, `base_url=https://api.openai.com/v1`, `gpt-4.1-mini`.
 
 **Ursache:** Upstream v0.19 `CustomProfile` sendet `reasoning_effort` top-level
-fuer Ollama/GLM (#25758). Powerunits setzt `agent.reasoning_effort: none` in
+fuer Ollama/GLM (#25758). Powerunits schrieb damals `agent.reasoning_effort: none` in
 `apply_powerunits_runtime_policy.py` — das wurde als `reasoning_effort="none"`
 an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
 `extra_body.think`).
@@ -95,22 +95,23 @@ an **echtes** OpenAI geroutet, das den Parameter nicht kennt (analog zu
 
 ## Model upgrade candidates (Powerunits OpenAI-direct setup)
 
-**Current default (Hermes‑5.4 trial):** `gpt-5.4` via `provider=custom` + `https://api.openai.com/v1` + **`api_mode: codex_responses`**.  
-Override / rollback env: **`HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`** (policy then pins `chat_completions`).
+**Current default (Hermes‑5.4 trial):** `gpt-5.4` via `provider=custom` + `https://api.openai.com/v1` + **`api_mode: codex_responses`** + **`agent.reasoning_effort: medium`**.  
+Model rollback: **`HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`** (policy then pins `chat_completions` + forces `reasoning_effort: none`).  
+Reasoning-only rollback: **`HERMES_POWERUNITS_REASONING_EFFORT=none`** (model stays gpt‑5.4 / Responses).
 
-**Practical rule:** change **model only** (not tier + profile in the same deploy). GPT‑5* needs Responses; GPT‑4.1* stays Chat Completions.
+**Practical rule:** change **model** *or* **reasoning dial** *or* **tier** — never two in one deploy. GPT‑5* needs Responses; GPT‑4.1* stays Chat Completions and always pins reasoning `none`.
 
-Prices below are **OpenAI list** (~2026-07, USD per 1M tokens). Multiply by your Telegram tool-call volume; Hermes turns often burn more **input** (history + tool JSON) than output.
+Prices below are **OpenAI list** (~2026-07, USD per 1M tokens). Multiply by your Telegram tool-call volume; Hermes turns often burn more **input** (history + tool JSON) than output. With `reasoning_effort: medium`, expect **higher latency and more billed tokens** than effort `none`.
 
 | Model id | Practical on our setup? | Notes |
 |----------|-------------------------|-------|
-| **`gpt-4.1`** | Yes — stable rollback | `chat_completions` |
-| **`gpt-5.4`** *(trial default)* | Yes — needs Responses | `codex_responses`; tools + stronger drafts/analysis |
+| **`gpt-4.1`** | Yes — stable rollback | `chat_completions`; reasoning forced `none` |
+| **`gpt-5.4`** *(trial default)* | Yes — needs Responses | `codex_responses`; default reasoning **`medium`** |
 | **`gpt-5.4-mini`** | Possible | cheaper 5.4-family; still Responses |
 
 **Hard facts (public):** `gpt-5.4` is the stronger/newer family vs `gpt-4.1`. List price (In/Out per 1M): 5.4 ≈ **$2.50 / $15** vs 4.1 ≈ **$2 / $8**.
 
-**Switch procedure:** redeploy image with policy default **or** set Railway `HERMES_POWERUNITS_PRIMARY_MODEL`. Verify: `grep -A8 '^model:' /opt/data/config.yaml`. Telegram smoke pack in RUNBOOK (Hermes‑5.4 trial).
+**Switch procedure:** redeploy image with policy default **or** set Railway `HERMES_POWERUNITS_PRIMARY_MODEL` / `HERMES_POWERUNITS_REASONING_EFFORT`. Verify: `grep -A8 '^model:' /opt/data/config.yaml` and `grep -A3 '^agent:' /opt/data/config.yaml`. Telegram smoke packs in RUNBOOK (Hermes‑5.4 + reasoning medium).
 
 ---
 

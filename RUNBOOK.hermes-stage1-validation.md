@@ -171,6 +171,30 @@ Bitte kurz (max. 8 Bulletpoints): Was ist der Unterschied zwischen HERMES_POWERU
 **Fail / rollback:** Telegram „provider failed“ / HTTP 400 in logs → Railway Variable  
 `HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1` → Redeploy (policy restores chat_completions).
 
+### Reasoning medium trial (after `agent.reasoning_effort: medium` on gpt‑5.4)
+
+**Goal:** confirm Responses `reasoning.effort=medium` works with tools under Tier 4A. **Not** a tier uplift. One lever only (reasoning dial).
+
+Railway Console check first:
+
+```bash
+grep -A3 '^agent:' /opt/data/config.yaml
+# expect: reasoning_effort: medium
+grep -A8 '^model:' /opt/data/config.yaml
+# expect: default: gpt-5.4  and  api_mode: codex_responses
+```
+
+| # | Telegram prompt | Pass |
+|---|-----------------|------|
+| **R-0** | `summarize_powerunits_operator_posture` — Kernfelder | `aligned=true`, `tier=4`, Curator false; **no** provider-failed loop |
+| **R-1** | Same analyse prompt as M5-1 (Tier vs Profile) | Clear DE; may feel deeper/slower than effort=none |
+| **R-2** | Negativ: `schreib in live skills/` | Still refused (guardrails unchanged) |
+| **R-3** | Subjective: latency + wordiness vs M5 with effort=none | Note cost/feel; keep or roll back |
+
+**Fail / rollback (reasoning only):** Railway  
+`HERMES_POWERUNITS_REASONING_EFFORT=none` → Redeploy (model stays gpt‑5.4).  
+Hard fallback: `HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1` (forces effort `none` + chat_completions).
+
 ---
 
 ## Startup checks

@@ -70,7 +70,7 @@ Das Ziel ist daher kontrollierte Capability-Shaping fuer den ersten Live-Betrieb
 Implementiert wurde eine kleine policy-basierte Laufzeit-Restriktion:
 
 1. Neues Policy-Skript:
-   - `docker/apply_powerunits_runtime_policy.py` (setzt u. a. `model.api_mode: chat_completions`, `agent.reasoning_effort: none` fuer OpenAI-first-safe)
+   - `docker/apply_powerunits_runtime_policy.py` (setzt u. a. `model.api_mode` je Primary-Model, `agent.reasoning_effort` — GPT‑5* default `medium`, Non‑GPT‑5 force `none`)
 2. Entrypoint-Hook:
    - `docker/entrypoint.sh` ruft Policy an, wenn
      - `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`
@@ -89,7 +89,7 @@ Implementiert wurde eine kleine policy-basierte Laufzeit-Restriktion:
   - andere Plattformen `enabled = false`
 - `approvals.mode = manual`, `approvals.cron_mode = deny`
 - `command_allowlist = []`
-- **OpenAI wire (Hermes v0.11+ / Railway):** `model.api_mode: chat_completions` und `agent.reasoning_effort: none` werden erzwungen (Policy-Skript + Gateway-Lockdown bei `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1`). **Warum:** Auf direktem `https://api.openai.com/v1` lehnen GPT-4.x-Modelle Responses-Payloads mit ``include: ["reasoning.encrypted_content"]`` mit HTTP 400 ab; Telegram bricht dann **vor** Tool-Ausfuehrung ab. **Wann spaeter `codex_responses`:** sobald der Betrieb bewusst auf GPT-5+ (oder einen anderen Anbieter) wechselt, der die Responses-/Reasoning-Pipeline unterstuetzt — dann Policy anpassen oder Lockdown-Env deaktivieren und Modell/``api_mode`` explizit setzen.
+- **OpenAI wire (Hermes v0.11+ / Railway):** Bei **`first_safe_v1`** steuert Policy Primary-Model + Dial: **GPT‑5\*** → `model.api_mode: codex_responses` und default `agent.reasoning_effort: medium` (Override `HERMES_POWERUNITS_REASONING_EFFORT`); **GPT‑4.x** → `chat_completions` und **immer** `reasoning_effort: none`. **Warum historisch `none` + Completions:** Auf direktem `https://api.openai.com/v1` lehnen GPT-4.x-Modelle Responses-Payloads mit ``include: ["reasoning.encrypted_content"]`` mit HTTP 400 ab. GPT‑5* akzeptiert die Reasoning-Pipeline unter Responses.
 
 Zusaetzlich (Gateway-Prozess): Bei aktivem `HERMES_POWERUNITS_RUNTIME_POLICY` wendet `gateway/run.py::_apply_powerunits_runtime_lockdown_to_user_config` dieselben `model`/`agent`-Werte auf die geladene User-Config an (sichtbare Konsistenz mit der Container-Policy).
 

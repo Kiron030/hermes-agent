@@ -266,6 +266,7 @@ def test_apply_policy_gpt54_trial_uses_codex_responses(
     yaml = pytest.importorskip("yaml")
     apply_policy = _load_apply_policy()
     monkeypatch.delenv("HERMES_POWERUNITS_PRIMARY_MODEL", raising=False)
+    monkeypatch.delenv("HERMES_POWERUNITS_REASONING_EFFORT", raising=False)
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "config.yaml"
         p.write_text(
@@ -278,6 +279,7 @@ def test_apply_policy_gpt54_trial_uses_codex_responses(
         assert data["model"]["api_mode"] == "codex_responses"
         assert data["model"]["provider"] == "custom"
         assert data["model"]["base_url"] == "https://api.openai.com/v1"
+        assert data["agent"]["reasoning_effort"] == "medium"
 
 
 def test_apply_policy_primary_model_env_override_gpt41(
@@ -286,6 +288,8 @@ def test_apply_policy_primary_model_env_override_gpt41(
     yaml = pytest.importorskip("yaml")
     apply_policy = _load_apply_policy()
     monkeypatch.setenv("HERMES_POWERUNITS_PRIMARY_MODEL", "gpt-4.1")
+    # Even if reasoning env asks for medium, GPT-4.x must stay none.
+    monkeypatch.setenv("HERMES_POWERUNITS_REASONING_EFFORT", "medium")
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "config.yaml"
         p.write_text(
@@ -296,4 +300,42 @@ def test_apply_policy_primary_model_env_override_gpt41(
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         assert data["model"]["default"] == "gpt-4.1"
         assert data["model"]["api_mode"] == "chat_completions"
+        assert data["agent"]["reasoning_effort"] == "none"
+
+
+def test_apply_policy_reasoning_effort_env_override_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.delenv("HERMES_POWERUNITS_PRIMARY_MODEL", raising=False)
+    monkeypatch.setenv("HERMES_POWERUNITS_REASONING_EFFORT", "none")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert data["model"]["default"] == "gpt-5.4"
+        assert data["agent"]["reasoning_effort"] == "none"
+
+
+def test_apply_policy_reasoning_effort_invalid_env_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    yaml = pytest.importorskip("yaml")
+    apply_policy = _load_apply_policy()
+    monkeypatch.delenv("HERMES_POWERUNITS_PRIMARY_MODEL", raising=False)
+    monkeypatch.setenv("HERMES_POWERUNITS_REASONING_EFFORT", "not-a-level")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "config.yaml"
+        p.write_text(
+            "model: {}\nplatforms: {}\nplatform_toolsets: {}\napprovals: {}\n",
+            encoding="utf-8",
+        )
+        apply_policy(p)
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        assert data["agent"]["reasoning_effort"] == "none"
 

@@ -64,7 +64,8 @@ Rollback to Tier 3: set `CAPABILITY_TIER=3`.
 `HERMES_POWERUNITS_BOUNDED_PROFILE=stage1_operator_execute` — only for short repair campaigns after backfill maturity. Rollback = switch back to `stage1_read_health`.
 
 **Deferred / separate decision:** Curator on, public dashboard, multi-region (blocked by volume).  
-**Model trial (2026-07-23):** default **`gpt-5.4`** + Responses (`codex_responses`). Rollback: Railway `HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`.
+**Model trial (2026-07-23):** default **`gpt-5.4`** + Responses (`codex_responses`). Rollback: Railway `HERMES_POWERUNITS_PRIMARY_MODEL=gpt-4.1`.  
+**Reasoning trial (2026-07-23):** default **`agent.reasoning_effort: medium`** on GPT‑5*. Rollback: `HERMES_POWERUNITS_REASONING_EFFORT=none` (or model rollback → forces `none`).
 
 ---
 

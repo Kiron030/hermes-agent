@@ -75,20 +75,49 @@ POWERUNITS_PRIMARY_MODEL_FALLBACK = "gpt-5.4"
 POWERUNITS_PRIMARY_PROVIDER = "custom"
 POWERUNITS_PRIMARY_BASE_URL = "https://api.openai.com/v1"
 
+# GPT-5.4 Responses trial: reasoning on by default (medium). Rollback via
+# HERMES_POWERUNITS_REASONING_EFFORT=none (or model rollback to gpt-4.1).
+POWERUNITS_REASONING_EFFORT_FALLBACK = "medium"
+_ALLOWED_REASONING_EFFORTS = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+)
+
 
 def _resolve_primary_model() -> str:
     raw = (os.getenv("HERMES_POWERUNITS_PRIMARY_MODEL") or "").strip()
     return raw or POWERUNITS_PRIMARY_MODEL_FALLBACK
 
 
-def _api_mode_for_primary_model(model: str) -> str:
-    """GPT-5.x on api.openai.com needs Responses; GPT-4.x stays on chat completions."""
+def _canonical_model_id(model: str) -> str:
     m = (model or "").strip().lower()
     if "/" in m:
         m = m.rsplit("/", 1)[-1]
-    if m.startswith("gpt-5"):
+    return m
+
+
+def _api_mode_for_primary_model(model: str) -> str:
+    """GPT-5.x on api.openai.com needs Responses; GPT-4.x stays on chat completions."""
+    if _canonical_model_id(model).startswith("gpt-5"):
         return "codex_responses"
     return "chat_completions"
+
+
+def _resolve_reasoning_effort(primary_model: str) -> str:
+    """Resolve agent.reasoning_effort for Powerunits first_safe_v1.
+
+    - GPT-5*: default ``medium`` (Responses + ``reasoning.effort``).
+    - Non-GPT-5: force ``none`` (GPT-4.x rejects encrypted reasoning include).
+    - Env ``HERMES_POWERUNITS_REASONING_EFFORT`` overrides on GPT-5* only
+      (invalid values fall back to ``none`` fail-closed).
+    """
+    if not _canonical_model_id(primary_model).startswith("gpt-5"):
+        return "none"
+    raw = (os.getenv("HERMES_POWERUNITS_REASONING_EFFORT") or "").strip().lower()
+    if not raw:
+        return POWERUNITS_REASONING_EFFORT_FALLBACK
+    if raw not in _ALLOWED_REASONING_EFFORTS:
+        return "none"
+    return raw
 
 
 # Back-compat alias for docs/tests that import the constant name.
@@ -131,13 +160,13 @@ def apply_policy(config_path: Path) -> None:
     model_cfg["api_mode"] = _api_mode_for_primary_model(primary_model)
     cfg["model"] = model_cfg
 
-    # Belt-and-suspenders: disable Hermes "reasoning effort" for this phase so
-    # auxiliary Responses-shaped calls do not request encrypted reasoning.
-    # GPT-5.4 still runs on Responses with tools when effort is off/none.
+    # Reasoning dial (GPT-5 Responses only). Default medium for the 5.4 trial;
+    # set HERMES_POWERUNITS_REASONING_EFFORT=none to roll back without model change.
+    # Non-GPT-5 primary always pins none (encrypted include unsafe on GPT-4.x).
     agent_cfg = cfg.get("agent")
     if not isinstance(agent_cfg, dict):
         agent_cfg = {}
-    agent_cfg["reasoning_effort"] = "none"
+    agent_cfg["reasoning_effort"] = _resolve_reasoning_effort(primary_model)
     cfg["agent"] = agent_cfg
 
     # Enforce narrow, explicit platform toolset policy (fail-closed for gateway usage).
