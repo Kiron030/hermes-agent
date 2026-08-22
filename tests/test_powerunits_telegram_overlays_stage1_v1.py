@@ -5,6 +5,7 @@ from __future__ import annotations
 from powerunits_telegram_overlays import (
     TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1,
     expected_telegram_toolsets_first_safe,
+    progressive_capability_overlays_aligned,
 )
 
 _HERMES_CORE_READ_TOOLSETS = (
@@ -50,3 +51,16 @@ def test_tier_zero_keeps_stage1_toolsets_after_workspace_insert() -> None:
     assert tg[wi + 1] == "powerunits_timescale_read"
     for name in _STAGE1_EXECUTE_FAMILIES:
         assert name in tg
+
+
+def test_session_search_absent_from_first_safe_base_and_all_tiers() -> None:
+    assert "session_search" not in TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1
+    for tier in range(7):
+        tg = expected_telegram_toolsets_first_safe(tier)
+        assert "session_search" not in tg
+        assert progressive_capability_overlays_aligned(tg, tier) is not False
+        wi = tg.index("powerunits_workspace")
+        if tier >= 1:
+            assert tg[wi + 1] == "powerunits_tier1_analysis"
+        else:
+            assert tg[wi + 1] == "powerunits_timescale_read"
