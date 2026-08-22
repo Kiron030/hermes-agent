@@ -87,7 +87,7 @@ No production `.env` was read. No Railway/Vercel/GitHub write token was used.
 ```text
 MODERN_RUNTIME_BOOT      = PASS
 TOOL_SURFACE_INSPECTABLE = YES
-MODEL_SMOKE              = HUMAN_CREDENTIAL_REQUIRED
+MODEL_SMOKE              = PASS
 ```
 
 Boot evidence: isolated `import hermes_cli, model_tools, toolsets` and `hermes --help` against the pinned venv.
@@ -112,7 +112,22 @@ python scripts/r1_modern_hermes_proof/harness.py model-smoke
 DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT TO PR WITHOUT REVIEW/REDACTION.
 
 `MODEL_SMOKE_HARNESS = READY`. The harness does not read `.env` and does not
-write the key to disk.
+write the key to disk. The dedicated human test key is not persisted and
+will be revoked outside the repository.
+
+Final human smoke (2026-08-22): `returncode = 0`, stdout `R1_MODEL_SMOKE_OK`,
+provider `openai-api`, model `gpt-4.1-mini`, host `api.openai.com`,
+`reasoning_effort = none`, production-authority names absent, ambient
+`OPENAI_API_KEY` passthrough false.
+
+```text
+KNOWN_RUNTIME_DEPENDENCY_DEBT =
+  SQLite/WAL compatibility warning; safe DELETE fallback active
+```
+
+Linked SQLite 3.38.4 is affected by the WAL-reset bug. Hermes used
+`journal_mode=DELETE`. Not an R1 blocker. Carry forward for R5/runtime hygiene.
+Do not expand R1 into a SQLite upgrade.
 
 ---
 
@@ -236,12 +251,13 @@ Do not treat additional safe non-production capabilities as regressions.
 ## Gate
 
 ```text
-GATE_1_STATUS = CLOSED_PENDING_HUMAN_MODEL_SMOKE
+GATE_1_STATUS = CLOSED
 ```
 
 Closed on isolation, frozen install, boot, inspectable surface, clamp answer
 (both bypass classes), Hermes tool-dispatch probes, official OCI digest smoke,
-and canonical-doc provenance. Model smoke remains a human non-production key action.
+canonical-doc provenance, and the real human model smoke (`MODEL_SMOKE = PASS`).
+The thin-core clamp remains `PATCH_REQUIRED` and is not implemented in R1.
 
 ---
 

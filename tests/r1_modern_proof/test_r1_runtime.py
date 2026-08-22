@@ -16,6 +16,8 @@ from r1_modern_hermes_proof.harness import (
     isolated_env,
     load_pin,
     operator_home,
+    probe_model_smoke_auth_path,
+    probe_model_smoke_reasoning_kwargs,
     upstream_src,
     write_proof_homes,
 )
@@ -111,6 +113,30 @@ def test_benign_capability_probes_use_hermes_dispatch() -> None:
     assert result["CAPABILITY_TOOL_DISPATCH"]["FILESYSTEM"] == "PASS"
     assert result["CAPABILITY_TOOL_DISPATCH"]["TERMINAL"] == "PASS"
     assert result["CAPABILITY_TOOL_DISPATCH"]["SKILLS"] == "PASS"
+
+
+def test_model_smoke_sentinel_reaches_openai_api_request_path() -> None:
+    result = probe_model_smoke_auth_path("r1-sentinel-not-a-real-secret")
+    assert result["provider"] == "openai-api"
+    assert result["base_url_scheme"] == "https"
+    assert result["base_url_host"] == "api.openai.com"
+    assert result["path_class"] == "/v1/chat/completions"
+    assert result["child_key_present"] is True
+    assert result["runtime_key_present"] is True
+    assert result["runtime_key_matches_sentinel"] is True
+    assert result["auth_header_scheme"] == "Bearer"
+    assert result["wrong_host_openrouter"] is False
+    assert result["returncode"] == 0
+
+
+def test_gpt_41_mini_openai_api_omits_reasoning_effort() -> None:
+    result = probe_model_smoke_reasoning_kwargs()
+    assert result["provider"] == "openai-api"
+    assert result["model"] == "gpt-4.1-mini"
+    assert result["resolved_omits_reasoning_effort"] is True
+    assert result["upstream_default_effort"] == "medium"
+    assert result["upstream_default_emits_reasoning_effort"] is True
+    assert result["returncode"] == 0
 
 
 def test_operator_and_developer_homes_differ() -> None:

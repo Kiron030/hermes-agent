@@ -64,6 +64,11 @@ set HERMES_R1_MODEL=gpt-4.1-mini
 python scripts/r1_modern_hermes_proof/harness.py model-smoke
 ```
 
+`HERMES_R1_MODEL_PROVIDER=openai` is mapped only in the model-smoke child to
+`OPENAI_API_KEY` plus Hermes provider `openai-api` (`api.openai.com`).
+Ambient `OPENAI_API_KEY` is not passed through. Hermes `auto` would otherwise
+treat `OPENAI_API_KEY` as OpenRouter.
+
 DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT TO PR WITHOUT REVIEW/REDACTION.
 
 stdout/stderr tails may contain provider-error material. There is no

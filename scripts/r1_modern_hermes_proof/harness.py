@@ -43,6 +43,8 @@ PROOF_ROOT_ENV = "HERMES_R1_PROOF_ROOT"
 MODEL_KEY_ENV = "HERMES_R1_MODEL_API_KEY"
 MODEL_PROVIDER_ENV = "HERMES_R1_MODEL_PROVIDER"
 MODEL_NAME_ENV = "HERMES_R1_MODEL"
+DEFAULT_SMOKE_MODEL = "gpt-4.1-mini"
+SMOKE_PROMPT = "Reply with exactly: R1_MODEL_SMOKE_OK"
 
 SAFE_ENV_PASSTHROUGH = (
     "PATH",
@@ -123,6 +125,55 @@ def production_authority_names(pin: dict[str, Any] | None = None) -> tuple[str, 
     return tuple(data["production_authority_names"])
 
 
+def resolve_model_smoke_target(
+    r1_provider: str | None = None,
+    model: str | None = None,
+) -> dict[str, str]:
+    """Map the R1 human provider alias onto the Hermes runtime identity.
+
+    Hermes ``auto`` treats ``OPENAI_API_KEY`` as OpenRouter. The smoke path
+    must pin ``openai-api`` (api.openai.com) explicitly.
+    """
+    raw = (
+        r1_provider
+        if r1_provider is not None
+        else os.environ.get(MODEL_PROVIDER_ENV, "openai")
+    ).strip().lower() or "openai"
+    model_name = (
+        model if model is not None else os.environ.get(MODEL_NAME_ENV, DEFAULT_SMOKE_MODEL)
+    ).strip() or DEFAULT_SMOKE_MODEL
+    if raw in {"openai", "openai-api"}:
+        return {
+            "r1_provider": "openai",
+            "hermes_provider": "openai-api",
+            "key_env": "OPENAI_API_KEY",
+            "model": model_name,
+            "base_url_scheme": "https",
+            "base_url_host": "api.openai.com",
+            "path_class": "/v1/chat/completions",
+        }
+    if raw == "openrouter":
+        return {
+            "r1_provider": "openrouter",
+            "hermes_provider": "openrouter",
+            "key_env": "OPENROUTER_API_KEY",
+            "model": model_name,
+            "base_url_scheme": "https",
+            "base_url_host": "openrouter.ai",
+            "path_class": "/api/v1/chat/completions",
+        }
+    raise ValueError(f"unsupported R1 model-smoke provider {raw!r}")
+
+
+def map_model_key_into_env(env: dict[str, str], model_key: str) -> dict[str, str]:
+    """Map the R1 key into the child provider env only. Never persist it."""
+    target = resolve_model_smoke_target()
+    env[target["key_env"]] = model_key
+    env["HERMES_INFERENCE_PROVIDER"] = target["hermes_provider"]
+    env["HERMES_INFERENCE_MODEL"] = target["model"]
+    return env
+
+
 def isolated_env(
     hermes_home: Path,
     *,
@@ -144,16 +195,7 @@ def isolated_env(
     if include_model_key:
         model_key = os.environ.get(MODEL_KEY_ENV, "").strip()
         if model_key:
-            provider = os.environ.get(MODEL_PROVIDER_ENV, "openai").strip() or "openai"
-            if provider == "openai":
-                env["OPENAI_API_KEY"] = model_key
-            elif provider == "openrouter":
-                env["OPENROUTER_API_KEY"] = model_key
-            else:
-                env[MODEL_KEY_ENV] = model_key
-            model_name = os.environ.get(MODEL_NAME_ENV, "").strip()
-            if model_name:
-                env["HERMES_MODEL"] = model_name
+            map_model_key_into_env(env, model_key)
     if extra:
         for key, value in extra.items():
             if key in blocked:
@@ -163,6 +205,53 @@ def isolated_env(
     if present:
         raise RuntimeError(f"isolated env leaked production-authority names: {present}")
     return env
+
+
+def model_smoke_cli_args() -> list[str]:
+    """Pinned CLI argv after the executable.
+
+    ``-z/--oneshot`` takes PROMPT as its immediate argument. Placing
+    ``--provider`` after ``-z`` makes argparse report
+    ``argument -z/--oneshot: expected one argument`` before any HTTP call.
+    """
+    target = resolve_model_smoke_target()
+    return [
+        "--provider",
+        target["hermes_provider"],
+        "--model",
+        target["model"],
+        "-z",
+        SMOKE_PROMPT,
+    ]
+
+
+def model_smoke_command(hermes: Path, python: Path) -> list[str]:
+    """Run the R1 oneshot shim, not raw ``hermes -z``.
+
+    Pinned ``hermes -z`` builds ``AIAgent`` without
+    ``resolve_reasoning_config``. The Responses transport then defaults
+    ``reasoning.effort=medium``, which ``gpt-4.1-mini`` rejects with HTTP 400.
+    The shim is oneshot-equivalent and applies isolated
+    ``agent.reasoning_effort: none``.
+    """
+    return [str(python), str(HERE / "model_smoke_run.py")]
+
+
+def write_model_smoke_operator_config(home: Path) -> dict[str, str]:
+    """Pin provider/model in isolated config. Never persist the API key."""
+    pin = load_pin()
+    target = resolve_model_smoke_target()
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "config.yaml").write_text(
+        _operator_config(
+            pin,
+            model_provider=target["hermes_provider"],
+            model_name=target["model"],
+            omit_reasoning=True,
+        ),
+        encoding="utf-8",
+    )
+    return target
 
 
 def assert_authority_absent(env: dict[str, str], pin: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -358,13 +447,28 @@ def write_proof_homes() -> dict[str, Any]:
     return {name: str(path) for name, path in homes.items()}
 
 
-def _operator_config(pin: dict[str, Any]) -> str:
+def _operator_config(
+    pin: dict[str, Any],
+    *,
+    model_provider: str | None = None,
+    model_name: str | None = None,
+    omit_reasoning: bool = False,
+) -> str:
     allowed = "\n".join(f"    - {name}" for name in pin["operator_allowed_toolsets"])
     disabled = "\n".join(f"    - {name}" for name in pin["operator_forbidden_toolsets"])
-    return (
+    reasoning = ""
+    if omit_reasoning:
+        reasoning = "  reasoning_effort: none\n"
+        if model_name:
+            reasoning += (
+                "  reasoning_overrides:\n"
+                f"    {model_name}: none\n"
+            )
+    text = (
         "security:\n"
         "  allow_lazy_installs: false\n"
         "agent:\n"
+        f"{reasoning}"
         f"  disabled_toolsets:\n{disabled}\n"
         "platform_toolsets:\n"
         "  cli:\n"
@@ -373,6 +477,13 @@ def _operator_config(pin: dict[str, Any]) -> str:
         "  mode: manual\n"
         "  cron_mode: deny\n"
     )
+    if model_provider and model_name:
+        text += (
+            "model:\n"
+            f"  provider: {model_provider}\n"
+            f"  default: {model_name}\n"
+        )
+    return text
 
 
 def _developer_config() -> str:
@@ -793,18 +904,10 @@ def model_smoke() -> dict[str, Any]:
     python = _upstream_python(src)
     hermes = python.with_name("hermes.exe" if python.suffix == ".exe" else "hermes")
     write_proof_homes()
+    target = write_model_smoke_operator_config(operator_home())
     env = isolated_env(operator_home(), include_model_key=True)
     assertion = assert_authority_absent(env)
-    cmd = (
-        [str(hermes), "-z", "Reply with exactly: R1_MODEL_SMOKE_OK"]
-        if hermes.exists()
-        else [
-            str(python),
-            "-c",
-            "from hermes_cli.oneshot import main; import sys; "
-            "sys.argv=['hermes','-z','Reply with exactly: R1_MODEL_SMOKE_OK']; main()",
-        ]
-    )
+    cmd = model_smoke_command(hermes, python)
     completed = subprocess.run(
         cmd,
         cwd=src,
@@ -819,12 +922,75 @@ def model_smoke() -> dict[str, Any]:
         "MODEL_SMOKE_HARNESS": "READY",
         "returncode": completed.returncode,
         "production_credential_assertions": assertion,
+        "wiring": {
+            "provider": target["hermes_provider"],
+            "model": target["model"],
+            "child_key_env": target["key_env"],
+            "child_key_present": bool(env.get(target["key_env"])),
+            "intended_host": target["base_url_host"],
+            "intended_path_class": target["path_class"],
+            "ambient_openai_key_passthrough": False,
+            "reasoning_effort": "none",
+        },
         "stdout_tail": completed.stdout[-400:],
         "stderr_tail": completed.stderr[-400:],
         "warning": warning,
     }
     write_json(artifacts_dir() / "model_smoke.json", result)
     return result
+
+
+def probe_model_smoke_auth_path(sentinel: str) -> dict[str, Any]:
+    """Resolve the Hermes provider path with a sentinel key. No live model call."""
+    if not sentinel or sentinel.startswith("sk-"):
+        raise ValueError("probe sentinel must be a non-secret test token")
+    src = _require_source()
+    python = _upstream_python(src)
+    write_proof_homes()
+    target = write_model_smoke_operator_config(operator_home())
+    env = isolated_env(operator_home())
+    map_model_key_into_env(env, sentinel)
+    env["HERMES_R1_AUTH_PROBE_SENTINEL"] = sentinel
+    env["HERMES_R1_AUTH_PROBE_KEY_ENV"] = target["key_env"]
+    completed = subprocess.run(
+        [str(python), str(HERE / "model_smoke_auth_probe.py")],
+        cwd=src,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not completed.stdout.strip():
+        raise RuntimeError(f"auth probe produced no JSON: {completed.stderr[-2000:]}")
+    payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    payload["returncode"] = completed.returncode
+    payload["intended_host"] = target["base_url_host"]
+    payload["intended_provider"] = target["hermes_provider"]
+    return payload
+
+
+def probe_model_smoke_reasoning_kwargs() -> dict[str, Any]:
+    """Prove gpt-4.1-mini Responses kwargs omit reasoning.effort. No live call."""
+    src = _require_source()
+    python = _upstream_python(src)
+    write_proof_homes()
+    write_model_smoke_operator_config(operator_home())
+    env = isolated_env(operator_home())
+    completed = subprocess.run(
+        [str(python), str(HERE / "model_smoke_reasoning_probe.py")],
+        cwd=src,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not completed.stdout.strip():
+        raise RuntimeError(
+            f"reasoning probe produced no JSON: {completed.stderr[-2000:]}"
+        )
+    payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    payload["returncode"] = completed.returncode
+    return payload
 
 
 def _require_source() -> Path:
