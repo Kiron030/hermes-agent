@@ -20,6 +20,11 @@ import httpx
 
 from tools.powerunits_option_d_bounded_market_features import _validate_slice
 import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +50,7 @@ def _truthy_env(name: str) -> bool:
 def check_powerunits_option_d_execute_requirements() -> bool:
     if not _truthy_env(_FEATURE_ENV):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -62,9 +67,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _internal_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_EXECUTE_PATH}"
 
 
@@ -176,6 +182,7 @@ def execute_powerunits_option_d_bounded_slice(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "execute_config_incomplete",
                 "surface": _SURFACE,
@@ -189,7 +196,8 @@ def execute_powerunits_option_d_bounded_slice(
                 "correlation_id": None,
                 "response_body_summary": "",
                 "hermes_statement": base_statement,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

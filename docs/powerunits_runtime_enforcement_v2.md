@@ -125,3 +125,32 @@ PowerUnits operations have an explicit effect class in
   user-scoped. Registry completeness is name/toolset based and does not cover
   future plugin/MCP registration.
 
+## S0-C — Single PowerUnits execute Base-URL resolver
+
+Bounded PowerUnits HTTP tools resolve `POWERUNITS_INTERNAL_EXECUTE_BASE_URL`
+only through `tools/powerunits_execute_base_url_v1.py`. Wrappers still own
+their compile-time route suffix. The model cannot choose host, path, or URL.
+
+- HTTPS is mandatory. HTTP is refused and is not upgraded. `http://localhost`
+  is not a special case in this slice.
+- Host matching uses the parsed hostname (exact, case-insensitive). No regex,
+  wildcards, or suffix matching.
+- `POWERUNITS_INTERNAL_EXECUTE_ALLOWED_HOSTS` is a comma-separated exact
+  hostname list.
+- `POWERUNITS_INTERNAL_EXECUTE_HOST_PIN_MODE` is `warn` (code default) or
+  `enforce`. Unknown values fail closed.
+- `warn` + empty allowlist or foreign host: log a clear warning and preserve
+  the current HTTP behaviour.
+- `enforce` + empty allowlist or foreign host: refuse before any HTTP request.
+- Missing Base URL keeps each tool's existing structured config contract
+  (`feature_disabled` / `read_config_incomplete` / family equivalent).
+
+```text
+CODE_CAPABILITY = IMPLEMENTED
+PRODUCTION_ENFORCEMENT = PENDING_HUMAN_CONFIG
+```
+
+Production `enforce` requires a human-confirmed host list and pin mode in
+deployment configuration. This slice does not change `.env`, Railway, or
+production settings. Code support is not production enforcement.
+

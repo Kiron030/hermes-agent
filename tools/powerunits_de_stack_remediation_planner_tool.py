@@ -18,6 +18,11 @@ from typing import Any
 import httpx
 
 from tools.powerunits_baseline_layer_preview_slice import validate_baseline_preview_slice
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +48,7 @@ def _truthy_env(name: str) -> bool:
 def check_powerunits_de_stack_remediation_planner_requirements() -> bool:
     if not _truthy_env(_FEATURE_ENV):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -60,9 +65,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _plan_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_PLAN_PATH}"
 
 
@@ -144,13 +150,15 @@ def plan_powerunits_de_stack_remediation(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "planner_config_incomplete",
                 "surface": _SURFACE,
                 "plan_attempted": False,
                 "http_status": None,
                 "hermes_statement": base_statement,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

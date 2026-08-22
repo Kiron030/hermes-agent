@@ -12,6 +12,7 @@ from copy import deepcopy
 from typing import Any
 
 import tools.powerunits_bounded_family_gates as g
+from tools.powerunits_execute_base_url_v1 import powerunits_execute_base_url_is_configured
 
 
 def _truthy_env(name: str) -> bool:
@@ -30,7 +31,7 @@ _MARKET_FEATURES_ISO2_V1 = frozenset({"DE", "PL"})
 
 
 def _base_http_ready() -> bool:
-    return bool((os.getenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL") or "").strip()) and bool(
+    return powerunits_execute_base_url_is_configured() and bool(
         (os.getenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET") or "").strip()
     )
 

@@ -34,6 +34,11 @@ from tools.powerunits_entsoe_empirical_candidate_countries import (
 from tools.powerunits_entsoe_market_bounded_countries import (
     ALLOWED_BOUNDED_ENTSOE_MARKET_COUNTRY_CODES_V1,
 )
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +65,7 @@ _HERMES_NOTE_V1 = (
 def check_powerunits_entsoe_empirical_candidate_validate_requirements() -> bool:
     if not entsoe_empirical_candidate_validate_enabled():
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -77,9 +82,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _validate_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_VALIDATE_PATH}"
 
 
@@ -254,12 +260,14 @@ def validate_powerunits_entsoe_empirical_candidate_window_v1(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "validate_config_incomplete",
                 "surface": _SURFACE,
                 "validation_attempted": False,
                 "hermes_operator_note_v1": _HERMES_NOTE_V1,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

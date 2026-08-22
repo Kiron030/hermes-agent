@@ -30,6 +30,11 @@ from tools.powerunits_entsoe_market_bounded_countries import (
 )
 from tools.powerunits_entsoe_market_bounded_slice import validate_entsoe_bounded_slice
 import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +57,7 @@ _SECRET_URL_RE = re.compile(
 def check_powerunits_entsoe_market_bounded_execute_requirements() -> bool:
     if not entsoe_market_bounded_core_step_enabled(_STEP):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -69,9 +74,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _internal_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_EXECUTE_PATH}"
 
 
@@ -181,6 +187,7 @@ def execute_powerunits_entsoe_market_bounded_slice(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "execute_config_incomplete",
                 "surface": _SURFACE,
@@ -189,7 +196,8 @@ def execute_powerunits_entsoe_market_bounded_slice(
                 "success": False,
                 "http_status": None,
                 "hermes_statement": base_statement,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

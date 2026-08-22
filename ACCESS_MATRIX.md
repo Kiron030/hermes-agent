@@ -74,4 +74,15 @@ Recorded parameters: `window_start_utc=2024-01-01T00:00:00Z`, `window_end_utc=20
 
 ---
 
+### Operator note — S0-C execute Base-URL resolver
+
+Bounded PowerUnits HTTP tools resolve `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` only through `tools/powerunits_execute_base_url_v1.py` (HTTPS required; exact host allowlist; `warn` default / `enforce` optional). The model cannot choose host, path, or URL.
+
+```text
+CODE_CAPABILITY = IMPLEMENTED
+PRODUCTION_ENFORCEMENT = PENDING_HUMAN_CONFIG
+```
+
+Production `enforce` needs a human-confirmed `POWERUNITS_INTERNAL_EXECUTE_ALLOWED_HOSTS` and `POWERUNITS_INTERNAL_EXECUTE_HOST_PIN_MODE=enforce`. This matrix does not activate that setting.
+
 **Summary:** Stage 1 rows are **live**. Stage 2/3 sections are **specification only** until runtime and access controls are deliberately changed — not this document alone.

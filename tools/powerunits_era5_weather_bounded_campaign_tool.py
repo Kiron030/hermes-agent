@@ -41,6 +41,7 @@ from tools.powerunits_era5_weather_bounded_summary_tool import (
     summarize_powerunits_era5_weather_bounded_window,
 )
 import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
+from tools.powerunits_execute_base_url_v1 import powerunits_execute_base_url_is_configured
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def check_powerunits_era5_weather_bounded_campaign_requirements() -> bool:
     if not campaign_era5_bounded_http_primitives_enabled():
         return False
     if not (
-        (os.getenv("POWERUNITS_INTERNAL_EXECUTE_BASE_URL") or "").strip()
+        powerunits_execute_base_url_is_configured()
         and (os.getenv("POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET") or "").strip()
     ):
         return False

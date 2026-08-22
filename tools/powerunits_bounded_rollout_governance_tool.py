@@ -23,6 +23,11 @@ from tools.powerunits_bounded_family_gates import (
     bounded_rollout_governance_enabled,
     bounded_rollout_governance_requirement_text,
 )
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +48,7 @@ _SECRET_URL_RE = re.compile(
 def check_powerunits_bounded_rollout_governance_requirements() -> bool:
     if not bounded_rollout_governance_enabled():
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -60,9 +65,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _governance_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_GOVERNANCE_PATH}"
 
 
@@ -118,13 +124,15 @@ def governance_powerunits_bounded_rollout_read_v1(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "governance_config_incomplete",
                 "surface": _SURFACE,
                 "governance_attempted": False,
                 "success": False,
                 "hermes_statement": base_stmt,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 
