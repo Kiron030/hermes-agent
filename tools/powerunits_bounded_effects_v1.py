@@ -31,17 +31,10 @@ EFFECT_CLASSES: frozenset[str] = frozenset(
 
 WRITE_EFFECT_CLASSES: frozenset[str] = frozenset({BOUNDED_WRITE, BOUNDED_WRITE_AMPLIFYING})
 
-# Local Tier 4A/4B/5A workspace scaffolding mutates files under HERMES_HOME only.
-# S0-B classifies those as READ_WITH_SIDE_EFFECT and does not add the write gate.
-# They are not Repo B recomputes. R0 may reclassify after the golden baseline.
-_LOCAL_SCAFFOLDING_SIDE_EFFECTS: tuple[str, ...] = (
-    "write_powerunits_skill_draft_proposal",
+# Idempotent directory/pointer setup only. Durable content mutators are BOUNDED_WRITE.
+_LOCAL_IDEMPOTENT_SCAFFOLDING: tuple[str, ...] = (
     "ensure_powerunits_governance_workspace",
-    "set_powerunits_skill_draft_review_status",
-    "append_powerunits_governance_note",
     "ensure_powerunits_bounded_workflow_workspace",
-    "upsert_powerunits_bounded_workflow_run",
-    "append_powerunits_bounded_workflow_note",
 )
 
 
@@ -132,13 +125,18 @@ EFFECT_CLASS_BY_OPERATION: dict[str, str] = {
     "execute_powerunits_option_d_bounded_slice": BOUNDED_WRITE,
     "execute_powerunits_outage_repair_bounded_slice": BOUNDED_WRITE,
     "save_hermes_workspace_note": BOUNDED_WRITE,
+    "write_powerunits_skill_draft_proposal": BOUNDED_WRITE,
+    "set_powerunits_skill_draft_review_status": BOUNDED_WRITE,
+    "append_powerunits_governance_note": BOUNDED_WRITE,
+    "upsert_powerunits_bounded_workflow_run": BOUNDED_WRITE,
+    "append_powerunits_bounded_workflow_note": BOUNDED_WRITE,
     # --- BOUNDED_WRITE_AMPLIFYING ---
     "campaign_powerunits_entsoe_market_bounded_de": BOUNDED_WRITE_AMPLIFYING,
     "campaign_powerunits_era5_weather_bounded_de": BOUNDED_WRITE_AMPLIFYING,
 }
 
 EFFECT_CLASS_BY_OPERATION.update(
-    {name: READ_WITH_SIDE_EFFECT for name in _LOCAL_SCAFFOLDING_SIDE_EFFECTS}
+    {name: READ_WITH_SIDE_EFFECT for name in _LOCAL_IDEMPOTENT_SCAFFOLDING}
 )
 
 

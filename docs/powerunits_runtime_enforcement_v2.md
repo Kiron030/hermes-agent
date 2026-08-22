@@ -109,11 +109,19 @@ PowerUnits operations have an explicit effect class in
 
 - `BOUNDED_WRITE` and `BOUNDED_WRITE_AMPLIFYING` require deterministic human
   approval via the existing `request_tool_approval(...)` gate **before** any
-  HTTP POST, campaign iteration, or local overwrite.
-- YOLO / `approvals.mode=off` cannot authorize a PowerUnits bounded write.
-  A prior explicit allowlist entry for the same
-  `<operation>:<country>:<window>` identity may still pass.
-- `READ` behaviour is unchanged. `READ_WITH_SIDE_EFFECT` is classified and
-  available for assertions, but is **not** write-gated in S0-B.
+  HTTP POST, campaign iteration, or durable local mutation.
+- Automatic bypass modes cannot independently create write authority:
+  YOLO, `approvals.mode=off`, and `HERMES_CRON_SESSION` + `cron_mode=approve`.
+  A prior explicit allowlist entry for the exact action identity may still pass.
+- Approval identity uses typed slots: `window:` for temporal slices (ISO z→Z)
+  and `resource:` for file/path identities (case-preserving).
+  `notes/az.md` and `notes/aZ.md` are distinct keys.
+- `READ` behaviour is unchanged. `READ_WITH_SIDE_EFFECT` covers research,
+  validation, scan, and idempotent workspace/directory setup only.
+- Durable local mutators (skill-draft write, review-status patch, governance
+  notes, workflow upsert/append, workspace notes) are `BOUNDED_WRITE`.
 - No destructive bounded operation was found in the current first-safe surface.
+- Residual: `[a]lways` persist across sessions and are profile-scoped, not
+  user-scoped. Registry completeness is name/toolset based and does not cover
+  future plugin/MCP registration.
 

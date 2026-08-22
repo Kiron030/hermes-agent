@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from powerunits_telegram_overlays import expected_telegram_toolsets_first_safe
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
 
 
 def _config_with_telegram(telegram: list[str]) -> str:
@@ -318,7 +319,8 @@ def test_posture_curator_true_caution(posture_mod, tmp_path: Path) -> None:
     assert any("curator_enabled_true" in x for x in out["caution_flags"])
 
 
-def test_posture_includes_exports_subset(posture_mod, tmp_path: Path) -> None:
+def test_posture_includes_exports_subset(posture_mod, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
     from tools import powerunits_workspace_tool as ws
 
     json.loads(ws.list_hermes_workspace())

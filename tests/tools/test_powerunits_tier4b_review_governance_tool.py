@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
 
 @pytest.fixture
 def t4b(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    grant_powerunits_write_approvals(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "5")
     from tools import powerunits_tier4b_review_governance_tool as m
@@ -121,6 +124,7 @@ def test_review_board_marks_invalid_frontmatter_status(t4b, tmp_path: Path, monk
 def test_tier4a_write_rejects_invalid_review_status_in_custom_frontmatter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "4")
     from tools import powerunits_tier4a_skill_draft_proposals_tool as t4a

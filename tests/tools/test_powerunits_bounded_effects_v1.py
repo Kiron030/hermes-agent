@@ -59,6 +59,11 @@ def test_write_families_match_roadmap() -> None:
         "execute_powerunits_era5_weather_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "save_hermes_workspace_note",
+        "write_powerunits_skill_draft_proposal",
+        "set_powerunits_skill_draft_review_status",
+        "append_powerunits_governance_note",
+        "upsert_powerunits_bounded_workflow_run",
+        "append_powerunits_bounded_workflow_note",
     }
     assert amplifying == {
         "campaign_powerunits_entsoe_market_bounded_de",
@@ -71,4 +76,6 @@ def test_read_with_side_effect_is_classified_not_write() -> None:
     assert effect_class_for("validate_powerunits_option_d_bounded_window") == READ_WITH_SIDE_EFFECT
     assert effect_class_for("scan_powerunits_entsoe_market_bounded_coverage_de") == READ_WITH_SIDE_EFFECT
     assert effect_class_for("research_powerunits_energy_web_v1") == READ_WITH_SIDE_EFFECT
+    assert effect_class_for("ensure_powerunits_governance_workspace") == READ_WITH_SIDE_EFFECT
+    assert effect_class_for("ensure_powerunits_bounded_workflow_workspace") == READ_WITH_SIDE_EFFECT
     assert effect_class_for("read_powerunits_coverage_snapshot_v1") == READ

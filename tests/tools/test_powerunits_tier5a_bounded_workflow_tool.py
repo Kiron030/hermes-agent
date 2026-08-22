@@ -8,8 +8,12 @@ from pathlib import Path
 import pytest
 
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
+
 @pytest.fixture
 def tier5_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    grant_powerunits_write_approvals(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "6")
     return tmp_path

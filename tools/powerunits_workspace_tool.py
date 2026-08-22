@@ -342,26 +342,23 @@ def save_hermes_workspace_note(
         if mode not in {"forbid", "overwrite"}:
             raise ValueError("overwrite_mode must be 'forbid' or 'overwrite'")
 
-        root = _ensure_workspace_dirs()
-        out_path = (root / k / n).resolve()
-        out_path.relative_to(root)
-
-        if mode == "forbid" and out_path.exists():
+        root_probe = _workspace_root()
+        out_probe = (root_probe / k / n).resolve()
+        out_probe.relative_to(root_probe)
+        if mode == "forbid" and out_probe.exists():
             return tool_error("file already exists (overwrite_mode=forbid)", error_code="already_exists")
+
         approval = pu_write_approval.require_powerunits_write_approval(
             operation="save_hermes_workspace_note",
             country="-",
-            window=f"{k}/{n}",
+            resource=f"{k}/{n}",
         )
         if not approval.get("approved"):
-            fields = pu_write_approval.write_approval_error_fields(approval)
-            return tool_error(
-                str(fields.get("message") or "workspace write not approved"),
-                error_code=fields["error_code"],
-                status=fields["status"],
-                success=False,
-                rule_key=fields.get("rule_key"),
-            )
+            return pu_write_approval.write_approval_tool_error(approval)
+
+        root = _ensure_workspace_dirs()
+        out_path = (root / k / n).resolve()
+        out_path.relative_to(root)
         out_path.write_text(str(content), encoding="utf-8")
         return json.dumps(
             {
