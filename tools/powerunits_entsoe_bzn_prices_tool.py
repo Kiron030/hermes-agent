@@ -17,6 +17,12 @@ from typing import Any
 
 import httpx
 
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
+
 logger = logging.getLogger(__name__)
 
 _FEATURE_ENV = "HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED"
@@ -58,7 +64,7 @@ def _truthy_env(name: str) -> bool:
 def check_powerunits_entsoe_bzn_prices_requirements() -> bool:
     if not _truthy_env(_FEATURE_ENV):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -75,9 +81,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _read_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_READ_PATH}"
 
 
@@ -237,6 +244,7 @@ def read_powerunits_entsoe_bzn_prices_v1(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "read_config_incomplete",
                 "surface": _SURFACE,
@@ -244,7 +252,8 @@ def read_powerunits_entsoe_bzn_prices_v1(
                 "http_status_from_repo_b": None,
                 "success": False,
                 "hermes_operator_note_v1": _HERMES_NOTE_V1,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

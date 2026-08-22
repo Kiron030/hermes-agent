@@ -29,6 +29,11 @@ from tools.powerunits_era5_weather_bounded_slice import validate_era5_bounded_ca
 from tools.powerunits_era5_tier1_countries import (
     BOUNDED_ERA5_USER_FACING_ISO2_DOCUMENTATION_V1 as _BOUNDED_ISO2_DOC,
 )
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +59,7 @@ def _truthy_env(name: str) -> bool:
 def check_powerunits_era5_weather_bounded_coverage_scan_requirements() -> bool:
     if not _truthy_env(_FEATURE_ENV):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -71,9 +76,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _scan_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_SCAN_PATH}"
 
 
@@ -176,13 +182,15 @@ def scan_powerunits_era5_weather_bounded_coverage_de(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "scan_config_incomplete",
                 "surface": _SURFACE,
                 "scan_attempted": False,
                 "http_status": None,
                 "hermes_statement": base_statement,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

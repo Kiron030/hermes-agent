@@ -78,7 +78,11 @@ Jedes Bounded-Tool ist **fail-closed** hinter zwei unabhängigen Bedingungen:
    check via `_truthy_env`), unabhängig von jedem anderen Tool/Toolset.
 2. **Secret/Provider-Credential** — das tatsächliche Zugangsmittel (`TAVILY_API_KEY`,
    oder für Repo-B-Tools `POWERUNITS_INTERNAL_EXECUTE_BASE_URL` +
-   `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`).
+   `POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET`). Repo-B-HTTP-Tools lesen die
+   Base-URL nicht selbst; `tools/powerunits_execute_base_url_v1.py` prüft
+   `https` und den Host (`warn` Default, `enforce` nach menschlicher Host-
+   Bestätigung). `CODE_CAPABILITY = IMPLEMENTED`;
+   `PRODUCTION_ENFORCEMENT = PENDING_HUMAN_CONFIG`.
 
 Beide müssen erfüllt sein, sonst liefert die `check_powerunits_<tool>_requirements()`-
 Funktion `False`, und der Tool-Aufruf gibt **sofort** einen `feature_disabled`-Fehler

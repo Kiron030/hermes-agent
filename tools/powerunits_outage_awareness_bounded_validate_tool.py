@@ -20,6 +20,11 @@ from tools.powerunits_bounded_family_gates import (
     outage_awareness_bounded_gate_requirement_text,
 )
 from tools.powerunits_outage_awareness_bounded_slice import validate_outage_awareness_bounded_slice
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,7 @@ _SECRET_URL_RE = re.compile(
 def check_powerunits_outage_awareness_bounded_validate_requirements() -> bool:
     if not outage_awareness_bounded_core_step_enabled(_STEP):
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -59,9 +64,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _validate_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_VALIDATE_PATH}"
 
 
@@ -164,6 +170,7 @@ def validate_powerunits_outage_awareness_bounded_window(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "validate_config_incomplete",
                 "surface": _SURFACE,
@@ -172,7 +179,8 @@ def validate_powerunits_outage_awareness_bounded_window(
                 "http_status": None,
                 "outcome": None,
                 "hermes_statement": base_statement,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 

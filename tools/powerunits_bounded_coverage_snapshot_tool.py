@@ -22,6 +22,11 @@ from tools.powerunits_bounded_family_gates import (
     bounded_coverage_snapshot_enabled,
     bounded_coverage_snapshot_requirement_text,
 )
+from tools.powerunits_execute_base_url_v1 import (
+    apply_powerunits_execute_base_url_refusal,
+    powerunits_execute_base_url_is_configured,
+    resolve_powerunits_execute_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +53,7 @@ _HERMES_NOTE_V1 = (
 def check_powerunits_bounded_coverage_snapshot_requirements() -> bool:
     if not bounded_coverage_snapshot_enabled():
         return False
-    if not (os.getenv(_BASE_ENV) or "").strip():
+    if not powerunits_execute_base_url_is_configured():
         return False
     if not (os.getenv(_SECRET_ENV) or "").strip():
         return False
@@ -65,9 +70,10 @@ def _redact_secrets(text: str) -> str:
 
 
 def _snapshot_url() -> str:
-    base = (os.getenv(_BASE_ENV) or "").strip().rstrip("/")
-    if not base:
+    resolved = resolve_powerunits_execute_base_url()
+    if resolved.refused or not resolved.base_url:
         return ""
+    base = resolved.base_url
     return f"{base}{_SNAPSHOT_PATH}"
 
 
@@ -211,6 +217,7 @@ def read_powerunits_coverage_snapshot_v1(
     secret = (os.getenv(_SECRET_ENV) or "").strip()
     if not url or not secret:
         return json.dumps(
+            apply_powerunits_execute_base_url_refusal(
             {
                 "error_code": "read_config_incomplete",
                 "surface": _SURFACE,
@@ -218,7 +225,8 @@ def read_powerunits_coverage_snapshot_v1(
                 "http_status_from_repo_b": None,
                 "success": False,
                 "hermes_operator_note_v1": _HERMES_NOTE_V1,
-            },
+            }
+            ),
             ensure_ascii=False,
         )
 
