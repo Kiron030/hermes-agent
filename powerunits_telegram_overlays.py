@@ -53,7 +53,6 @@ def energy_web_research_telegram_overlay_instructions() -> str:
 # overlays remain at ``workspace_index + 1 … + 6`` (tests + docs rely on this).
 TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1: tuple[str, ...] = (
     "memory",
-    "session_search",
     "todo",
     # Hermes core read (no browser/terminal/file write/delegate)
     "web",

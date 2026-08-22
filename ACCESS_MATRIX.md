@@ -8,7 +8,7 @@
 | **GitHub docs (allowlisted)** | Allowed (primary) | `POWERUNITS_GITHUB_TOKEN_READ` (or legacy docs token); paths/branches per `powerunits_github_knowledge` config. |
 | **Bundled Powerunits docs** | Allowed (fallback) | Build-time / env-directed; not primary when GitHub is healthy. |
 | **Workspace** (`hermes_workspace` allowlisted subdirs) | Allowed | Text notes / analysis under bounded paths; no delete/rename escapes. |
-| **Memory / session search / todo** | Allowed | Part of first_safe bounded set for continuity and tasks. |
+| **Memory / todo** | Allowed | Part of first_safe bounded set for continuity and tasks. `session_search` is **not** in `first_safe_v1` (S0-A / DISABLE) and is not callable, including after an explicit toolset request. |
 | **Timescale read** (`read_powerunits_timescale_dataset`) | Allowed **only** when gated | `HERMES_POWERUNITS_TIMESCALE_READ_ENABLED` + `DATABASE_URL_TIMESCALE`; single view `public.market_price_model_dataset_v`; fixed patterns only. |
 | **Repo B file read** (`read_powerunits_repo_b_allowlisted`) | Allowed **only** when gated | `HERMES_POWERUNITS_REPO_B_READ_ENABLED` + GitHub read token; actions `list_repo_b_keys` / `read_repo_b_key` only (snake_case keys from `config/powerunits_repo_b_read_allowlist.json`); not the doc manifest tool. |
 | **Option D preflight** (`preflight_powerunits_option_d_bounded_slice`) | Allowed **only** when gated | `HERMES_POWERUNITS_OPTION_D_PREFLIGHT_ENABLED`; local PL / `v1` / ≤24h UTC slice check, rollback SQL, optional legacy wrapper CLI, bounded HTTP hint — **no** Powerunits HTTP, **no** wrapper execution, **no** DB writes from Hermes. |

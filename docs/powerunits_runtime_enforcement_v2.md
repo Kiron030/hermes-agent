@@ -40,7 +40,9 @@ Wichtig: Fruehere YAML-/Platform-Filter sind nur vorgelagerte Inputs. Entscheide
 In `model_tools.py`:
 
 - Bei `HERMES_POWERUNITS_RUNTIME_POLICY=first_safe_v1` wird in `get_tool_definitions(...)` die Toolmenge final per Intersection auf die first-safe Allowlist begrenzt.
-- Allowlist-basiert (ueber Toolsets): `memory`, `session_search`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace` (Telegram: kein `clarify`, da kein Callback).
+- Allowlist-basiert (ueber Toolsets): `memory`, `todo`, `powerunits_docs`, `powerunits_github_docs`, `powerunits_workspace` (Telegram: kein `clarify`, da kein Callback).
+- `session_search` ist **nicht** Teil von `TELEGRAM_BASE_TOOLSETS_FIRST_SAFE_V1` (S0-A / `DISABLE`). Der finale Clamp entfernt es in jedem Capability-Tier 0-6, auch wenn das Toolset explizit angefordert wird.
+- Exit-Kriterium fuer die Wiederaufnahme: `session_search` darf erst zurueckkehren, nachdem Ownership-Scoping (Chat/Profil) im adopted Upstream-Release verifiziert ist (Upstream #87779). Bis dahin bleibt `memory` die erlaubte Recall-Flaeche.
 
 Effekt: Auch wenn ein spaeter Layer breite Toolsets anfordert, bleibt die final callable Surface hard-capped.
 
