@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 
 from tools.powerunits_option_d_bounded_market_features import _validate_slice
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,23 @@ def execute_powerunits_option_d_bounded_slice(
             },
             ensure_ascii=False,
         )
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="execute_powerunits_option_d_bounded_slice",
+        country=cc,
+        window=pu_write_approval.canonical_window(start_s, end_s),
+    )
+    if not approval.get("approved"):
+        payload = {
+            "surface": _SURFACE,
+            "slice": slice_obj,
+            "pipeline_run_id": None,
+            "correlation_id": None,
+            "response_body_summary": "",
+            "hermes_statement": base_statement,
+        }
+        payload.update(pu_write_approval.write_approval_error_fields(approval))
+        return json.dumps(payload, ensure_ascii=False)
 
     correlation_id = str(uuid.uuid4())
     body = {

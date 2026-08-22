@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from powerunits_skill_draft_review_contract import validate_review_status
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -293,15 +294,25 @@ def write_powerunits_skill_draft_proposal(
     if omode not in {"forbid", "overwrite"}:
         return tool_error("overwrite_mode must be forbid or overwrite", error_code="invalid_mode")
 
-    proposals = _ensure_proposals_tree()
     try:
         nrel = _normalize_rel(relative_file_path)
-        target = _safe_target(nrel, proposals)
+        target_probe = _safe_target(nrel, _proposals_root())
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_path")
 
-    if target.exists() and omode == "forbid":
+    if target_probe.exists() and omode == "forbid":
         return tool_error("target_exists_use_overwrite_or_new_name", error_code="exists")
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="write_powerunits_skill_draft_proposal",
+        country="-",
+        resource=nrel,
+    )
+    if not approval.get("approved"):
+        return pu_write_approval.write_approval_tool_error(approval)
+
+    proposals = _ensure_proposals_tree()
+    target = _safe_target(nrel, proposals)
 
     tier_raw = os.getenv("HERMES_POWERUNITS_CAPABILITY_TIER", "")
     meta_lines = [

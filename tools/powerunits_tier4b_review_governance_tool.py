@@ -29,6 +29,7 @@ from powerunits_skill_draft_review_contract import (
     REVIEW_STATUS_VALUES,
     validate_review_status,
 )
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -293,17 +294,28 @@ def set_powerunits_skill_draft_review_status(
     from tools.powerunits_tier4a_skill_draft_proposals_tool import (
         _ensure_proposals_tree,
         _normalize_rel,
+        _proposals_root,
     )
 
-    proposals = _ensure_proposals_tree()
     try:
         nrel = _normalize_rel(relative_file_path)
-        target = _safe_proposal_target(nrel, proposals)
+        target_probe = _safe_proposal_target(nrel, _proposals_root())
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_path")
 
-    if not target.is_file() or target.is_symlink():
+    if not target_probe.is_file() or target_probe.is_symlink():
         return tool_error("not_found", error_code="not_found")
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="set_powerunits_skill_draft_review_status",
+        country="-",
+        resource=nrel,
+    )
+    if not approval.get("approved"):
+        return pu_write_approval.write_approval_tool_error(approval)
+
+    proposals = _ensure_proposals_tree()
+    target = _safe_proposal_target(nrel, proposals)
 
     try:
         text = target.read_text(encoding="utf-8", errors="strict")
@@ -363,13 +375,23 @@ def append_powerunits_governance_note(
     if len(chunk) > _MAX_NOTE_APPEND:
         return tool_error("body_too_large", error_code="limit_exceeded")
 
-    ensure_powerunits_governance_workspace()
-    gov = _governance_root()
     try:
         nrel = _normalize_rel(relative_file_path)
-        target = _safe_gov_target(nrel, gov)
+        _safe_gov_target(nrel, _governance_root())
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_path")
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="append_powerunits_governance_note",
+        country="-",
+        resource=nrel,
+    )
+    if not approval.get("approved"):
+        return pu_write_approval.write_approval_tool_error(approval)
+
+    ensure_powerunits_governance_workspace()
+    gov = _governance_root()
+    target = _safe_gov_target(nrel, gov)
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     block = f"\n\n<!-- tier4b_note {stamp} -->\n{chunk}\n"

@@ -7,6 +7,13 @@ from typing import Any
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
+
+@pytest.fixture(autouse=True)
+def _grant_s0b_write_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
+
 
 def _exec(
     *,

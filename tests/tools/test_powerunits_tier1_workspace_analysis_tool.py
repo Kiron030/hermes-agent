@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
 
 @pytest.fixture
 def t1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    grant_powerunits_write_approvals(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_POWERUNITS_CAPABILITY_TIER", "1")
     from tools import powerunits_tier1_workspace_analysis_tool as m

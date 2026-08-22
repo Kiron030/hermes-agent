@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -382,9 +383,6 @@ def upsert_powerunits_bounded_workflow_run(
     if len(append_md) > _MAX_APPEND_MARKDOWN:
         return tool_error("append_markdown_too_large", error_code="limit_exceeded")
 
-    ensure_powerunits_bounded_workflow_workspace()
-    wf_root = _workflow_root()
-
     if relative_run_record_path:
         try:
             nrel = _normalize_rel(relative_run_record_path)
@@ -398,11 +396,23 @@ def upsert_powerunits_bounded_workflow_run(
         except ValueError as exc:
             return tool_error(str(exc), error_code="invalid_path")
     else:
-        leaf = f"{rid}.md"
+        nrel = f"{_RUN_SUBDIR}/{rid}.md"
         try:
-            target = _validated_under_workflow(f"{_RUN_SUBDIR}/{leaf}")
+            target = _validated_under_workflow(nrel)
         except ValueError as exc:
             return tool_error(str(exc), error_code="invalid_path")
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="upsert_powerunits_bounded_workflow_run",
+        country="-",
+        resource=nrel,
+    )
+    if not approval.get("approved"):
+        return pu_write_approval.write_approval_tool_error(approval)
+
+    ensure_powerunits_bounded_workflow_workspace()
+    wf_root = _workflow_root()
+    target = _validated_under_workflow(nrel)
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     core_patch: dict[str, str] = {
@@ -590,12 +600,22 @@ def append_powerunits_bounded_workflow_note(
     if len(chunk) > _MAX_NOTE_APPEND:
         return tool_error("body_too_large", error_code="limit_exceeded")
 
-    ensure_powerunits_bounded_workflow_workspace()
     try:
         nrel = _normalize_rel(relative_file_path)
         target = _validated_note_rel(nrel)
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_path")
+
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="append_powerunits_bounded_workflow_note",
+        country="-",
+        resource=nrel,
+    )
+    if not approval.get("approved"):
+        return pu_write_approval.write_approval_tool_error(approval)
+
+    ensure_powerunits_bounded_workflow_workspace()
+    target = _validated_note_rel(nrel)
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     block = f"\n\n<!-- tier5a_note {stamp} -->\n{chunk}\n"

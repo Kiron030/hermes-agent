@@ -7,12 +7,18 @@ from typing import Any
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
 from tools import powerunits_market_features_bounded_de_execute_tool as ex_mod
 from tools import powerunits_market_features_bounded_de_validate_tool as val_mod
 from tools.powerunits_bounded_family_gates import (
     MARKET_FEATURES_BOUNDED_LEGACY_ENV,
     MARKET_FEATURES_BOUNDED_PRIMARY_ENV,
 )
+
+
+@pytest.fixture(autouse=True)
+def _grant_s0b_write_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
 
 
 def _clear_market_features_gates(monkeypatch: pytest.MonkeyPatch) -> None:
