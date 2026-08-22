@@ -20,6 +20,12 @@ from tools.powerunits_entsoe_market_bounded_slice import (
     validate_entsoe_bounded_campaign,
     validate_entsoe_bounded_slice,
 )
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
+
+@pytest.fixture(autouse=True)
+def _grant_s0b_write_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
 
 
 def _clear_entso_bounded_core(monkeypatch: pytest.MonkeyPatch) -> None:

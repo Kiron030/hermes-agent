@@ -102,3 +102,18 @@ Die Verifikation nach Redeploy inkl. Mismatch-Analyse ist dokumentiert in:
 
 - `docs/powerunits_runtime_cleanup_v1.md`
 
+## S0-B — Effect classification and write approval
+
+PowerUnits operations have an explicit effect class in
+`tools/powerunits_bounded_effects_v1.py`. Missing classification fails closed.
+
+- `BOUNDED_WRITE` and `BOUNDED_WRITE_AMPLIFYING` require deterministic human
+  approval via the existing `request_tool_approval(...)` gate **before** any
+  HTTP POST, campaign iteration, or local overwrite.
+- YOLO / `approvals.mode=off` cannot authorize a PowerUnits bounded write.
+  A prior explicit allowlist entry for the same
+  `<operation>:<country>:<window>` identity may still pass.
+- `READ` behaviour is unchanged. `READ_WITH_SIDE_EFFECT` is classified and
+  available for assertions, but is **not** write-gated in S0-B.
+- No destructive bounded operation was found in the current first-safe surface.
+

@@ -12,6 +12,7 @@ from tools import powerunits_era5_weather_bounded_execute_tool as exec_mod
 from tools import powerunits_era5_weather_bounded_preflight_tool as pre_mod
 from tools import powerunits_era5_weather_bounded_summary_tool as sum_mod
 from tools import powerunits_era5_weather_bounded_validate_tool as val_mod
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
 from tools.powerunits_bounded_family_gates import (
     ERA5_WEATHER_BOUNDED_ALLOWED_COUNTRIES_ENV,
     ERA5_WEATHER_BOUNDED_LEGACY_ENV,
@@ -24,6 +25,11 @@ from tools.powerunits_era5_weather_bounded_slice import (
     validate_era5_bounded_campaign,
     validate_era5_bounded_slice,
 )
+
+
+@pytest.fixture(autouse=True)
+def _grant_s0b_write_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
 
 
 def _clear_era5_bounded_core(monkeypatch: pytest.MonkeyPatch) -> None:

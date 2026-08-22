@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
 from tools import powerunits_outage_repair_bounded_execute_tool as exec_mod
 from tools.powerunits_bounded_family_gates import (
     OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES_ENV,
@@ -24,6 +25,11 @@ def _clear_repair(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def _clear_repair_env(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_repair(monkeypatch)
+
+
+@pytest.fixture(autouse=True)
+def _grant_s0b_write_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    grant_powerunits_write_approvals(monkeypatch)
 
 
 def test_execute_gate_off() -> None:

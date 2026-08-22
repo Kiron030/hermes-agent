@@ -40,6 +40,7 @@ from tools.powerunits_era5_weather_bounded_summary_tool import (
     check_powerunits_era5_weather_bounded_summary_requirements,
     summarize_powerunits_era5_weather_bounded_window,
 )
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,37 @@ def campaign_powerunits_era5_weather_bounded_de(
         )
 
     planned = len(windows)
+    approval = pu_write_approval.require_powerunits_write_approval(
+        operation="campaign_powerunits_era5_weather_bounded_de",
+        country=cc,
+        window=pu_write_approval.canonical_window(start_s, end_s),
+    )
+    if not approval.get("approved"):
+        fields = pu_write_approval.write_approval_error_fields(approval)
+        return json.dumps(
+            {
+                "surface": _SURFACE,
+                "campaign": {
+                    "country": cc,
+                    "version": ver,
+                    "campaign_start_utc": start_s,
+                    "campaign_end_utc_exclusive": end_s,
+                },
+                "windows": [],
+                "windows_planned": planned,
+                "windows_attempted": 0,
+                "windows_succeeded": 0,
+                "stopped_reason": fields["error_code"],
+                "next_manual_step": (
+                    "Human approval is required before this campaign may iterate "
+                    "any bounded execute window."
+                ),
+                "hermes_statement": base_statement,
+                **fields,
+            },
+            ensure_ascii=False,
+        )
+
     rows: list[dict[str, Any]] = []
     windows_attempted = 0
     windows_succeeded = 0

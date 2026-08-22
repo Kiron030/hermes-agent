@@ -22,6 +22,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import tools.powerunits_bounded_write_approval_v1 as pu_write_approval
+
 logger = logging.getLogger(__name__)
 
 _ALLOWED_SUBDIRS = ("analysis", "notes", "drafts", "exports")
@@ -346,6 +348,20 @@ def save_hermes_workspace_note(
 
         if mode == "forbid" and out_path.exists():
             return tool_error("file already exists (overwrite_mode=forbid)", error_code="already_exists")
+        approval = pu_write_approval.require_powerunits_write_approval(
+            operation="save_hermes_workspace_note",
+            country="-",
+            window=f"{k}/{n}",
+        )
+        if not approval.get("approved"):
+            fields = pu_write_approval.write_approval_error_fields(approval)
+            return tool_error(
+                str(fields.get("message") or "workspace write not approved"),
+                error_code=fields["error_code"],
+                status=fields["status"],
+                success=False,
+                rule_key=fields.get("rule_key"),
+            )
         out_path.write_text(str(content), encoding="utf-8")
         return json.dumps(
             {

@@ -3,9 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.tools.powerunits_s0b_approval_support import grant_powerunits_write_approvals
+
 
 @pytest.fixture
 def ws(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    grant_powerunits_write_approvals(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     from tools import powerunits_workspace_tool as m
 
