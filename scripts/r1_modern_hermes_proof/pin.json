@@ -7,8 +7,10 @@
   "upstream_tag_object": "b05e680e63d39d5a8e3ec0f5842a41d1c4209c03",
   "upstream_image_digest": "sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
   "upstream_image_ref": "nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
-  "upstream_image_revision_label": null,
-  "image_revision_note": "OCI index digest verified via Docker Hub tag API on 2026-08-22. Image config revision label requires a digest pull; Docker is not required for the source proof.",
+  "upstream_image_revision_label": "fcbd1076a93841fa88855acce810e342a5b78101",
+  "image_revision_note": "Verified 2026-08-22 via GitHub Actions run 32594196233: docker pull IMAGE@DIGEST, RepoDigests match the pinned index digest, revision label equals upstream_release_sha.",
+  "oci_runtime_evidence": "PASS",
+  "oci_action_run": "32594196233",
   "release_url": "https://github.com/NousResearch/hermes-agent/releases/tag/v2026.8.19",
   "operator_allowed_toolsets": ["memory", "todo", "web"],
   "operator_forbidden_toolsets": [

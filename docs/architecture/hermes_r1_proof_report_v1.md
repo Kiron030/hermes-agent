@@ -22,10 +22,11 @@ UPSTREAM_PROJECT_VERSION = 0.20.5
 UPSTREAM_RELEASE_SHA     = fcbd1076a93841fa88855acce810e342a5b78101
 UPSTREAM_TAG_OBJECT      = b05e680e63d39d5a8e3ec0f5842a41d1c4209c03
 UPSTREAM_IMAGE_DIGEST    = sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+UPSTREAM_IMAGE_REVISION  = fcbd1076a93841fa88855acce810e342a5b78101
 IMMUTABLE_PIN            = PASS
 ```
 
-Live metadata on 2026-08-22 matched the pin (GitHub annotated tag + `pyproject.toml` + Docker Hub index digest). Image revision label was not read; that requires an image-config pull. Docker is not installed in this proof host. The source worktree is the matching SHA.
+Live metadata on 2026-08-22 matched the pin (GitHub annotated tag + `pyproject.toml` + Docker Hub index digest). Official OCI digest smoke later confirmed the same index digest and the image revision label `fcbd1076a93841fa88855acce810e342a5b78101` (equals the release SHA). The source worktree is the matching SHA.
 
 Reconstruct:
 
@@ -239,9 +240,8 @@ GATE_1_STATUS = CLOSED_PENDING_HUMAN_MODEL_SMOKE
 ```
 
 Closed on isolation, frozen install, boot, inspectable surface, clamp answer
-(both bypass classes), Hermes tool-dispatch probes, and canonical-doc
-provenance. Official OCI digest smoke is recorded via GitHub Actions when the
-workflow completes. Model smoke remains a human non-production key action.
+(both bypass classes), Hermes tool-dispatch probes, official OCI digest smoke,
+and canonical-doc provenance. Model smoke remains a human non-production key action.
 
 ---
 
@@ -257,10 +257,12 @@ Workflow: `.github/workflows/r1-oci-digest-smoke.yml`
 Script: `scripts/r1_modern_hermes_proof/oci_digest_smoke.sh`
 
 ```text
-OCI_RUNTIME_EVIDENCE = see GitHub Actions run after push
+OCI_RUNTIME_EVIDENCE = PASS
+OCI_ACTION_RUN       = 32594196233
+OCI_REVISION_LABEL   = fcbd1076a93841fa88855acce810e342a5b78101
 ```
 
-No Railway, no production secrets, no public listener, no registry mirror.
+Evidence from that run: pull by `IMAGE@DIGEST` (not tag), RepoDigests contain the pinned index digest, scratch `HERMES_HOME`, 14 production-authority names absent inside the container, no public listener, container removed. No Railway, no production secrets, no registry mirror.
 
 ---
 

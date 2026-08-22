@@ -15,7 +15,9 @@ UPSTREAM_RELEASE_SHA      = fcbd1076a93841fa88855acce810e342a5b78101
 UPSTREAM_TAG_OBJECT       = b05e680e63d39d5a8e3ec0f5842a41d1c4209c03
 UPSTREAM_IMAGE_DIGEST     = sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
 UPSTREAM_IMAGE_REF        = nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
-UPSTREAM_IMAGE_REVISION   = not read (requires image-config pull; digest verified)
+UPSTREAM_IMAGE_REVISION   = fcbd1076a93841fa88855acce810e342a5b78101
+OCI_RUNTIME_EVIDENCE      = PASS
+OCI_ACTION_RUN            = 32594196233
 ```
 
 ## Verification performed 2026-08-22
@@ -27,6 +29,7 @@ UPSTREAM_IMAGE_REVISION   = not read (requires image-config pull; digest verifie
 | Release commit | peeled annotated tag | `fcbd1076a93841fa88855acce810e342a5b78101` | YES |
 | Project version | `pyproject.toml` at release SHA | `0.20.5` | YES |
 | OCI index digest | Docker Hub tag API `v2026.8.19` | `sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09` | YES |
+| OCI revision label | GHA run `32594196233` digest pull | `fcbd1076a93841fa88855acce810e342a5b78101` | YES |
 
 Platform image digests under that index (informational, not substitutes):
 
