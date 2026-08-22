@@ -1,0 +1,41 @@
+{
+  "slice": "R1",
+  "audit_date": "2026-08-22",
+  "upstream_release": "v2026.8.19",
+  "upstream_project_version": "0.20.5",
+  "upstream_release_sha": "fcbd1076a93841fa88855acce810e342a5b78101",
+  "upstream_tag_object": "b05e680e63d39d5a8e3ec0f5842a41d1c4209c03",
+  "upstream_image_digest": "sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
+  "upstream_image_ref": "nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
+  "upstream_image_revision_label": null,
+  "image_revision_note": "OCI index digest verified via Docker Hub tag API on 2026-08-22. Image config revision label requires a digest pull; Docker is not required for the source proof.",
+  "release_url": "https://github.com/NousResearch/hermes-agent/releases/tag/v2026.8.19",
+  "operator_allowed_toolsets": ["memory", "todo", "web"],
+  "operator_forbidden_toolsets": [
+    "terminal",
+    "file",
+    "session_search",
+    "delegation",
+    "browser",
+    "cronjob",
+    "computer_use",
+    "skills",
+    "code_execution"
+  ],
+  "production_authority_names": [
+    "DATABASE_URL_TIMESCALE",
+    "DATABASE_URL",
+    "POWERUNITS_HERMES_INTERNAL_EXECUTE_SECRET",
+    "RAILWAY_TOKEN",
+    "RAILWAY_API_TOKEN",
+    "RAILWAY_SERVICE_ID",
+    "RAILWAY_PROJECT_ID",
+    "RAILWAY_ENVIRONMENT_ID",
+    "RAILWAY_PUBLIC_DOMAIN",
+    "RAILWAY_STATIC_URL",
+    "VERCEL_TOKEN",
+    "VERCEL_ORG_ID",
+    "VERCEL_PROJECT_ID",
+    "VERCEL_DEPLOY_HOOK"
+  ]
+}
