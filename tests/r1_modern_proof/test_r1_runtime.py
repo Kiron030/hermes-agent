@@ -53,19 +53,36 @@ def test_tool_surface_is_inspectable() -> None:
 
 def test_operator_clamp_answers_equivalence() -> None:
     result = clamp_operator()
-    assert result["CLAMP_EQUIVALENCE"] in {"CONFIG_SUFFICIENT", "PATCH_REQUIRED"}
+    assert result["CLAMP_EQUIVALENCE"] == "PATCH_REQUIRED"
+    assert result["CONFIG_ONLY"] == "INSUFFICIENT"
+    assert result["CORE_PATCH_NEEDED"] == "YES"
+    assert result["CLAMP_IMPLEMENTATION_CLASS"] == "THIN_CORE_PATCH"
+    assert result["FUTURE_CORE_PATCH_IMPLEMENTED"] == "NO"
     names = {case["name"]: case for case in result["cases"]}
     assert "terminal" not in names["normal_allowed_set"]["forbidden_present"]
     assert "terminal" not in names["disabled_family_terminal"]["forbidden_present"]
     assert "terminal" not in names["unknown_toolset_does_not_widen"]["forbidden_present"]
     explicit = names["explicit_caller_requests_terminal"]
-    if result["CLAMP_EQUIVALENCE"] == "CONFIG_SUFFICIENT":
-        assert "terminal" not in explicit["forbidden_present"]
-    else:
-        assert result["PATCH_SEAM_IF_REQUIRED"]
-        assert result["caller_can_restore_forbidden_tool"] or not result[
-            "oneshot_passes_disabled_toolsets"
-        ]
+    assert result["PATCH_SEAM_IF_REQUIRED"]
+    assert result["CALLER_BYPASS"] == "VERIFIED"
+    assert result["caller_can_restore_forbidden_tool"] is True
+    assert "terminal" in explicit["forbidden_present"] or "process" in explicit["forbidden_present"]
+
+
+def test_toolsets_all_bypasses_operator_allowlist() -> None:
+    result = clamp_operator()
+    bypass = result["TOOLSETS_ALL_BYPASS"]
+    assert bypass["resolved_enabled"] is None
+    assert bypass["pass"] is True
+    restored = set(bypass["restored_high_authority"])
+    assert {"write_file", "delegate_task", "session_search"} <= restored
+
+
+def test_plugin_allowlist_self_expansion() -> None:
+    result = clamp_operator()
+    expansion = result["PLUGIN_SELF_EXPANSION"]
+    assert "r1_undeclared_plugin" not in expansion["declared"]
+    assert expansion["undeclared_plugin_present"] is True
 
 
 def test_lazy_install_is_absent_or_disabled_on_startup() -> None:
@@ -82,11 +99,18 @@ def test_capability_inventory_records_upstream_names() -> None:
     assert inventory["delegation_subagents"].startswith("delegation")
 
 
-def test_benign_capability_probes_operate_on_scratch() -> None:
+def test_benign_capability_probes_use_hermes_dispatch() -> None:
     result = capability_probes()
+    assert result["dispatch_path"] == "model_tools.handle_function_call"
     assert result["CAPABILITY_PROBE_1_WORKSPACE"] == "PASS"
     assert result["CAPABILITY_PROBE_2_TERMINAL_TEST_LOOP"] == "PASS"
     assert result["CAPABILITY_PROBE_3_MODERN_PRIMITIVE"] == "PASS"
+    assert result["filesystem"]["pass"] is True
+    assert result["terminal"]["pass"] is True
+    assert result["skills"]["pass"] is True
+    assert result["CAPABILITY_TOOL_DISPATCH"]["FILESYSTEM"] == "PASS"
+    assert result["CAPABILITY_TOOL_DISPATCH"]["TERMINAL"] == "PASS"
+    assert result["CAPABILITY_TOOL_DISPATCH"]["SKILLS"] == "PASS"
 
 
 def test_operator_and_developer_homes_differ() -> None:

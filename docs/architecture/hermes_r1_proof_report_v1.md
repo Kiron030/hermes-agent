@@ -102,11 +102,16 @@ memory, todo, web_extract
 Human model smoke (do **not** read production `.env`):
 
 ```text
-set HERMES_R1_MODEL_API_KEY=<non-production-key>
+set HERMES_R1_MODEL_API_KEY=<non-production-ephemeral-key>
 set HERMES_R1_MODEL_PROVIDER=openai
 set HERMES_R1_MODEL=gpt-4.1-mini
 python scripts/r1_modern_hermes_proof/harness.py model-smoke
 ```
+
+DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT TO PR WITHOUT REVIEW/REDACTION.
+
+`MODEL_SMOKE_HARNESS = READY`. The harness does not read `.env` and does not
+write the key to disk.
 
 ---
 
@@ -124,26 +129,39 @@ Representative upstream names (not guessed):
 | Explicit caller requests `terminal` **without** disabled arg | **`terminal` and `process` restored** |
 | Explicit caller + `disabled_toolsets` argument | forbidden absent again |
 | Unknown toolset `not_a_real_toolset` | surface does not widen |
-| `tools_config._get_platform_tools` | subtracts `agent.disabled_toolsets` from enabled |
+| `hermes -z --toolsets all` equivalent | `enabled=None`, `disabled=None` restores `execute_code`, `browser_exec`, `session_search`, `delegate_task`, `write_file`, `terminal`, `read_file` |
+| Config allowlist + unknown plugin | undeclared `r1_undeclared_plugin` is added because unknown plugins default enabled |
+| `tools_config._get_platform_tools` | subtracts `agent.disabled_toolsets` from enabled, but then self-adds unknown plugin toolsets |
 | `hermes_cli/oneshot.py` | passes `enabled_toolsets` only — **does not pass `disabled_toolsets`** |
 | Multiplex | not used |
 
 ```text
+CALLER_BYPASS = VERIFIED
+TOOLSETS_ALL_BYPASS = VERIFIED
+PLUGIN_SELF_EXPANSION = VERIFIED
+CONFIG_ONLY = INSUFFICIENT
+CORE_PATCH_NEEDED = YES
 CLAMP_EQUIVALENCE = PATCH_REQUIRED
+CLAMP_IMPLEMENTATION_CLASS = THIN_CORE_PATCH
+FUTURE_CORE_PATCH_IMPLEMENTED = NO
 ```
 
-`disabled_toolsets` works when it is actually passed into `get_tool_definitions`. It is **not** a final caller-proof cap. An explicit oneshot/CLI `enabled_toolsets` request restores a forbidden family because upstream has no post-resolution operator intersection.
+PATCH_REQUIRED is supported by both:
+
+1. caller override/bypass (`--toolsets all` and explicit enabled without disabled);
+2. positive-allowlist absence / plugin self-expansion.
 
 ```text
-PATCH_SEAM_IF_REQUIRED =
-  Smallest seam: model_tools._compute_tool_definitions after enabled/disabled
-  resolution. Add a final declared-operator intersection that callers cannot
-  widen. Alternative: oneshot/AIAgent always union config
-  agent.disabled_toolsets into the disabled argument.
-  R1 does not implement this patch.
+MINIMUM_ENFORCEMENT_SEAM =
+  model_tools._compute_tool_definitions
+  FINAL POSITIVE INTERSECTION against a declared operator allowlist
+  after normal enabled/disabled resolution and before registry definitions.
+
+Future patch MUST be domain-agnostic: no PowerUnits, Telegram,
+capability-tier, PowerUnits env-policy, or Repo-B logic.
 ```
 
-This is evidence for later `THIN_FORK` vs `ZERO_CORE_FORK`. It is not a Thin-Fork implementation.
+This is evidence for later `THIN_FORK`. It is not a Thin-Fork implementation.
 
 ---
 
@@ -175,26 +193,30 @@ memory, patch, process, read_file, search_files, skill_manage, skill_view,
 skills_list, terminal, todo, web_extract, web_search, write_file
 ```
 
-### Probes (scratch only)
+### Probes (Hermes tool dispatch)
+
+Path: `model_tools.handle_function_call` in the pinned upstream venv.
+Not direct `Path.write_text` / `subprocess.run`.
 
 ```text
-CAPABILITY_PROBE_1_WORKSPACE          = PASS
-  read alpha.txt + beta.txt, write note.txt, show git diff --no-index
-
-CAPABILITY_PROBE_2_TERMINAL_TEST_LOOP = PASS
-  failing r1_add_probe.py, trivial fix, rerun success
-
-CAPABILITY_PROBE_3_MODERN_PRIMITIVE   = PASS
-  skills_list / skill_view / skill_manage present and enumerable
+CAPABILITY_TOOL_DISPATCH
+  FILESYSTEM = PASS
+    search_files(alpha-source) + read_file + write_file(note.txt) + re-read
+  TERMINAL   = PASS
+    terminal(r1_add_probe.py) fail -> write_file fix -> terminal rerun exit 0
+  SKILLS     = PASS
+    skills_list + skill_view(r1-proof-skill) local fixture, no network install
 ```
 
 ```text
 CAPABILITY_UPLIFT          = STRONG
 CAPABILITY_UPLIFT_EVIDENCE =
-  workspace edit+diff; fail/fix/rerun command loop; skills primitive
+  handle_function_call search/read/write;
+  handle_function_call terminal fail/fix/rerun;
+  handle_function_call skills_list + skill_view
 ```
 
-These probes ran in the isolated modern runtime (pinned venv + scratch workspace), not as a billed production session. Missing PowerUnits plugin tools are **not** a regression; that is R2.
+These probes ran in the isolated modern runtime, not as a billed production session. Missing PowerUnits plugin tools are **not** a regression; that is R2.
 
 ---
 
@@ -213,10 +235,42 @@ Do not treat additional safe non-production capabilities as regressions.
 ## Gate
 
 ```text
-GATE_1_STATUS = CLOSED_PENDING_MODEL_SMOKE
+GATE_1_STATUS = CLOSED_PENDING_HUMAN_MODEL_SMOKE
 ```
 
-Closed on isolation, frozen install, boot, inspectable surface, clamp answer, and capability probes. Model smoke waits for a dedicated non-production key.
+Closed on isolation, frozen install, boot, inspectable surface, clamp answer
+(both bypass classes), Hermes tool-dispatch probes, and canonical-doc
+provenance. Official OCI digest smoke is recorded via GitHub Actions when the
+workflow completes. Model smoke remains a human non-production key action.
+
+---
+
+## Official OCI digest
+
+Pinned image only:
+
+```text
+nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+```
+
+Workflow: `.github/workflows/r1-oci-digest-smoke.yml`  
+Script: `scripts/r1_modern_hermes_proof/oci_digest_smoke.sh`
+
+```text
+OCI_RUNTIME_EVIDENCE = see GitHub Actions run after push
+```
+
+No Railway, no production secrets, no public listener, no registry mirror.
+
+---
+
+## Canonical decision documents
+
+Tracked byte-for-byte (provenance only, no rewrite):
+
+- `docs/architecture/hermes_modernisation_execution_roadmap_v1.md`
+- `docs/architecture/hermes_upstream_reassessment_v1.md`
+- `docs/architecture/hermes_upstream_reassessment_red_team_v1.md`
 
 ---
 

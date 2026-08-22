@@ -1,0 +1,32 @@
+name: R1 OCI digest smoke
+
+# Smallest official-image proof. Does not build, push, sign, or deploy.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/r1-oci-digest-smoke.yml"
+      - "scripts/r1_modern_hermes_proof/oci_digest_smoke.sh"
+      - "scripts/r1_modern_hermes_proof/pin.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r1-oci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  oci-digest-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PINNED_DIGEST: sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull official image by digest and smoke
+        run: |
+          chmod +x scripts/r1_modern_hermes_proof/oci_digest_smoke.sh
+          scripts/r1_modern_hermes_proof/oci_digest_smoke.sh "${PINNED_DIGEST}"

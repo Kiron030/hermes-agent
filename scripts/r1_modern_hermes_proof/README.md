@@ -58,11 +58,26 @@ Two contexts, never one shared toolset:
 Do not read production `.env`. If a dedicated non-production key exists:
 
 ```bash
-set HERMES_R1_MODEL_API_KEY=<non-production-key>
+set HERMES_R1_MODEL_API_KEY=<non-production-ephemeral-key>
 set HERMES_R1_MODEL_PROVIDER=openai
-set HERMES_R1_MODEL_NAME=gpt-4.1-mini
+set HERMES_R1_MODEL=gpt-4.1-mini
 python scripts/r1_modern_hermes_proof/harness.py model-smoke
 ```
+
+DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT TO PR WITHOUT REVIEW/REDACTION.
+
+stdout/stderr tails may contain provider-error material. There is no
+secret-redaction subsystem. A human must review before attaching output.
+
+## OCI digest smoke
+
+Official image only, by digest:
+
+```bash
+scripts/r1_modern_hermes_proof/oci_digest_smoke.sh sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+```
+
+GitHub Actions: `.github/workflows/r1-oci-digest-smoke.yml` (`workflow_dispatch`).
 
 ## Tests
 

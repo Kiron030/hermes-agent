@@ -28,6 +28,22 @@ ALWAYS_BLOCKED = (
 )
 
 
+def test_canonical_decision_documents_are_tracked() -> None:
+    files = (
+        REPO_ROOT / "docs/architecture/hermes_modernisation_execution_roadmap_v1.md",
+        REPO_ROOT / "docs/architecture/hermes_upstream_reassessment_v1.md",
+        REPO_ROOT / "docs/architecture/hermes_upstream_reassessment_red_team_v1.md",
+    )
+    starts = (
+        "# PowerUnits × Hermes: Modernisierungs-Execution-Roadmap v1",
+        "# PowerUnits × Hermes: Upstream Reassessment v1",
+        "# PowerUnits × Hermes: Red-Team Review v1",
+    )
+    for path, prefix in zip(files, starts):
+        assert path.is_file(), path
+        assert path.read_text(encoding="utf-8").startswith(prefix)
+
+
 def test_pin_file_matches_declared_identities() -> None:
     pin = load_pin()
     assert pin["upstream_release"] == "v2026.8.19"
@@ -93,6 +109,16 @@ def test_isolated_env_refuses_to_inject_authority(tmp_path: Path) -> None:
 def test_model_key_env_is_not_a_production_name() -> None:
     assert MODEL_KEY_ENV == "HERMES_R1_MODEL_API_KEY"
     assert MODEL_KEY_ENV not in production_authority_names()
+
+
+def test_model_smoke_harness_is_ready_without_reading_credentials() -> None:
+    from r1_modern_hermes_proof.harness import model_smoke
+
+    result = model_smoke()
+    assert result["MODEL_SMOKE"] == "HUMAN_CREDENTIAL_REQUIRED"
+    assert result["MODEL_SMOKE_HARNESS"] == "READY"
+    assert "DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT" in result["notes"]
+    assert MODEL_KEY_ENV in result["human_command"]
 
 
 def test_operator_policy_uses_upstream_toolset_names() -> None:

@@ -535,6 +535,7 @@ def clamp_operator() -> dict[str, Any]:
     cases.append(run_case("explicit_caller_requests_terminal", allowed + ["terminal"], None))
     cases.append(run_case("explicit_caller_plus_disabled_arg", allowed + ["terminal"], forbidden))
     cases.append(run_case("unknown_toolset_does_not_widen", allowed + ["not_a_real_toolset"], forbidden))
+    cases.append(run_case("toolsets_all_bypass", None, None))
 
     oneshot = (src / "hermes_cli" / "oneshot.py").read_text(encoding="utf-8")
     model_tools = (src / "model_tools.py").read_text(encoding="utf-8")
@@ -542,24 +543,68 @@ def clamp_operator() -> dict[str, Any]:
     oneshot_passes_disabled = "disabled_toolsets=" in oneshot
     has_final_policy_intersection = "first_safe" in model_tools or "POWERUNITS" in model_tools
     platform_tools_subtracts_disabled = "enabled_toolsets -= disabled_set" in tools_config
+    plugin_default_enabled = "New plugin not yet seen by hermes tools — default enabled" in tools_config
+
+    all_resolution = _run_upstream_json(
+        python,
+        src,
+        env,
+        (
+            "import json\n"
+            "from hermes_cli.oneshot import _validate_explicit_toolsets\n"
+            "from model_tools import get_tool_definitions\n"
+            "resolved, err = _validate_explicit_toolsets('all')\n"
+            "defs = get_tool_definitions(enabled_toolsets=resolved, disabled_toolsets=None, quiet_mode=True)\n"
+            "names = sorted(d['function']['name'] for d in defs)\n"
+            "print(json.dumps({'resolved_enabled': resolved, 'error': err, 'callable': names}))\n"
+        ),
+    )
+    high_authority = [
+        "execute_code",
+        "browser_exec",
+        "browser_navigate",
+        "session_search",
+        "delegate_task",
+        "write_file",
+        "terminal",
+        "read_file",
+    ]
+    restored = [name for name in high_authority if name in all_resolution.get("callable", [])]
+    plugin_expansion = _run_upstream_json(
+        python,
+        src,
+        env,
+        (
+            "import json\n"
+            "from unittest.mock import patch\n"
+            "from hermes_cli.tools_config import _get_platform_tools\n"
+            "declared = ['memory', 'todo', 'web']\n"
+            "config = {'platform_toolsets': {'cli': list(declared)}, "
+            "'agent': {'disabled_toolsets': ['terminal', 'file']}, "
+            "'known_plugin_toolsets': {}}\n"
+            "with patch('hermes_cli.tools_config._get_plugin_toolset_keys', "
+            "return_value={'r1_undeclared_plugin'}):\n"
+            "    enabled = sorted(_get_platform_tools(config, 'cli'))\n"
+            "print(json.dumps({'declared': declared, 'enabled': enabled, "
+            "'undeclared_plugin_present': 'r1_undeclared_plugin' in enabled}))\n"
+        ),
+    )
 
     explicit = next(case for case in cases if case["name"] == "explicit_caller_requests_terminal")
     forbidden_tools_from_terminal = {"terminal", "process"}
     caller_restored_forbidden = bool(set(explicit["callable"]) & forbidden_tools_from_terminal)
+    toolsets_all_bypass = bool(restored) and all_resolution.get("resolved_enabled") is None
+    plugin_self_expansion = bool(plugin_expansion.get("undeclared_plugin_present"))
 
-    if caller_restored_forbidden or not oneshot_passes_disabled:
-        equivalence = "PATCH_REQUIRED"
-        seam = (
-            "Smallest seam: model_tools._compute_tool_definitions after "
-            "enabled/disabled resolution. Add a final declared-operator "
-            "intersection that callers cannot widen. Alternative local seam: "
-            "hermes_cli/oneshot.py and AIAgent constructors must always union "
-            "config agent.disabled_toolsets into the disabled argument. "
-            "R1 does not implement this patch."
-        )
-    else:
-        equivalence = "CONFIG_SUFFICIENT"
-        seam = None
+    equivalence = "PATCH_REQUIRED"
+    seam = (
+        "MINIMUM_ENFORCEMENT_SEAM = model_tools._compute_tool_definitions "
+        "using a FINAL POSITIVE INTERSECTION against a declared operator "
+        "allowlist after normal enabled/disabled resolution and before "
+        "registry definitions. Domain-agnostic; no PowerUnits/Telegram/"
+        "capability-tier/Repo-B logic. CLAMP_IMPLEMENTATION_CLASS = "
+        "THIN_CORE_PATCH. R1 does not implement this patch."
+    )
 
     result = {
         "cases": [
@@ -568,7 +613,18 @@ def clamp_operator() -> dict[str, Any]:
                 "forbidden_present": sorted(
                     name
                     for name in case["callable"]
-                    if name in {"terminal", "process", "read_file", "write_file", "delegate_task", "session_search"}
+                    if name
+                    in {
+                        "terminal",
+                        "process",
+                        "read_file",
+                        "write_file",
+                        "delegate_task",
+                        "session_search",
+                        "execute_code",
+                        "browser_navigate",
+                        "browser_exec",
+                    }
                 ),
             }
             for case in cases
@@ -580,21 +636,54 @@ def clamp_operator() -> dict[str, Any]:
                 if not oneshot_passes_disabled
                 else "passes disabled_toolsets"
             ),
+            "oneshot_toolsets_all": "hermes -z --toolsets all -> enabled=None, disabled=None",
             "tools_config._get_platform_tools": (
                 "subtracts agent.disabled_toolsets from enabled"
                 if platform_tools_subtracts_disabled
                 else "does not subtract disabled"
             ),
+            "plugin_default_enabled_comment_present": plugin_default_enabled,
             "multiplex": "not used in this proof",
         },
         "oneshot_passes_disabled_toolsets": oneshot_passes_disabled,
         "upstream_has_final_policy_intersection": has_final_policy_intersection,
         "caller_can_restore_forbidden_tool": caller_restored_forbidden,
+        "CALLER_BYPASS": "VERIFIED" if caller_restored_forbidden else "NOT_PROVEN",
+        "TOOLSETS_ALL_BYPASS": {
+            "resolved_enabled": all_resolution.get("resolved_enabled"),
+            "restored_high_authority": restored,
+            "pass": toolsets_all_bypass,
+        },
+        "PLUGIN_SELF_EXPANSION": plugin_expansion,
+        "CONFIG_ONLY": "INSUFFICIENT",
+        "CORE_PATCH_NEEDED": "YES",
+        "CLAMP_IMPLEMENTATION_CLASS": "THIN_CORE_PATCH",
         "CLAMP_EQUIVALENCE": equivalence,
         "PATCH_SEAM_IF_REQUIRED": seam,
+        "FUTURE_CORE_PATCH_IMPLEMENTED": "NO",
     }
+    if not (toolsets_all_bypass and plugin_self_expansion and caller_restored_forbidden):
+        raise RuntimeError(
+            "expected both caller bypass and plugin self-expansion evidence; "
+            f"got toolsets_all={toolsets_all_bypass} plugin={plugin_self_expansion} "
+            f"caller={caller_restored_forbidden}"
+        )
     write_json(artifacts_dir() / "clamp_operator.json", result)
     return result
+
+
+def _run_upstream_json(python: Path, src: Path, env: dict[str, str], script: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [str(python), "-c", script],
+        cwd=src,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"upstream probe failed: {completed.stderr[-4000:]}\n{completed.stdout[-2000:]}")
+    return json.loads(completed.stdout.strip().splitlines()[-1])
 
 
 def capability_inventory() -> dict[str, Any]:
@@ -628,46 +717,27 @@ def capability_probes() -> dict[str, Any]:
     scratch.mkdir(parents=True)
     (scratch / "alpha.txt").write_text("alpha-source\n", encoding="utf-8")
     (scratch / "beta.txt").write_text("beta-source\n", encoding="utf-8")
-    probe_py = scratch / "r1_add_probe.py"
-    probe_py.write_text(
+    (scratch / "r1_add_probe.py").write_text(
         "def add(a, b):\n    return a - b\n\nif __name__ == '__main__':\n    raise SystemExit(0 if add(2, 3) == 5 else 1)\n",
         encoding="utf-8",
     )
-    env = isolated_env(developer_home(), extra={"PWD": str(scratch)})
-    script = r"""
-import json, subprocess, sys
-from pathlib import Path
-root = Path(sys.argv[1])
-alpha = (root / "alpha.txt").read_text(encoding="utf-8")
-beta = (root / "beta.txt").read_text(encoding="utf-8")
-(root / "note.txt").write_text(alpha.strip() + "+" + beta.strip() + "\n", encoding="utf-8")
-diff = subprocess.run(["git", "diff", "--no-index", "--", "alpha.txt", "note.txt"], cwd=root, capture_output=True, text=True)
-probe = root / "r1_add_probe.py"
-first = subprocess.run([sys.executable, str(probe)], cwd=root, capture_output=True, text=True)
-probe.write_text("def add(a, b):\n    return a + b\n\nif __name__ == '__main__':\n    raise SystemExit(0 if add(2, 3) == 5 else 1)\n", encoding="utf-8")
-second = subprocess.run([sys.executable, str(probe)], cwd=root, capture_output=True, text=True)
-skills = []
-try:
-    from model_tools import get_tool_definitions
-    names = [d["function"]["name"] for d in get_tool_definitions(enabled_toolsets=["skills", "file", "terminal"], quiet_mode=True)]
-    skills = sorted(n for n in names if n.startswith("skill") or n in {"read_file", "write_file", "terminal"})
-except Exception as exc:
-    skills = [f"inventory-error:{exc}"]
-print(json.dumps({
-    "probe1_read": [alpha.strip(), beta.strip()],
-    "probe1_edit": (root / "note.txt").read_text(encoding="utf-8").strip(),
-    "probe1_diff_exit": diff.returncode,
-    "probe1_diff_has_change": "note.txt" in (diff.stdout + diff.stderr),
-    "probe2_first_failed": first.returncode != 0,
-    "probe2_second_passed": second.returncode == 0,
-    "probe2_first_tail": first.stdout[-400:] + first.stderr[-400:],
-    "probe2_second_tail": second.stdout[-400:] + second.stderr[-400:],
-    "probe3_modern_primitive": "skills" if any(n.startswith("skill") for n in skills) else "file+terminal",
-    "probe3_available": skills,
-}))
-"""
+    skill_dir = developer_home() / "skills" / "r1-proof-skill"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: r1-proof-skill\ndescription: Local isolated R1 fixture. Not networked.\n---\n\nRead-only proof skill.\n",
+        encoding="utf-8",
+    )
+    env = isolated_env(
+        developer_home(),
+        extra={
+            "PWD": str(scratch),
+            "HERMES_YOLO_MODE": "1",
+            "HERMES_ACCEPT_HOOKS": "1",
+        },
+    )
+    probe_script = HERE / "dispatch_probes.py"
     completed = subprocess.run(
-        [str(python), "-c", script, str(scratch)],
+        [str(python), str(probe_script), str(scratch)],
         cwd=src,
         env=env,
         capture_output=True,
@@ -677,36 +747,43 @@ print(json.dumps({
     if completed.returncode != 0:
         raise RuntimeError(f"capability probes failed: {completed.stderr[-4000:]}\n{completed.stdout[-2000:]}")
     payload = json.loads(completed.stdout.strip().splitlines()[-1])
-    payload["CAPABILITY_PROBE_1_WORKSPACE"] = (
-        "PASS" if payload["probe1_edit"] == "alpha-source+beta-source" and payload["probe1_diff_has_change"] else "FAIL"
+    payload["CAPABILITY_TOOL_DISPATCH"] = {
+        "FILESYSTEM": payload.get("CAPABILITY_PROBE_1_WORKSPACE"),
+        "TERMINAL": payload.get("CAPABILITY_PROBE_2_TERMINAL_TEST_LOOP"),
+        "SKILLS": payload.get("CAPABILITY_PROBE_3_MODERN_PRIMITIVE"),
+        "path": "model_tools.handle_function_call",
+    }
+    all_pass = (
+        payload.get("CAPABILITY_PROBE_1_WORKSPACE") == "PASS"
+        and payload.get("CAPABILITY_PROBE_2_TERMINAL_TEST_LOOP") == "PASS"
+        and payload.get("CAPABILITY_PROBE_3_MODERN_PRIMITIVE") == "PASS"
     )
-    payload["CAPABILITY_PROBE_2_TERMINAL_TEST_LOOP"] = (
-        "PASS" if payload["probe2_first_failed"] and payload["probe2_second_passed"] else "FAIL"
-    )
-    payload["CAPABILITY_PROBE_3_MODERN_PRIMITIVE"] = (
-        "PASS" if payload["probe3_available"] else "FAIL"
-    )
+    payload["CAPABILITY_UPLIFT"] = "STRONG" if all_pass else "MODERATE"
     write_json(artifacts_dir() / "capability_probes.json", payload)
     return payload
 
 
 def model_smoke() -> dict[str, Any]:
     key = os.environ.get(MODEL_KEY_ENV, "").strip()
+    warning = (
+        "DO NOT ATTACH RAW MODEL-SMOKE ARTIFACT TO PR WITHOUT REVIEW/REDACTION. "
+        "stdout/stderr tails may contain provider-error material."
+    )
     if not key:
-        command = (
-            f'{sys.executable} scripts/r1_modern_hermes_proof/harness.py model-smoke'
-        )
+        command = f"{sys.executable} scripts/r1_modern_hermes_proof/harness.py model-smoke"
         result = {
             "MODEL_SMOKE": "HUMAN_CREDENTIAL_REQUIRED",
+            "MODEL_SMOKE_HARNESS": "READY",
             "human_command": (
-                f"set {MODEL_KEY_ENV}=<non-production-key>\n"
+                f"set {MODEL_KEY_ENV}=<non-production-ephemeral-key>\n"
                 f"set {MODEL_PROVIDER_ENV}=openai\n"
                 f"set {MODEL_NAME_ENV}=gpt-4.1-mini\n"
                 f"{command}"
             ),
             "notes": (
                 "Do not source the key from production .env or secret stores. "
-                "Use a dedicated non-production provider key only."
+                "Use a dedicated non-production provider key only. "
+                + warning
             ),
         }
         write_json(artifacts_dir() / "model_smoke.json", result)
@@ -714,18 +791,22 @@ def model_smoke() -> dict[str, Any]:
 
     src = _require_source()
     python = _upstream_python(src)
+    hermes = python.with_name("hermes.exe" if python.suffix == ".exe" else "hermes")
     write_proof_homes()
     env = isolated_env(operator_home(), include_model_key=True)
     assertion = assert_authority_absent(env)
-    completed = subprocess.run(
-        [
+    cmd = (
+        [str(hermes), "-z", "Reply with exactly: R1_MODEL_SMOKE_OK"]
+        if hermes.exists()
+        else [
             str(python),
-            "-m",
-            "hermes_cli",
-            "chat",
-            "--one-shot",
-            "Reply with exactly: R1_MODEL_SMOKE_OK",
-        ],
+            "-c",
+            "from hermes_cli.oneshot import main; import sys; "
+            "sys.argv=['hermes','-z','Reply with exactly: R1_MODEL_SMOKE_OK']; main()",
+        ]
+    )
+    completed = subprocess.run(
+        cmd,
         cwd=src,
         env=env,
         capture_output=True,
@@ -735,10 +816,12 @@ def model_smoke() -> dict[str, Any]:
     output = completed.stdout + completed.stderr
     result = {
         "MODEL_SMOKE": "PASS" if completed.returncode == 0 and "R1_MODEL_SMOKE_OK" in output else "FAIL",
+        "MODEL_SMOKE_HARNESS": "READY",
         "returncode": completed.returncode,
         "production_credential_assertions": assertion,
-        "stdout_tail": completed.stdout[-1000:],
-        "stderr_tail": completed.stderr[-1000:],
+        "stdout_tail": completed.stdout[-400:],
+        "stderr_tail": completed.stderr[-400:],
+        "warning": warning,
     }
     write_json(artifacts_dir() / "model_smoke.json", result)
     return result
