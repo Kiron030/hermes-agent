@@ -187,6 +187,22 @@ function Test-HasExplicitRule {
     return $false
 }
 
+# Statement-position `try` (not a parenthesized pipeline expression). Windows
+# PowerShell 5.1 treats `(try { ... } catch { ... })` inside Where-Object as
+# the command name "try" and throws CommandNotFoundException.
+function Test-UsersGroupReadExecute {
+    param($Acl, [string]$Sid)
+    foreach ($ace in $Acl.Access) {
+        if ($ace.AccessControlType -ne 'Allow') { continue }
+        $aceSid = try { $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { '' }
+        if ($aceSid -ne $Sid) { continue }
+        if ($ace.FileSystemRights.ToString() -match 'ReadAndExecute|Modify|FullControl') {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Grant-InheritedModify {
     param([string]$Path, [string]$Sid)
     $acl = Get-Acl -LiteralPath $Path
@@ -273,11 +289,7 @@ foreach ($path in $ToolchainPaths) {
     $entry = [ordered]@{ path = $path; exists = (Test-Path -LiteralPath $path); users_read_execute = $null }
     if ($entry.exists) {
         $acl = Get-Acl -LiteralPath $path
-        $entry.users_read_execute = [bool](@($acl.Access | Where-Object {
-            $_.AccessControlType -eq 'Allow' -and
-            (try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { '' }) -eq $SID_USERS_GROUP -and
-            $_.FileSystemRights.ToString() -match 'ReadAndExecute|Modify|FullControl'
-        }).Count)
+        $entry.users_read_execute = Test-UsersGroupReadExecute -Acl $acl -Sid $SID_USERS_GROUP
     }
     [void]$toolchainFacts.Add($entry)
     if ($entry.exists -and -not $entry.users_read_execute) {
