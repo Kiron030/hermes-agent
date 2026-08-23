@@ -63,6 +63,14 @@ SAFE_ENV_PASSTHROUGH = (
     "no_proxy",
 )
 
+# The deploy-CLI stubs are a convenience nudge, not a security control.
+# The independent isolation review showed a PATH shadow is defeated by an
+# absolute path, a shell indirection or a subprocess call, so no part of the
+# authority proof may depend on them. Keeping them is a UX choice only.
+DEPLOY_CLI_STUB_SECURITY_CONTROL = False
+
+PRINCIPAL_ISOLATION_ARTIFACT = "principal_isolation.json"
+
 
 def load_pin() -> dict[str, Any]:
     return json.loads(PIN_PATH.read_text(encoding="utf-8"))
@@ -139,7 +147,14 @@ def upstream_src() -> Path:
 
 
 def _path_with_deploy_cli_stubs(raw_path: str, isolated_home: Path) -> str:
-    """Shadow host Railway/Vercel CLIs so a host-user login is not child authority."""
+    """Put a visible "don't deploy from here" nudge in front of the deploy CLIs.
+
+    SECURITY_CONTROL = NO. This changes what ``railway`` resolves to for a
+    careless PATH lookup and nothing else. It does not remove the host login,
+    it does not survive an absolute path, and the stub files themselves sit in
+    a directory the developer instance can write to. Isolation comes from the
+    OS principal (see :func:`os_principal_status`), never from this function.
+    """
     stub_dir = isolated_home / "bin"
     stub_dir.mkdir(parents=True, exist_ok=True)
     unix = (
@@ -326,19 +341,81 @@ def prepare_runtime() -> dict[str, Any]:
     }
 
 
-def container_boundary_status() -> dict[str, Any]:
-    docker = shutil.which("docker")
+def os_principal_status() -> dict[str, Any]:
+    """Identify the OS security principal this process actually runs as.
+
+    The constructed environment is not a boundary; the logon token is. On
+    Windows that means the account SID, which no environment variable can
+    change.
+    """
+    if os.name != "nt":
+        return {
+            "platform": os.name,
+            "principal_id": str(os.getuid()),  # type: ignore[attr-defined]
+            "is_administrator": os.getuid() == 0,  # type: ignore[attr-defined]
+        }
+    account = sid = None
+    completed = subprocess.run(
+        ["whoami.exe", "/user", "/fo", "csv", "/nh"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode == 0 and completed.stdout.strip():
+        parts = [field.strip('" ') for field in completed.stdout.strip().split('","')]
+        if len(parts) >= 2:
+            account, sid = parts[0].strip('"'), parts[1].strip('"')
+    groups = subprocess.run(
+        ["whoami.exe", "/groups", "/fo", "csv", "/nh"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     return {
-        "ISOLATION_BOUNDARY": "PROCESS_CONSTRUCTED_ENV",
+        "platform": "nt",
+        "account": account,
+        "principal_id": sid,
+        "is_administrator": "S-1-5-32-544" in (groups.stdout or ""),
+    }
+
+
+def principal_isolation_evidence() -> dict[str, Any] | None:
+    """Load the Phase C proof produced under the dedicated principal, if any."""
+    path = artifacts_dir() / PRINCIPAL_ISOLATION_ARTIFACT
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def isolation_boundary_status() -> dict[str, Any]:
+    """Describe the boundary honestly, and fail closed when it is unproven."""
+    docker = shutil.which("docker")
+    principal = os_principal_status()
+    evidence = principal_isolation_evidence()
+    proven = bool(
+        evidence
+        and evidence.get("CHILD_OS_PRINCIPAL") == "SEPARATE_PRINCIPAL"
+        and evidence.get("ISOLATION_ACCEPTANCE") == "PASS"
+    )
+    return {
+        "ISOLATION_BOUNDARY": "DEDICATED_OS_PRINCIPAL" if proven else "PROCESS_CONSTRUCTED_ENV",
+        "BOUNDARY_SUFFICIENT": "YES" if proven else "NO",
+        "PATH_STUB_SECURITY_ROLE": "NONE",
         "docker_binary": docker,
         "docker_available": bool(docker),
         "container_used": False,
+        "os_principal": principal,
+        "principal_evidence_present": evidence is not None,
         "note": (
-            "This host has no Docker CLI. R5 uses the repo-supported R1 "
-            "process boundary: a child process whose environment is constructed "
-            "from a safe passthrough allowlist. Production names are never "
-            "copied. This is not in-process redaction and does not call "
-            "env.update(os.environ)."
+            "A constructed child environment is not an authority boundary: the "
+            "child keeps the host logon token, so it keeps host ACL rights and "
+            "any credential store discovered through the Windows known-folder "
+            "API rather than through environment variables. Isolation is "
+            "claimed only when scripts/r5_developer_hermes/principal has proven "
+            "a separate, non-administrative OS principal."
         ),
     }
 
@@ -359,8 +436,11 @@ def isolate_env() -> dict[str, Any]:
         "child_env_authority_present": child["present"],
         "parent_may_contain_blocked_names": parent_has_blocked,
         "child_did_not_inherit_blocked_names": not child["present"],
-        "isolation_boundary": container_boundary_status(),
+        "isolation_boundary": isolation_boundary_status(),
+        "os_principal": os_principal_status(),
         "approvals_mode": "off",
+        # Env hygiene only. This says nothing about authority: see
+        # isolation_boundary["BOUNDARY_SUFFICIENT"] for that.
         "pass": assertion["pass"] and not child["present"],
     }
     write_json(artifacts_dir() / "isolate_env.json", result)
@@ -530,11 +610,26 @@ def authority_proof() -> dict[str, Any]:
     modern_text = (modern_run.stdout or "") + (modern_run.stderr or "")
     modern_unreachable = "unknown tool" in modern_text.lower()
 
+    # Deployment reachability is a property of the OS principal, not of the
+    # environment. Absence of RAILWAY_TOKEN says nothing while the process still
+    # runs as a user whose file-backed Railway session is discoverable, so this
+    # value is sourced from the Phase C principal proof and defaults to unproven.
+    evidence = principal_isolation_evidence()
+    boundary = isolation_boundary_status()
+    deploy_reachable = (
+        evidence.get("PRODUCTION_DEPLOY_REACHABLE") if evidence else "NOT_PROVEN"
+    )
+    secret_files_reachable = (
+        evidence.get("PRODUCTION_SECRET_FILES_REACHABLE") if evidence else "NOT_PROVEN"
+    )
+
     result = {
         "isolation": assertion,
         "fork_fail_closed": fork_payload,
         "modern_dispatch_excerpt": modern_text[-800:],
         "modern_execute_unreachable": modern_unreachable,
+        "isolation_boundary": boundary,
+        "principal_evidence": evidence,
         "PRODUCTION_DB_CREDENTIAL_PRESENT": fork_payload.get(
             "PRODUCTION_DB_CREDENTIAL_PRESENT"
         ),
@@ -544,11 +639,15 @@ def authority_proof() -> dict[str, Any]:
         "DEPLOYMENT_CREDENTIAL_PRESENT": fork_payload.get("DEPLOYMENT_CREDENTIAL_PRESENT"),
         "PRODUCTION_WRITE_REACHABLE": bool(fork_payload.get("PRODUCTION_WRITE_REACHABLE"))
         or not modern_unreachable,
-        "PRODUCTION_DEPLOY_REACHABLE": bool(fork_payload.get("PRODUCTION_DEPLOY_REACHABLE")),
+        "PRODUCTION_DEPLOY_REACHABLE": deploy_reachable,
+        "PRODUCTION_SECRET_FILES_REACHABLE": secret_files_reachable,
+        "PATH_STUB_SECURITY_ROLE": "NONE",
         "pass": (
             assertion["pass"]
             and fork_payload.get("pass") is True
             and modern_unreachable
+            and deploy_reachable == "NO"
+            and secret_files_reachable == "NO"
         ),
     }
     write_json(artifacts_dir() / "authority_proof.json", result)
@@ -673,6 +772,10 @@ def preflight() -> dict[str, Any]:
         "scripts/r5_developer_hermes/authority_failclosed.py",
         "scripts/r5_developer_hermes/sqlite_probe.py",
         "scripts/r5_developer_hermes/pin.json",
+        "scripts/r5_developer_hermes/principal/preflight-principal.ps1",
+        "scripts/r5_developer_hermes/principal/provision-principal.ps1",
+        "scripts/r5_developer_hermes/principal/launch-developer-hermes.ps1",
+        "scripts/r5_developer_hermes/principal/verify-principal-isolation.ps1",
         "tests/r5_developer_hermes/test_r5_contracts.py",
         "tests/r5_developer_hermes/test_r5_runtime.py",
         "docs/architecture/hermes_r5_developer_hermes_v1.md",
@@ -693,7 +796,7 @@ def preflight() -> dict[str, Any]:
         },
         "workspace_repo_a": str(repo_a_root()),
         "workspace_repo_b": str(repo_b_root()) if repo_b_root() else None,
-        "docker": container_boundary_status(),
+        "isolation_boundary": isolation_boundary_status(),
     }
     write_json(artifacts_dir() / "preflight.json", result)
     return result

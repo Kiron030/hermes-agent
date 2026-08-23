@@ -10,7 +10,11 @@
   "upstream_image_digest": "sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
   "upstream_image_ref": "nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
   "security_objective": "POWERFUL_IN_WORKSPACE / NOT_POWERFUL_IN_PRODUCTION",
-  "isolation_boundary": "PROCESS_CONSTRUCTED_ENV",
+  "isolation_boundary": "DEDICATED_OS_PRINCIPAL",
+  "isolation_boundary_rejected": "PROCESS_CONSTRUCTED_ENV",
+  "isolation_boundary_rejected_reason": "Independent review proved a constructed environment keeps the host logon token, so host ACL rights and known-folder credential stores stay reachable and PATH stubs are bypassed by any absolute path.",
+  "dedicated_principal_account": "hermes-dev",
+  "path_stub_security_role": "NONE",
   "approvals_mode": "off",
   "ordinary_workspace_approvals": 0,
   "developer_enabled_toolsets": [

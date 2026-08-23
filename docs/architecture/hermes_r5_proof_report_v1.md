@@ -7,10 +7,17 @@
 **This report does not start R2 or R3.**
 
 ```text
-R5_STATUS = PASS
+R5_STATUS = PARTIAL_PENDING_ISOLATION
+CAPABILITY_RESULT = PASS
 GATE_1_CLOSED = YES
 SECURITY_OBJECTIVE = POWERFUL_IN_WORKSPACE / NOT_POWERFUL_IN_PRODUCTION
 ```
+
+> **Isolation claim withdrawn.** An independent review disproved the original
+> `PROCESS_CONSTRUCTED_ENV` boundary on this host. The capability result stands
+> unchanged; every production-authority verdict below is now sourced from an
+> OS-principal proof that requires a human provisioning step. See
+> [Isolation remediation](#isolation-remediation).
 
 ---
 
@@ -30,21 +37,97 @@ child env, `approvals.mode: off`. Not the Stage-1 operator clamp.
 
 ---
 
-## Isolation boundary
+## Isolation remediation
 
 ```text
-ISOLATION_BOUNDARY = PROCESS_CONSTRUCTED_ENV
-DOCKER_ON_THIS_HOST = UNAVAILABLE
-CONTAINER_USED = NO
+ISOLATION_BOUNDARY          = DEDICATED_OS_PRINCIPAL   (target)
+ISOLATION_BOUNDARY_REJECTED = PROCESS_CONSTRUCTED_ENV
+CURRENT_BOUNDARY_SUFFICIENT = NO
+PATH_STUB_SECURITY_ROLE     = NONE
+DOCKER_ON_THIS_HOST         = UNAVAILABLE
+CONTAINER_USED              = NO
 ```
 
-The child environment is **built**, not sanitized-then-merged. Production
-names are never copied. `HOME` / `USERPROFILE` point at
-`.r5-dev/process-home`, not the host profile. `railway` / `vercel` on the
-host PATH are shadowed by fail-closed stubs so a host-user CLI login is
-not child authority.
+### What the independent review overturned
 
-This is not in-process redaction and does not call `env.update(os.environ)`.
+The constructed environment was real — production names genuinely never reach
+the child — but it was never an authority boundary:
+
+| Assumption in R5 v1 | Measured reality |
+|---|---|
+| Synthetic `HOME`/`USERPROFILE` separates credentials | Railway resolves config via the Windows known-folder API; with `HOME`, `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` all redirected to an empty directory, `railway whoami` still returned a live session |
+| PATH stubs remove deploy authority | Defeated by absolute path, `cmd`, PowerShell and Python `subprocess` alike; the stub files are writable by the instance itself |
+| Child cannot reach the host profile | Identical account SID, `FullControl` on `C:\Users\<host>` |
+| `railway`/`vercel` were "present but unauthenticated" | `shutil.which` resolved the stub first, so the proof measured itself; `vercel` is not installed on this host at all |
+
+### The replacement
+
+A dedicated non-administrative local account (`hermes-dev`) with explicit
+`Modify` on the two approved workspace roots. Host credential stores become
+unreachable as a consequence of default NTFS profile ownership rather than an
+enumerated deny list.
+
+Artifacts, for human execution:
+
+| Script | Elevation | Role |
+|---|---|---|
+| `principal/preflight-principal.ps1` | no | mechanised Phase A; records host SID, absolute deploy-CLI paths, sentinel |
+| `principal/provision-principal.ps1` | **yes** | creates the standard account, adds additive ACEs only |
+| `principal/launch-developer-hermes.ps1` | no | `runas` into the principal; no cached credentials |
+| `principal/verify-principal-isolation.ps1` | no | Phase C property proof, fail-closed |
+
+### Preflight result on this host
+
+```text
+PREFLIGHT_RESULT = BLOCKED
+```
+
+Cleared:
+
+- `W:` is a local fixed NTFS volume, not `subst`, not a network share, so a
+  second principal sees it natively.
+- `python`, `git` and `gh` are system-wide and readable by `BUILTIN\Users`.
+- The pinned R1 venv is repo-local with base `C:\Python311`, so
+  `SEPARATE_DEV_ENVIRONMENT_REQUIRED = NO`.
+- Every `railway` binary resolves through `C:\nvm4w\nodejs` into
+  `C:\Users\<host>\AppData\Local\nvm\...`, i.e. into the host profile. A second
+  principal loses the deploy CLI as a side effect of the boundary, not because
+  of a stub.
+
+Open:
+
+- `uv`, `node` and `npm` are user-profile-only, so `hermes-dev` cannot re-sync
+  the pinned venv or run the Node-based LSP. Capability limitation, not a
+  security defect.
+- `W:\` already grants `Modify` to Authenticated Users, so `hermes-dev` inherits
+  Modify across the whole volume. Explicit grants are still added so the
+  boundary survives a later tightening of the volume root.
+- Two blockers below.
+
+### Blockers
+
+```text
+[SECRETS_INSIDE_APPROVED_WORKSPACE]  4 files
+[SECRETS_IN_GIT_HISTORY]             1 file
+```
+
+Repo B carries secret-class files inside the tree that R5 requires to be
+read/write:
+
+| Path (Repo B) | Size | Tracked | In history |
+|---|---|---|---|
+| `.env` | 3796 | no | no |
+| `.env.pgurl` | 91 | **yes** | **yes** (`1ee4b5f`) |
+| `app/.env.local` | 209 | no | no |
+| `scripts/mapbox/.env.local` | 179 | no | no |
+
+No OS-principal boundary can close this. `WORKSPACE_REPO_B_RW = YES` and
+`PRODUCTION_SECRET_FILES_REACHABLE = NO` are contradictory while a live
+credential lives inside the mounted workspace. `.env.pgurl` is worse than the
+rest: a deny ACE on the working-tree file leaves the value readable from git
+object storage, and denying read on `.git` would cost the required `GIT`
+capability. Rotation in Repo B is the only mitigation that holds. Contents were
+never read; this inventory is names, sizes and git metadata only.
 
 ---
 
@@ -104,25 +187,37 @@ Catalog presence was not treated as proof. Delegation was not expanded.
 
 ---
 
-## Production impossibility
+## Production authority
+
+Environment hygiene — still true, still necessary, no longer sufficient:
 
 ```text
 PRODUCTION_DB_CREDENTIAL_PRESENT    = NO
 POWERUNITS_EXECUTE_SECRET_PRESENT   = NO
 DEPLOYMENT_CREDENTIAL_PRESENT       = NO
 PRODUCTION_WRITE_REACHABLE          = NO
-PRODUCTION_DEPLOY_REACHABLE         = NO
+```
+
+Authority properties — sourced from the OS-principal proof, fail-closed:
+
+```text
+PRODUCTION_DEPLOY_REACHABLE         = NOT_PROVEN
+PRODUCTION_SECRET_FILES_REACHABLE   = NOT_PROVEN
 ```
 
 Mechanical evidence (values never printed):
 
-1. Child env assertion: all production-authority names absent, including
-   when the parent had them injected in tests.
+1. Child env assertion: all production-authority names absent, including when
+   the parent had them injected in tests.
 2. Modern dispatch of `execute_powerunits_option_d_bounded_slice` →
    `Unknown tool`.
 3. Fork `check_powerunits_option_d_execute_requirements()` → `False`.
-4. Child `railway` / `vercel` resolve to fail-closed stubs (`exit 1`).
-   Host CLI login is not inherited.
+4. Deploy-CLI resolution now skips the stub directory and probes the real
+   binaries. Item 4 in the previous revision claimed the stubs proved absence of
+   authority; it measured the stubs and has been removed.
+5. `PRODUCTION_DEPLOY_REACHABLE` and `PRODUCTION_SECRET_FILES_REACHABLE` read
+   `NOT_PROVEN` until `.r5-dev/artifacts/principal_isolation.json` exists and
+   passes. `authority_proof()["pass"]` is `False` while they do.
 
 Deleting `.r5-dev/` cannot touch production. No production `.env` was read.
 
@@ -142,12 +237,39 @@ Hermes warned: linked 3.38.4 is vulnerable to the WAL-reset bug and used
 
 ---
 
+## Human action required
+
+Phase C cannot run until the principal exists. From an **elevated** PowerShell:
+
+```powershell
+cd W:\Workbench\hermes-agent\scripts\r5_developer_hermes\principal
+powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1
+```
+
+Then, from the ordinary account:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\preflight-principal.ps1 -CreateSentinel
+powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode verify
+powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode probes
+```
+
+The password is entered interactively and never stored. Do not authenticate
+`gh` or `railway` for `hermes-dev`, and do not copy SSH keys or Credential
+Manager state into it — their absence is the point.
+
 ## Tests
 
 ```text
 python -m pytest tests/r5_developer_hermes -q
-19 passed
+25 passed
 ```
+
+New coverage: boundary fails closed without principal evidence; the boundary is
+only claimed on proof; PATH stubs are declared non-security; deploy-CLI
+resolution skips the stub directory; provisioning scripts never cache
+credentials and never reset an ACL.
 
 ---
 
@@ -160,7 +282,7 @@ Delete `.r5-dev/` (or `HERMES_R5_PROOF_ROOT`). Production was never attached.
 ## R3 evidence
 
 ```text
-R3_DEVELOPER_EXPERIENCE_EVIDENCE = READY
+R3_DEVELOPER_EXPERIENCE_EVIDENCE = READY_WITH_ISOLATION_CAVEAT
 ```
 
 A representative developer task (locate symbol → edit → fail/fix test →

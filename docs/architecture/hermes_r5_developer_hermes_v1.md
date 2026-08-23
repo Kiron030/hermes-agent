@@ -19,18 +19,47 @@ the process does not possess production authority.
 ## Isolation boundary
 
 ```text
-ISOLATION_BOUNDARY = PROCESS_CONSTRUCTED_ENV
-DOCKER_ON_THIS_HOST = UNAVAILABLE
+ISOLATION_BOUNDARY          = DEDICATED_OS_PRINCIPAL
+ISOLATION_BOUNDARY_REJECTED = PROCESS_CONSTRUCTED_ENV
+DOCKER_ON_THIS_HOST         = UNAVAILABLE
+PATH_STUB_SECURITY_ROLE     = NONE
 ```
 
-The host supervisor pattern (`env.update(os.environ)` after sanitizing) is
-why in-process redaction is not a credential boundary. R5 therefore
-**constructs** a child environment from a safe passthrough allowlist and
-spawns Hermes in that child. Production names are never copied.
+### Why the first boundary was withdrawn
 
-Docker is not required. When the Docker CLI is absent, this process
-boundary is the repo-supported mechanism introduced by R1. An optional
-OCI path remains the R1 pinned digest; this host did not use it.
+R5 v1 built the child environment from a safe passthrough allowlist, pointed
+`HOME` / `USERPROFILE` at a synthetic directory, and shadowed `railway` /
+`vercel` with fail-closed PATH stubs. An independent review disproved that
+boundary on this host:
+
+- The child kept the **host logon token** (identical account SID), so it kept
+  `FullControl` over `C:\Users\<host>` no matter what the environment said.
+- Railway's CLI resolves its config through the Windows known-folder API, not
+  through environment variables. With `HOME`, `USERPROFILE`, `APPDATA` and
+  `LOCALAPPDATA` all redirected to an empty directory, `railway whoami` still
+  returned a live session.
+- The PATH shadow fell to an absolute path, a `cmd` indirection, a PowerShell
+  indirection and a Python `subprocess` call alike — and the stub files
+  themselves sat in a directory the instance could write to.
+- The old proof resolved the CLI with `shutil.which` while the stub directory
+  was first on PATH, so it measured its own stub rather than the host CLI.
+
+Environment absence is not authority absence. Only a different OS security
+principal changes ACL authority and credential-store discovery at once.
+
+### The boundary that replaces it
+
+Developer Hermes runs as a dedicated, non-administrative local Windows
+account (`hermes-dev`) with explicit `Modify` on the two approved workspace
+roots and nothing in the host profile. The host user's Railway session, GitHub
+CLI configuration, Credential Manager entries and cloud CLI stores all sit
+under `C:\Users\<host>`, which a standard second account cannot traverse — the
+protection is a consequence of default NTFS ownership, not of an enumerated
+deny list.
+
+Provisioning and proof scripts live in
+`scripts/r5_developer_hermes/principal/`. Docker is still not required and is
+still not installed on this host.
 
 Pinned modern runtime (unchanged from R1):
 
@@ -75,13 +104,30 @@ Asserted absent in the developer child (values never printed):
 - `POWERUNITS_INTERNAL_EXECUTE_BASE_URL`
 - Railway / Vercel deployment names from `scripts/r5_developer_hermes/pin.json`
 
+Those assertions are environment hygiene. They are necessary and they are not
+sufficient, so they no longer feed the production-authority verdict.
+
 Mechanical fail-closed proofs:
 
 1. Modern runtime `handle_function_call(execute_powerunits_option_d_bounded_slice)` → unknown tool.
 2. Fork `check_powerunits_option_d_execute_requirements()` → false without secrets.
-3. Railway / Vercel CLIs are absent or unauthenticated.
+3. Deploy-CLI resolution deliberately **skips** the stub directory and probes the
+   real binaries, so a shadowed PATH cannot manufacture a pass.
+4. `PRODUCTION_DEPLOY_REACHABLE` and `PRODUCTION_SECRET_FILES_REACHABLE` are read
+   from the Phase C principal proof (`.r5-dev/artifacts/principal_isolation.json`)
+   and default to `NOT_PROVEN` when that proof is absent.
 
 Deleting `.r5-dev/` has zero production effect.
+
+## Known limit: secrets inside the approved workspace
+
+An OS-principal boundary separates the developer instance from the *host
+profile*. It cannot hide anything inside a workspace the instance is required to
+read and write. Any credential committed to, or living in, Repo A or Repo B is
+therefore reachable by design, and reachable through git object storage even
+when the working-tree file is denied. For a credential in that position,
+rotation is the only mitigation that holds; see the proof report for the current
+inventory.
 
 ## SQLite
 
@@ -91,10 +137,17 @@ this build is vulnerable to the WAL-reset bug and uses
 force WAL. Upgrade path: SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6)
 via a newer CPython / `hermes update` / the official image on a Docker host.
 
-Host Railway CLI logins can survive a stripped env because the Windows
-user profile is not a container. The constructed child PATH therefore
-shadows `railway` / `vercel` with fail-closed stubs. Env tokens remain
-absent.
+## Deploy-CLI stubs
+
+The `railway` / `vercel` PATH stubs are retained purely as a visible "do not
+deploy from here" nudge for a careless interactive command.
+
+```text
+SECURITY_CONTROL = NO
+```
+
+Nothing in the authority proof depends on them, and no test may treat them as a
+boundary.
 
 ## Commands
 

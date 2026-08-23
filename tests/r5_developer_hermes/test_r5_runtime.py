@@ -66,16 +66,33 @@ def test_developer_probes_use_hermes_dispatch() -> None:
     assert result["production_execute_dispatch"]["unreachable"] is True
 
 
-def test_production_authority_is_mechanically_absent() -> None:
+def test_production_authority_is_not_claimed_without_principal_proof() -> None:
+    """Environment hygiene is real; it is just not the same thing as authority.
+
+    The independent review overturned the original assertion here, which read
+    ``PRODUCTION_DEPLOY_REACHABLE is False`` off an environment scan while a
+    file-backed Railway session remained reachable by absolute path. Deploy and
+    secret-file reachability are now sourced from the OS-principal proof and
+    default to unproven.
+    """
     result = authority_proof()
-    assert result["pass"] is True
     assert result["PRODUCTION_DB_CREDENTIAL_PRESENT"] is False
     assert result["POWERUNITS_EXECUTE_SECRET_PRESENT"] is False
     assert result["DEPLOYMENT_CREDENTIAL_PRESENT"] is False
     assert result["PRODUCTION_WRITE_REACHABLE"] is False
-    assert result["PRODUCTION_DEPLOY_REACHABLE"] is False
     assert result["modern_execute_unreachable"] is True
     assert result["fork_fail_closed"]["execute_check_fn"]["fail_closed"] is True
+    assert result["PATH_STUB_SECURITY_ROLE"] == "NONE"
+
+    if result["principal_evidence"] is None:
+        assert result["PRODUCTION_DEPLOY_REACHABLE"] == "NOT_PROVEN"
+        assert result["PRODUCTION_SECRET_FILES_REACHABLE"] == "NOT_PROVEN"
+        assert result["pass"] is False
+    else:
+        assert result["pass"] is (
+            result["PRODUCTION_DEPLOY_REACHABLE"] == "NO"
+            and result["PRODUCTION_SECRET_FILES_REACHABLE"] == "NO"
+        )
 
 
 def test_sqlite_keeps_safe_delete_on_old_build() -> None:
