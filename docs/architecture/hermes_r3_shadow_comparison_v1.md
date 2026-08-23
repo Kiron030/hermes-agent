@@ -261,11 +261,29 @@ Exact counts, `scripts/r3_shadow_comparison/measure_migration_cost.py`.
 | … R2's wrapper definition (httpx **and** execute Base URL) | **35** | 12,165 |
 | … all HTTP-touching files (broader marker) | 44 | 14,781 |
 | … non-HTTP (workspace, docs, preflight, campaigns) | 28 | 9,967 |
-| PowerUnits-aware tests | 95 | 29,846 |
+| PowerUnits-aware tests, **excluding** R3's own harness | 90 | 29,139 |
+| … R3's harness, listed separately | 5 | 727 |
 
 R2's `CURRENT_WRAPPER_FILES = 35` and `CURRENT_POWERUNITS_TOOL_FILES = 55`
 reproduce exactly under the same definitions; the 44 is a broader marker set that
-also catches the shared support modules.
+also catches the shared support modules. R3's own tests are excluded from the
+burden figure — billing the measurement for the thing it measures would inflate
+migration cost.
+
+One further file, `tools/bounded_rollout_governance_projection_v1.py`, is
+PowerUnits-related but carries no `powerunits_` prefix, so the 72 above is a
+marginal undercount.
+
+### 6.1a Coupling — why the wrappers are not 35 independent files
+
+| Shared support module | Importers |
+|---|---|
+| `tools/powerunits_bounded_family_gates.py` | **44** |
+| `tools/powerunits_execute_base_url_v1.py` | **40** |
+
+Both become unused once the bounded HTTP surface moves onto the one generic
+client, which is the single largest structural simplification a migration buys.
+It is also why the wrappers cannot be retired one at a time in arbitrary order.
 
 ### 6.2 Domain knowledge inside generic shared core
 
@@ -285,9 +303,14 @@ Lines mentioning `powerunits` in files that are otherwise upstream's:
 | `tools/registry.py` | 1 |
 | **total** | **10 files, 341 lines** |
 
-`toolsets.py` is the dominant seam, not `model_tools.py`. The plugin does not
-touch it at all: `ctx.register_tool` carries its own toolset name, so a migrated
-operation removes shared-core lines rather than adding them.
+`toolsets.py` is the dominant seam, not `model_tools.py`. Those 253 lines
+register **55 PowerUnits toolsets**, which between them cover the **88 registered
+PowerUnits operations** frozen in R0's `effect_classes.json`.
+
+The plugin does not touch `toolsets.py` at all: `ctx.register_tool` carries its
+own toolset name, so a migrated operation *removes* shared-core lines rather than
+adding them. That is the single most important maintainability fact in this
+report — the fork's growth path runs through shared core, the plugin's does not.
 
 ### 6.3 What the modern architecture owns instead
 
@@ -522,9 +545,11 @@ Nothing was deleted. These are the quantities a migration would move.
 | shared support modules that become unused after the HTTP move | 2 (`powerunits_execute_base_url_v1.py`, `powerunits_bounded_family_gates.py`) |
 | top-level fork modules | 5 (774 lines) |
 | shared-core domain lines to retire | 341 across 10 files, of which `toolsets.py` is 253 |
+| shared-core toolset registrations to retire | 55 toolsets covering 88 operations |
+| support modules whose 44 and 40 importers must move together | 2 |
 | new plugin files already written | 7 (1,134 lines) |
 | **shared-core generic patch surface** | **1 file, 2 symbols, 96 lines, domain-agnostic** |
-| PowerUnits-aware test files to re-point | 95 (29,846 lines) |
+| PowerUnits-aware test files to re-point | 90 (29,139 lines) |
 | remaining legacy-fork seams after a full bounded-read migration | Telegram transport overlay, capability-tier ladder, campaign-as-loop tools, workspace/docs tools |
 
 Deletion and reduction happen **only after** a migration decision. R3 deleted
@@ -533,8 +558,44 @@ nothing.
 ```text
 MIGRATION_COST = QUANTIFIED, NON-TRIVIAL
   the expensive part is not the client — it is 33 remaining operations,
-  341 shared-core domain lines, and 95 test files
+  55 shared-core toolset registrations, 341 shared-core domain lines,
+  and 90 test files
 ```
+
+---
+
+## 12a. BASE-vs-R3 delta — R3 introduces no regression
+
+R3 changes no tracked file. `git status --porcelain --untracked-files=no` is
+empty; the only entries are three new directories. The delta was still measured
+mechanically rather than asserted, by running identical selections on a scratch
+worktree of the canonical base and on R3.
+
+| Group | BASE | R3 | Delta |
+|---|---|---|---|
+| `tests/powerunits_golden` | 116 passed | 116 passed | 0 |
+| `tests/r2_powerunits_plugin` + `tests/test_final_toolset_cap.py` | 60 passed | 60 passed | 0 |
+| seven `tests/tools/…` PowerUnits + registry files | 127 passed | 127 passed | 0 |
+| `tests/test_packaging_metadata.py` + `tests/hermes_cli/test_tools_config.py` | 150 passed, 3 failed | 150 passed, 3 failed | 0 |
+| `tests/r3_shadow_comparison` | not present | 39 passed | +39 |
+
+```text
+REGRESSIONS = NONE
+R3_INTRODUCES_NO_REGRESSION = YES
+```
+
+`PREEXISTING` — identical failures on both sides, not touched by R3, and exactly
+the cache/isolation debt R0 already recorded in its "Bekannte Testschuld" section:
+
+```text
+tests/hermes_cli/test_tools_config.py::test_telegram_first_safe_bzn_not_in_schema_when_gate_off
+tests/hermes_cli/test_tools_config.py::test_telegram_first_safe_resolves_bzn_prices_tool_in_get_tool_definitions
+tests/hermes_cli/test_tools_config.py::test_telegram_first_safe_exposes_both_bzn_tools_when_gates_on
+```
+
+`tests/tools/test_search_hidden_dirs.py` fails to collect in this environment
+(missing external binary) and was excluded identically on both sides. Per the
+execution addendum, none of this was repaired inside R3.
 
 ---
 
@@ -652,7 +713,12 @@ pytest tests/powerunits_golden -q                                  # 116 passed
 pytest tests/test_final_toolset_cap.py tests/r2_powerunits_plugin -q   # 60 passed
 
 # the R3 comparison harness
-pytest tests/r3_shadow_comparison -q
+pytest tests/r3_shadow_comparison -q                               # 39 passed
+
+# BASE-vs-R3 delta (§12a) — same selections on a scratch worktree of the base
+git worktree add --detach <BASE_TREE> d7dbb7e64072659d3ebd27aaaee197c91ce3fa6c
+pytest <GROUP> -q -p no:randomly -p no:cacheprovider \
+    --ignore=tests/tools/test_search_hidden_dirs.py    # run in both trees
 
 # measurements
 python scripts/r3_shadow_comparison/measure_upstream_proximity.py

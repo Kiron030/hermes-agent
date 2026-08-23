@@ -165,9 +165,39 @@ def main() -> int:
         ),
     }
 
+    # --- toolset registration in shared core -------------------------------
+    toolsets_src = (REPO_ROOT / "toolsets.py").read_text(encoding="utf-8", errors="replace")
+    toolset_names = sorted(set(re.findall(r'"(powerunits[^"]*)":', toolsets_src)))
+    report["shared_core_toolset_registration"] = {
+        "file": "toolsets.py",
+        "powerunits_toolsets": len(toolset_names),
+        "names": toolset_names,
+    }
+
+    # --- coupling: who depends on the shared support modules ---------------
+    all_py = [
+        p
+        for p in REPO_ROOT.rglob("*.py")
+        if "__pycache__" not in p.parts and ".venv" not in p.parts
+    ]
+    coupling = {}
+    for module in ("powerunits_execute_base_url_v1", "powerunits_bounded_family_gates"):
+        pattern = re.compile(rf"(?:from tools\.{module} import|import tools\.{module})")
+        coupling[module] = sum(
+            1
+            for p in all_py
+            if p.name != f"{module}.py"
+            and pattern.search(p.read_text(encoding="utf-8", errors="replace"))
+        )
+    report["support_module_importers"] = coupling
+
     # --- test burden -------------------------------------------------------
+    # R3's own harness is separated out: counting it as migration burden would
+    # bill the measurement for the thing it measures.
     buckets: dict[str, dict[str, int]] = {}
     for path in (REPO_ROOT / "tests").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
         rel = path.relative_to(REPO_ROOT).as_posix()
         text = path.read_text(encoding="utf-8", errors="replace")
         if "powerunits" not in rel.lower() and not POWERUNITS.search(text):
@@ -176,9 +206,18 @@ def main() -> int:
         row = buckets.setdefault(bucket, {"files": 0, "lines": 0})
         row["files"] += 1
         row["lines"] += len(text.splitlines())
+
+    r3_own = buckets.get("tests/r3_shadow_comparison", {"files": 0, "lines": 0})
+    total_files = sum(r["files"] for r in buckets.values())
+    total_lines = sum(r["lines"] for r in buckets.values())
     report["test_burden"] = {
-        "files": sum(r["files"] for r in buckets.values()),
-        "lines": sum(r["lines"] for r in buckets.values()),
+        "files": total_files,
+        "lines": total_lines,
+        "excluding_r3_harness": {
+            "files": total_files - r3_own["files"],
+            "lines": total_lines - r3_own["lines"],
+        },
+        "r3_harness": r3_own,
         "by_directory": dict(sorted(buckets.items())),
     }
 

@@ -232,9 +232,82 @@
     "added_lines_measured_by_git": 96,
     "helpers_present": true
   },
+  "shared_core_toolset_registration": {
+    "file": "toolsets.py",
+    "powerunits_toolsets": 55,
+    "names": [
+      "powerunits_baseline_layer_preview",
+      "powerunits_bounded_coverage_inventory",
+      "powerunits_bounded_coverage_snapshot",
+      "powerunits_bounded_rollout_governance",
+      "powerunits_de_stack_remediation_planner",
+      "powerunits_docs",
+      "powerunits_energy_web_research",
+      "powerunits_entsoe_bzn_price_readiness",
+      "powerunits_entsoe_bzn_prices",
+      "powerunits_entsoe_empirical_candidate_validate",
+      "powerunits_entsoe_forecast_bounded_execute",
+      "powerunits_entsoe_forecast_bounded_preflight",
+      "powerunits_entsoe_forecast_bounded_summary",
+      "powerunits_entsoe_forecast_bounded_validate",
+      "powerunits_entsoe_market_bounded_campaign",
+      "powerunits_entsoe_market_bounded_coverage_scan",
+      "powerunits_entsoe_market_bounded_execute",
+      "powerunits_entsoe_market_bounded_preflight",
+      "powerunits_entsoe_market_bounded_summary",
+      "powerunits_entsoe_market_bounded_validate",
+      "powerunits_era5_weather_bounded_campaign",
+      "powerunits_era5_weather_bounded_coverage_scan",
+      "powerunits_era5_weather_bounded_execute",
+      "powerunits_era5_weather_bounded_preflight",
+      "powerunits_era5_weather_bounded_summary",
+      "powerunits_era5_weather_bounded_validate",
+      "powerunits_github_docs",
+      "powerunits_market_driver_features_bounded_de_execute",
+      "powerunits_market_driver_features_bounded_de_readiness",
+      "powerunits_market_driver_features_bounded_de_summary",
+      "powerunits_market_driver_features_bounded_de_validate",
+      "powerunits_market_features_bounded_de_execute",
+      "powerunits_market_features_bounded_de_readiness",
+      "powerunits_market_features_bounded_de_summary",
+      "powerunits_market_features_bounded_de_validate",
+      "powerunits_multi_country_data_health",
+      "powerunits_operator_posture",
+      "powerunits_option_d_execute",
+      "powerunits_option_d_preflight",
+      "powerunits_option_d_readiness",
+      "powerunits_option_d_summary",
+      "powerunits_option_d_validate",
+      "powerunits_outage_awareness_bounded_summary",
+      "powerunits_outage_awareness_bounded_validate",
+      "powerunits_outage_repair_bounded_execute",
+      "powerunits_repo_b_read",
+      "powerunits_tier1_analysis",
+      "powerunits_tier2_allowlisted_read",
+      "powerunits_tier3_skills_integration",
+      "powerunits_tier4a_skill_draft_proposals",
+      "powerunits_tier4b_review_governance",
+      "powerunits_tier5a_bounded_workflow_scaffolding",
+      "powerunits_timescale_read",
+      "powerunits_worker_country_coverage_freshness",
+      "powerunits_workspace"
+    ]
+  },
+  "support_module_importers": {
+    "powerunits_execute_base_url_v1": 40,
+    "powerunits_bounded_family_gates": 44
+  },
   "test_burden": {
     "files": 95,
-    "lines": 29846,
+    "lines": 29866,
+    "excluding_r3_harness": {
+      "files": 90,
+      "lines": 29139
+    },
+    "r3_harness": {
+      "files": 5,
+      "lines": 727
+    },
     "by_directory": {
       "tests": {
         "files": 7,
@@ -270,7 +343,7 @@
       },
       "tests/r3_shadow_comparison": {
         "files": 5,
-        "lines": 707
+        "lines": 727
       },
       "tests/tools": {
         "files": 49,
