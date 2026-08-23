@@ -42,6 +42,10 @@ _POWERUNITS_FIRST_SAFE_POLICY = "first_safe_v1"
 # advisory (#33924) is logged once per name, not on every tool recompute.
 _WARNED_DISABLED_BUNDLES: set = set()
 
+# Tracks unknown names already flagged in the final callable-surface cap so the
+# fail-closed warning is logged once per name, not on every tool recompute.
+_WARNED_FINAL_CAP_NAMES: set = set()
+
 
 # =============================================================================
 # Async Bridging  (single source of truth -- used by registry.dispatch too)
@@ -248,6 +252,84 @@ _LEGACY_TOOLSET_MAP = {
 
 
 # =============================================================================
+# Final callable-surface cap
+# =============================================================================
+#
+# Optional deployment-level upper bound on the tool surface. Normal resolution
+# (catalog defaults, plugins, enabled_toolsets, disabled_toolsets, check_fn)
+# runs first and unchanged; when `agent.final_allowed_toolsets` is configured,
+# the resolved surface is then intersected with it as the last resolution step.
+#
+# It is read from config here rather than accepted as a parameter on purpose:
+# every widening path an operator has to worry about — a caller passing its own
+# enabled_toolsets, the `all` / `*` alias, a plugin toolset that default-enables
+# itself — arrives as an argument or as registry state, so an argument-shaped
+# cap could be widened by the very callers it is meant to bound.
+#
+# Intersection only. It can never add a tool, never resurrect one a disabled
+# toolset removed, and never widens a caller that asked for less.
+_FINAL_TOOLSET_CAP_KEY = "final_allowed_toolsets"
+
+
+def _read_final_toolset_cap() -> Optional[List[str]]:
+    """Return the configured final allowlist, or ``None`` when uncapped.
+
+    ``None`` means no cap is configured and resolution is left untouched
+    (upstream-equivalent behaviour). A configured-but-empty list is a real,
+    empty allowlist — not an absent one — and caps the surface to nothing.
+
+    A config that cannot be read at all is indistinguishable from a config
+    that does not declare the key, so it is treated as uncapped.
+    """
+    try:
+        from hermes_cli.config import load_config_readonly
+        agent_cfg = (load_config_readonly() or {}).get("agent")
+    except Exception as e:
+        logger.debug("Final toolset cap: config unreadable (%s); no cap applied", e)
+        return None
+
+    if not isinstance(agent_cfg, dict):
+        return None
+    raw = agent_cfg.get(_FINAL_TOOLSET_CAP_KEY)
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        # `final_allowed_toolsets: memory` — an unambiguous single-entry slip.
+        raw = [raw]
+    if not isinstance(raw, (list, tuple, set, frozenset)):
+        logger.warning(
+            "agent.%s must be a list of toolset names, got %s; capping the "
+            "tool surface to nothing rather than ignoring the declared cap.",
+            _FINAL_TOOLSET_CAP_KEY, type(raw).__name__,
+        )
+        return []
+    return [str(name).strip() for name in raw if str(name).strip()]
+
+
+def _resolve_final_allowed_tools(allowlist: List[str]) -> set:
+    """Resolve a final allowlist of toolset names into tool names, fail-closed.
+
+    A name that resolves to no known toolset contributes no tools. It is never
+    interpreted as "allow everything" — an allowlist of only unknown names
+    yields an empty surface, which is the safe reading of a typo in a cap.
+    """
+    allowed: set = set()
+    for name in allowlist:
+        if validate_toolset(name):
+            allowed.update(resolve_toolset(name))
+        elif name in _LEGACY_TOOLSET_MAP:
+            allowed.update(_LEGACY_TOOLSET_MAP[name])
+        elif name not in _WARNED_FINAL_CAP_NAMES:
+            _WARNED_FINAL_CAP_NAMES.add(name)
+            logger.warning(
+                "agent.%s contains unknown toolset '%s'; it contributes no "
+                "tools to the cap.",
+                _FINAL_TOOLSET_CAP_KEY, name,
+            )
+    return allowed
+
+
+# =============================================================================
 # get_tool_definitions  (the main schema provider)
 # =============================================================================
 
@@ -311,7 +393,10 @@ def get_tool_definitions(
     # registry.get_definitions. The config-mtime fingerprint below captures
     # user-visible config edits that affect dynamic schemas (execute_code
     # mode, discord action allowlist, etc.) without needing an explicit
-    # invalidate hook on every config-writer.
+    # invalidate hook on every config-writer. That same fingerprint covers
+    # the final callable-surface cap, which is read from config inside
+    # _compute_tool_definitions — editing it changes the config file, which
+    # changes cfg_fp, which misses the memo.
     #
     # Note (Powerunits): the first-safe lockdown check inside
     # _compute_tool_definitions reads HERMES_POWERUNITS_RUNTIME_POLICY at
@@ -455,6 +540,16 @@ def _compute_tool_definitions(
         for ts_name in expected_telegram_toolsets_first_safe(read_powerunits_capability_tier()):
             allowed_tools.update(resolve_toolset(ts_name))
         tools_to_include.intersection_update(allowed_tools)
+
+    # Final callable-surface cap — the last resolution step, so nothing that
+    # runs before it (caller-supplied enabled_toolsets, the `all` alias, a
+    # self-expanding plugin toolset) can exceed the declared bound. See the
+    # `_FINAL_TOOLSET_CAP_KEY` notes above.
+    final_allowlist = _read_final_toolset_cap()
+    if final_allowlist is not None:
+        tools_to_include.intersection_update(
+            _resolve_final_allowed_tools(final_allowlist)
+        )
 
     # Plugin-registered tools are now resolved through the normal toolset
     # path — validate_toolset() / resolve_toolset() / get_all_toolsets()
