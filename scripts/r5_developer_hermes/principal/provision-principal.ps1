@@ -123,7 +123,7 @@ if ($account) {
         }
         $account = New-LocalUser -Name $AccountName `
                                  -FullName $FullName `
-                                 -Description 'R5 Developer Hermes. Workspace-only. No production authority.' `
+                                 -Description 'PowerUnits Developer Hermes' `
                                  -Password $secret `
                                  -PasswordNeverExpires `
                                  -AccountNeverExpires

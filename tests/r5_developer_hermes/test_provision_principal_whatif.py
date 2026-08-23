@@ -21,6 +21,12 @@ PROVISION = (
 ACCOUNT_NAME = "hermes-dev"
 SCOPE_ROOT = Path(r"W:\hermes-dev")
 WINDOWS_POWERSHELL = shutil.which("powershell.exe")
+# New-LocalUser -Description carries ValidateLength(0, 48) on this host.
+WINDOWS_LOCALUSER_DESCRIPTION_LIMIT = 48
+DESCRIPTION_LITERAL = re.compile(
+    r"New-LocalUser[\s\S]*?-Description\s+'([^']*)'",
+    re.MULTILINE,
+)
 
 requires_windows_powershell = pytest.mark.skipif(
     not WINDOWS_POWERSHELL,
@@ -142,6 +148,34 @@ def test_failed_toolchain_verification_remains_fail_closed() -> None:
     assert "return $false" in helper
 
 
+def _account_description() -> str:
+    matches = DESCRIPTION_LITERAL.findall(_powershell_code(PROVISION))
+    assert len(matches) == 1, "exactly one New-LocalUser Description is required"
+    return matches[0]
+
+
+def test_account_description_fits_windows_localuser_limit() -> None:
+    description = _account_description()
+    assert len(description) <= WINDOWS_LOCALUSER_DESCRIPTION_LIMIT
+    assert description
+    assert "\n" not in description
+
+
+@requires_windows_powershell
+def test_account_description_matches_host_new_localuser_contract() -> None:
+    """The limit is the cmdlet ValidateLengthAttribute, not a guessed number."""
+    result = _run_windows_powershell(
+        "-Command",
+        "$attr = (Get-Command New-LocalUser).Parameters['Description'].Attributes |"
+        " Where-Object { $_ -is [System.Management.Automation.ValidateLengthAttribute] };"
+        " if (-not $attr) { Write-Output 'NO_VALIDATE_LENGTH'; exit 1 };"
+        " Write-Output ('MAX=' + $attr.MaxLength)",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == f"MAX={WINDOWS_LOCALUSER_DESCRIPTION_LIMIT}"
+    assert len(_account_description()) <= WINDOWS_LOCALUSER_DESCRIPTION_LIMIT
+
+
 def test_existing_provisioning_semantics_remain_unchanged() -> None:
     code = _powershell_code(PROVISION)
     assert "AddAccessRule" in code
@@ -153,6 +187,15 @@ def test_existing_provisioning_semantics_remain_unchanged() -> None:
     assert "host_profile_touched = $false" in code
     assert "credential_stores_copied = $false" in code
     assert "/savecred" not in code.lower()
+    assert code.count("New-LocalUser") == 1
+    assert "$AccountName    = 'hermes-dev'" in code
+    assert "Create standard local account" in code
+    assert "is a member of Administrators" in code
+    assert "will not silently change administrative group membership" in code
+    assert "Add-LocalGroupMember -SID $SID_USERS" in code
+    assert "Add-LocalGroupMember -SID $SID_ADMINISTRATORS" not in code
+    assert "Read-Host -AsSecureString" in code
+    assert "-Password $secret" in code
 
 
 @requires_windows_powershell
