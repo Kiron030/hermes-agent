@@ -23,6 +23,13 @@ param(
     [string]   $FullName       = 'Hermes Developer (R5 isolated principal)',
     [string[]] $WorkspaceRoots = @('W:\Workbench\hermes-agent', 'W:\Workbench\EU-PP-Database'),
 
+    # Verified as readable, never modified. Declared so the report can state
+    # which toolchain locations the boundary depends on.
+    [string[]] $ToolchainPaths = @('C:\Python311', 'C:\Program Files\Git', 'C:\Program Files\GitHub CLI'),
+
+    # Host-only secret root. Named solely so this script can refuse to grant it.
+    [string]   $HostSecretRoot = (Join-Path $env:USERPROFILE '.powerunits\secrets'),
+
     # Opt-in, PARTIAL mitigation for secret-class files that live inside the
     # approved workspace. Read the caveat printed at the end before relying on it.
     [switch]   $DenyInWorkspaceSecrets,
@@ -74,6 +81,13 @@ foreach ($root in $WorkspaceRoots) {
             Write-Error "Refusing to operate on '$root': it is inside a user profile. The whole point of this boundary is that user profiles stay out of reach."
             exit 2
         }
+    }
+    # Named separately from the generic profile guard so the reason is unambiguous
+    # in the transcript: the host-only secret root is the relocation target and
+    # granting it would undo the relocation.
+    if ($root.TrimEnd('\') -like "$($HostSecretRoot.TrimEnd('\'))*") {
+        Write-Error "Refusing to operate on '$root': it is the host-only secret root. Relocating secrets there and then granting access to it would cancel out."
+        exit 2
     }
     if (-not (Test-Path -LiteralPath $root)) {
         Write-Error "Workspace root '$root' does not exist. Run preflight-principal.ps1 first."
@@ -246,6 +260,35 @@ if ($accountSid) {
     Add-Action 'acl' '-' 'account SID unavailable (WhatIf run); no ACL changes attempted' 'WHATIF'
 }
 
+# ------------------------------------------- 4b. toolchain: verify, never grant
+#
+# The dedicated principal executes Python and git from machine-wide locations.
+# On this host those already carry BUILTIN\Users ReadAndExecute, so provisioning
+# needs no toolchain ACL change at all. Verify that rather than assume it, and
+# never widen anything: a missing grant is reported for a human decision.
+
+$SID_USERS_GROUP = 'S-1-5-32-545'
+$toolchainFacts = New-Object System.Collections.ArrayList
+foreach ($path in $ToolchainPaths) {
+    $entry = [ordered]@{ path = $path; exists = (Test-Path -LiteralPath $path); users_read_execute = $null }
+    if ($entry.exists) {
+        $acl = Get-Acl -LiteralPath $path
+        $entry.users_read_execute = [bool](@($acl.Access | Where-Object {
+            $_.AccessControlType -eq 'Allow' -and
+            (try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { '' }) -eq $SID_USERS_GROUP -and
+            $_.FileSystemRights.ToString() -match 'ReadAndExecute|Modify|FullControl'
+        }).Count)
+    }
+    [void]$toolchainFacts.Add($entry)
+    if ($entry.exists -and -not $entry.users_read_execute) {
+        Add-Action 'toolchain' $path "BUILTIN\Users has no read/execute here; $AccountName will not be able to run it. Decide this deliberately; this script does not widen toolchain ACLs." 'FAILED'
+    } elseif ($entry.exists) {
+        Add-Action 'toolchain' $path 'BUILTIN\Users already has read/execute; no ACL change needed' 'VERIFIED'
+    } else {
+        Add-Action 'toolchain' $path 'absent on this host' 'ABSENT'
+    }
+}
+
 # --------------------- 5. optional partial mitigation for in-workspace secrets
 
 $secretActions = New-Object System.Collections.ArrayList
@@ -290,6 +333,10 @@ $report = [ordered]@{
     account_is_administrator = $inAdmins
     workspace_roots  = $WorkspaceRoots
     actions          = @($actions)
+    toolchain        = @($toolchainFacts)
+    toolchain_acls_changed = $false
+    host_secret_root = $HostSecretRoot
+    host_secret_root_granted = $false
     in_workspace_secret_denies = @($secretActions)
     password_persisted = $false
     host_profile_touched = $false

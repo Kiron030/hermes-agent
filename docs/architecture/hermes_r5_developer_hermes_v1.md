@@ -119,15 +119,38 @@ Mechanical fail-closed proofs:
 
 Deleting `.r5-dev/` has zero production effect.
 
-## Known limit: secrets inside the approved workspace
+## Secrets must live outside the approved workspace
 
 An OS-principal boundary separates the developer instance from the *host
 profile*. It cannot hide anything inside a workspace the instance is required to
-read and write. Any credential committed to, or living in, Repo A or Repo B is
-therefore reachable by design, and reachable through git object storage even
-when the working-tree file is denied. For a credential in that position,
-rotation is the only mitigation that holds; see the proof report for the current
-inventory.
+read and write. Any credential living in Repo A or Repo B is therefore reachable
+by design — and reachable through git object storage even when the working-tree
+file is denied.
+
+The consequence is a layout rule rather than a stack of deny ACEs:
+
+```text
+HOST_ONLY_SECRET_ROOT = %USERPROFILE%\.powerunits\secrets\
+```
+
+The root is derived from the running account's profile, never hardcoded, and the
+dedicated principal is simply never granted it. Values reach local consumers
+through the **process environment** via
+`principal/run-with-host-secrets.ps1`; there is deliberately no symlink or
+junction from a workspace into that root, because a link would restore exactly
+the filesystem reachability the move removes.
+
+Two cases behave differently:
+
+- **Never committed.** Moving the file out of the tree is sufficient.
+  `principal/bootstrap-host-secrets.ps1 -Relocate` does the move and refuses to
+  copy.
+- **Committed at any point.** The blob stays readable in `.git`, denying read on
+  `.git` would destroy the required `GIT` capability, and untracking is hygiene
+  rather than mitigation. Rotation is the only fix that holds.
+
+Inventory, loading mechanisms, blast radius and the ordered human runbook:
+[`hermes_r5_secret_relocation_v1.md`](./hermes_r5_secret_relocation_v1.md).
 
 ## SQLite
 

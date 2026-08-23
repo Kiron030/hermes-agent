@@ -74,6 +74,9 @@ cd scripts\r5_developer_hermes\principal
 # ordinary account, read-only
 powershell -ExecutionPolicy Bypass -File .\preflight-principal.ps1 -CreateSentinel
 
+# ordinary account: move secrets out of the workspace FIRST (see below)
+powershell -ExecutionPolicy Bypass -File .\bootstrap-host-secrets.ps1 -Relocate
+
 # ELEVATED account, creates hermes-dev and adds additive ACEs only
 powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1 -WhatIf
 powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1
@@ -85,6 +88,26 @@ powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode pro
 
 Do not authenticate `gh` or `railway` as `hermes-dev`, and do not copy SSH keys
 or Credential Manager state into that profile. Their absence is the boundary.
+
+## Secrets must leave the workspace first
+
+`hermes-dev` needs `Modify` on both workspace roots, so nothing inside them can
+be hidden from it. Secret-class files therefore move to a host-only root that
+lives in the human account's profile:
+
+```text
+HOST_ONLY_SECRET_ROOT = %USERPROFILE%\.powerunits\secrets\
+```
+
+`bootstrap-host-secrets.ps1` creates `repo-b.env`, `app.env` and `mapbox.env`
+there and, with `-Relocate`, **moves** the three untracked Repo-B files out.
+`run-with-host-secrets.ps1` keeps normal human development working by injecting
+those files into the **process environment** — no symlink back into the
+workspace, no copy, no value ever printed or written.
+
+Full inventory, blast radius and the ordered human runbook (including the legacy
+`.env.pgurl` rotation):
+[`docs/architecture/hermes_r5_secret_relocation_v1.md`](../../docs/architecture/hermes_r5_secret_relocation_v1.md).
 
 ## Workspace
 

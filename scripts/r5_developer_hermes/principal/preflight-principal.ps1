@@ -18,6 +18,7 @@
 param(
     [string]   $AccountName    = 'hermes-dev',
     [string[]] $WorkspaceRoots = @('W:\Workbench\hermes-agent', 'W:\Workbench\EU-PP-Database'),
+    [string]   $HostSecretRoot = (Join-Path $env:USERPROFILE '.powerunits\secrets'),
     [string]   $ArtifactPath,
     [switch]   $CreateSentinel
 )
@@ -414,6 +415,51 @@ foreach ($extra in @(
     }
 }
 
+# ------------------------------------------------- 8. host-only secret layout
+#
+# Phase C must be able to assert that the relocated secrets are unreachable, so
+# the exact external paths are recorded here. Paths are not secrets; the ACL on
+# the host profile is what protects the contents.
+
+$hostSecretFacts = [ordered]@{
+    root        = $HostSecretRoot
+    root_exists = (Test-Path -LiteralPath $HostSecretRoot)
+    inside_profile = ($HostSecretRoot.TrimEnd('\') -like "$((Resolve-Path -LiteralPath $env:USERPROFILE).Path.TrimEnd('\'))\*")
+    files       = @()
+}
+$hostSecretFiles = New-Object System.Collections.ArrayList
+foreach ($name in @('repo-b.env', 'app.env', 'mapbox.env')) {
+    $path = Join-Path $HostSecretRoot $name
+    [void]$hostSecretFiles.Add([ordered]@{
+        path   = $path
+        exists = (Test-Path -LiteralPath $path)
+    })
+}
+$hostSecretFacts.files = @($hostSecretFiles)
+if (-not $hostSecretFacts.inside_profile) {
+    Add-Blocker 'HOST_SECRET_ROOT_OUTSIDE_PROFILE' "$HostSecretRoot is not inside the host profile, so nothing guarantees $AccountName cannot read it."
+}
+if (-not $hostSecretFacts.root_exists) {
+    Add-Warning 'HOST_SECRET_ROOT_ABSENT' "$HostSecretRoot does not exist yet. Run bootstrap-host-secrets.ps1 before relying on relocation."
+}
+
+# A relocation that leaves a link behind restores exactly the reachability it
+# was meant to remove, so the origins are checked for reparse points.
+$relocationOrigins = @(
+    (Join-Path $WorkspaceRoots[-1] '.env'),
+    (Join-Path $WorkspaceRoots[-1] 'app\.env.local'),
+    (Join-Path $WorkspaceRoots[-1] 'scripts\mapbox\.env.local')
+)
+$linkFindings = New-Object System.Collections.ArrayList
+foreach ($origin in $relocationOrigins) {
+    if (-not (Test-Path -LiteralPath $origin)) { continue }
+    $item = Get-Item -LiteralPath $origin -Force
+    if ($item.LinkType) {
+        [void]$linkFindings.Add([ordered]@{ path = $origin; link_type = $item.LinkType; target = @($item.Target) })
+        Add-Blocker 'WORKSPACE_LINK_INTO_SECRET_ROOT' "$origin is a $($item.LinkType). A link makes the external secret readable through the workspace again; delete it and inject through the environment instead."
+    }
+}
+
 # ------------------------------------------------------------------ report
 
 $report = [ordered]@{
@@ -428,6 +474,8 @@ $report = [ordered]@{
     toolchain                = $toolFacts
     pinned_runtime           = $runtimeFacts
     in_workspace_secret_files = @($secretFindings)
+    host_secret_layout       = $hostSecretFacts
+    workspace_links_into_secret_root = @($linkFindings)
     host_credential_stores   = $storeFacts
     deploy_cli_absolute_candidates = @($deployCandidates)
     host_profile_sentinel    = $sentinelFacts

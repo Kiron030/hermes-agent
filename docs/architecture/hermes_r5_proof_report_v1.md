@@ -71,7 +71,9 @@ Artifacts, for human execution:
 
 | Script | Elevation | Role |
 |---|---|---|
-| `principal/preflight-principal.ps1` | no | mechanised Phase A; records host SID, absolute deploy-CLI paths, sentinel |
+| `principal/preflight-principal.ps1` | no | mechanised Phase A; records host SID, absolute deploy-CLI paths, sentinel, host-only secret layout |
+| `principal/bootstrap-host-secrets.ps1` | no | creates the host-only secret root; `-Relocate` moves workspace secrets out |
+| `principal/run-with-host-secrets.ps1` | no | keeps human local development working by injecting those files into the process environment |
 | `principal/provision-principal.ps1` | **yes** | creates the standard account, adds additive ACEs only |
 | `principal/launch-developer-hermes.ps1` | no | `runas` into the principal; no cached credentials |
 | `principal/verify-principal-isolation.ps1` | no | Phase C property proof, fail-closed |
@@ -114,20 +116,48 @@ Open:
 Repo B carries secret-class files inside the tree that R5 requires to be
 read/write:
 
-| Path (Repo B) | Size | Tracked | In history |
-|---|---|---|---|
-| `.env` | 3796 | no | no |
-| `.env.pgurl` | 91 | **yes** | **yes** (`1ee4b5f`) |
-| `app/.env.local` | 209 | no | no |
-| `scripts/mapbox/.env.local` | 179 | no | no |
+| Path (Repo B) | Size | Tracked | In history | Remediation |
+|---|---|---|---|---|
+| `.env` | 3796 | no | no | relocate → `repo-b.env` |
+| `app/.env.local` | 209 | no | no | relocate → `app.env` |
+| `scripts/mapbox/.env.local` | 179 | no | no | relocate → `mapbox.env` |
+| `.env.pgurl` | 0 in tree, **91 in `HEAD`** | **yes** | **yes** (`1ee4b5f`) | rotate, then untrack |
 
 No OS-principal boundary can close this. `WORKSPACE_REPO_B_RW = YES` and
 `PRODUCTION_SECRET_FILES_REACHABLE = NO` are contradictory while a live
-credential lives inside the mounted workspace. `.env.pgurl` is worse than the
-rest: a deny ACE on the working-tree file leaves the value readable from git
-object storage, and denying read on `.git` would cost the required `GIT`
-capability. Rotation in Repo B is the only mitigation that holds. Contents were
-never read; this inventory is names, sizes and git metadata only.
+credential lives inside the mounted workspace. The three untracked files were
+never committed, so moving them out of the tree is sufficient; that is the
+relocation half of the remediation.
+
+`.env.pgurl` is the different case. Its working-tree copy is now empty, but the
+tracked 91-byte blob in `1ee4b5f` is still readable — `git show HEAD:.env.pgurl`
+needs no working-tree file, a deny ACE on the file changes nothing, and denying
+read on `.git` would cost the required `GIT` capability. Rotation is the only
+mitigation that holds; untracking is hygiene that follows it. The credential
+points at the legacy `trolley.proxy.rlwy.net:47583` sandbox, not the production
+Timescale SoT.
+
+Contents were never read; this inventory is names, sizes and git metadata only.
+
+### Secret relocation and blast radius
+
+```text
+HOST_ONLY_SECRET_ROOT                   = %USERPROFILE%\.powerunits\secrets\
+PRODUCTION_CREDENTIAL_ROTATION_REQUIRED = NO
+LEGACY_DB_ROTATION_REQUIRED             = YES
+LEGACY_DB_RAILWAY_SERVICE               = HUMAN_CONFIRMATION_REQUIRED
+LEGACY_DB_GITHUB_SECRET_NAMES           = none
+```
+
+`LEGACY_DB_GITHUB_SECRET_NAMES` is proven rather than assumed: repository
+Actions secrets `total_count = 0`, and the `Preview` and `Production`
+environments hold `0` secrets each. `bounded-validate-smoke.yml` references
+`secrets.DATABASE_URL`, which is unset, so its `smoke-skipped-no-secret` branch
+is what runs; `backend-pytest-offline.yml` uses a hardcoded placeholder DSN and
+no secret at all.
+
+Full loading-mechanism inventory, layout, launcher and the ordered human
+runbook: [`hermes_r5_secret_relocation_v1.md`](./hermes_r5_secret_relocation_v1.md).
 
 ---
 
@@ -239,21 +269,22 @@ Hermes warned: linked 3.38.4 is vulnerable to the WAL-reset bug and used
 
 ## Human action required
 
-Phase C cannot run until the principal exists. From an **elevated** PowerShell:
+Phase C cannot run until the secrets are out of the workspace *and* the
+principal exists. Creating the principal first would only produce a `FAIL` on
+the in-workspace secret checks, so the order matters:
 
-```powershell
-cd W:\Workbench\hermes-agent\scripts\r5_developer_hermes\principal
-powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1 -WhatIf
-powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1
+```text
+1. bootstrap-host-secrets.ps1              create the host-only secret root
+2. bootstrap-host-secrets.ps1 -Relocate    move the three untracked files out
+3. run-with-host-secrets.ps1               confirm human local dev still works
+4. rotate the legacy trolley DB credential (Railway UI)
+5. untrack .env.pgurl                      Repo-B change, separate PR
+6. provision-principal.ps1                 ELEVATED; creates hermes-dev
+7. launch-developer-hermes.ps1 -Mode verify / -Mode probes
 ```
 
-Then, from the ordinary account:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\preflight-principal.ps1 -CreateSentinel
-powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode verify
-powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode probes
-```
+Exact commands, expected failures and confirmation points:
+[`hermes_r5_secret_relocation_v1.md`](./hermes_r5_secret_relocation_v1.md#runbook-human-execution).
 
 The password is entered interactively and never stored. Do not authenticate
 `gh` or `railway` for `hermes-dev`, and do not copy SSH keys or Credential
@@ -263,13 +294,17 @@ Manager state into it — their absence is the point.
 
 ```text
 python -m pytest tests/r5_developer_hermes -q
-25 passed
+32 passed
 ```
 
 New coverage: boundary fails closed without principal evidence; the boundary is
 only claimed on proof; PATH stubs are declared non-security; deploy-CLI
 resolution skips the stub directory; provisioning scripts never cache
-credentials and never reset an ACL.
+credentials and never reset an ACL; the host secret root is derived from the
+profile rather than hardcoded; relocation moves and never copies; no principal
+script creates a link back into the workspace; the launcher writes no value to
+disk and refuses to run as the dedicated principal; provisioning refuses to
+grant the secret root and never widens a toolchain ACL.
 
 ---
 

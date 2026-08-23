@@ -221,6 +221,8 @@ def test_principal_provisioning_scripts_are_present() -> None:
         "provision-principal.ps1",
         "launch-developer-hermes.ps1",
         "verify-principal-isolation.ps1",
+        "bootstrap-host-secrets.ps1",
+        "run-with-host-secrets.ps1",
     )
     for name in expected:
         assert (PRINCIPAL_SCRIPTS / name).is_file(), name
@@ -248,6 +250,76 @@ def test_provisioning_never_persists_credentials_or_touches_the_host_profile() -
     assert "PurgeAccessRules" not in provision
     # The host profile stays out of scope.
     assert "Refusing to operate on" in provision
+
+
+def test_host_secret_root_is_derived_not_hardcoded() -> None:
+    """A hardcoded username would break on any other host and leak this one."""
+    for name in ("bootstrap-host-secrets.ps1", "run-with-host-secrets.ps1"):
+        code = _powershell_code(PRINCIPAL_SCRIPTS / name)
+        assert "$env:USERPROFILE" in code, name
+        assert ".powerunits\\secrets" in code, name
+        assert "C:\\Users\\" not in code, name
+
+
+def test_secret_relocation_never_links_back_into_the_workspace() -> None:
+    """A link at the old path restores the reachability relocation removes."""
+    forbidden = ("SymbolicLink", "HardLink", "Junction", "mklink", "New-Symlink")
+    for script in PRINCIPAL_SCRIPTS.glob("*.ps1"):
+        code = _powershell_code(script)
+        for marker in forbidden:
+            assert f"New-Item -ItemType {marker}" not in code, (script.name, marker)
+            assert f"mklink /{marker[0]}" not in code, (script.name, marker)
+        assert "mklink" not in code.lower(), script.name
+
+
+def test_relocation_moves_and_never_copies_secrets() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "bootstrap-host-secrets.ps1")
+    assert "Move-Item" in code
+    assert "Copy-Item" not in code
+    # A git-tracked secret needs rotation, so relocation must refuse to move it.
+    assert "ORIGIN_IS_GIT_TRACKED" in code
+    # And it must refuse a root that the dedicated principal can reach.
+    assert "Refusing to place the secret root inside workspace root" in code
+
+
+def test_host_launcher_injects_without_persisting_or_printing_values() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "run-with-host-secrets.ps1")
+    # Injection into this process only.
+    assert 'Set-Item -LiteralPath "Env:$key"' in code
+    # Nothing is written back to disk: no file-writing cmdlet at all.
+    for writer in ("Out-File", "Set-Content", "Add-Content", "Copy-Item", "Export-Csv"):
+        assert writer not in code, writer
+    # The dedicated principal does not gain this authority by reading the source.
+    assert "Refusing to run as" in code
+
+
+def test_provisioning_refuses_to_grant_the_host_secret_root() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "provision-principal.ps1")
+    assert "HostSecretRoot" in code
+    assert "host_secret_root_granted = $false" in code
+    assert "toolchain_acls_changed = $false" in code
+    # Toolchain rights are verified, never widened.
+    assert "does not widen toolchain ACLs" in code
+
+
+def test_secret_relocation_plan_is_documented() -> None:
+    doc = REPO_ROOT / "docs" / "architecture" / "hermes_r5_secret_relocation_v1.md"
+    assert doc.is_file()
+    text = doc.read_text(encoding="utf-8")
+    for marker in (
+        "HOST_ONLY_SECRET_ROOT = %USERPROFILE%\\.powerunits\\secrets\\",
+        "LEGACY_DB_GITHUB_SECRET_NAMES = none",
+        "LEGACY_DB_RAILWAY_SERVICE = HUMAN_CONFIRMATION_REQUIRED",
+        "Runbook (human execution)",
+    ):
+        assert marker in text, marker
+
+
+def test_secret_relocation_doc_carries_no_secret_values() -> None:
+    doc = REPO_ROOT / "docs" / "architecture" / "hermes_r5_secret_relocation_v1.md"
+    text = doc.read_text(encoding="utf-8").lower()
+    for needle in ("postgres://", "postgresql://", "sk-", "sk.ey", "ghp_", "pk.ey"):
+        assert needle not in text, needle
 
 
 def test_r1_decision_docs_remain_tracked() -> None:

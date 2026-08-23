@@ -329,6 +329,64 @@ foreach ($secret in $inWorkspaceSecrets) {
     }
 }
 
+# ---------------------------------- F2. relocated host-only secret files
+#
+# The relocation is only worth anything if the new location is genuinely out of
+# reach. Same fail-closed rule: an unrecorded layout is NOT_PROVEN, never NO.
+
+$hostSecretLayout = if ($preflight) { $preflight.host_secret_layout } else { $null }
+$hostSecretResults = New-Object System.Collections.ArrayList
+$hostSecretReachable = 'NOT_PROVEN'
+
+if ($hostSecretLayout) {
+    $rootReadable = $null
+    try {
+        $null = Get-ChildItem -LiteralPath $hostSecretLayout.root -Force -ErrorAction Stop
+        $rootReadable = $true
+    } catch [System.UnauthorizedAccessException] {
+        $rootReadable = $false
+    } catch [System.IO.DirectoryNotFoundException] {
+        $rootReadable = $false
+    } catch {
+        $rootReadable = $false
+    }
+    [void]$hostSecretResults.Add([ordered]@{ path = $hostSecretLayout.root; kind = 'ROOT'; readable = $rootReadable })
+
+    $anyFileReadable = $false
+    $anyFileRecorded = $false
+    foreach ($file in @($hostSecretLayout.files)) {
+        if (-not $file.exists) {
+            [void]$hostSecretResults.Add([ordered]@{ path = $file.path; kind = 'FILE'; readable = $null })
+            continue
+        }
+        $anyFileRecorded = $true
+        $readable = $false
+        try {
+            $stream = [System.IO.File]::OpenRead($file.path)
+            $null = $stream.ReadByte()   # one byte, discarded; contents are never surfaced
+            $stream.Close()
+            $readable = $true
+        } catch {
+        }
+        if ($readable) { $anyFileReadable = $true }
+        [void]$hostSecretResults.Add([ordered]@{ path = $file.path; kind = 'FILE'; readable = $readable })
+    }
+
+    if ($anyFileReadable -or $rootReadable -eq $true) {
+        $hostSecretReachable = 'YES'
+        Add-Finding 'CRITICAL' 'HOST_SECRET_ROOT_READABLE' "The dedicated principal can read the host-only secret root $($hostSecretLayout.root). Relocation moved the files but did not remove reachability."
+    } elseif ($anyFileRecorded -and $rootReadable -eq $false) {
+        $hostSecretReachable = 'NO'
+    } elseif ($rootReadable -eq $false -and -not $hostSecretLayout.root_exists) {
+        # Nothing relocated yet: nothing proven either.
+        $hostSecretReachable = 'NOT_PROVEN'
+        Add-Finding 'MEDIUM' 'HOST_SECRET_LAYOUT_ABSENT' 'No host-only secret files were recorded, so the relocation half of the remediation is unproven.'
+    }
+}
+
+if ($hostSecretReachable -eq 'YES') { $secretFilesReachable = 'YES' }
+elseif ($hostSecretReachable -eq 'NOT_PROVEN' -and $secretFilesReachable -eq 'NO') { $secretFilesReachable = 'NOT_PROVEN' }
+
 # ------------------------------------------------------- G. deploy authority
 
 $deployReachable = 'NO'
@@ -373,6 +431,7 @@ $acceptanceMet = (
     $railwayReachable -eq 'NO' -and
     $ghReachable -eq 'NO' -and
     $credentialAuthorityReachable -eq 'NO' -and
+    $hostSecretReachable -eq 'NO' -and
     $secretFilesReachable -eq 'NO' -and
     $deployReachable -eq 'NO' -and
     $gitWorks -and
@@ -388,6 +447,7 @@ $report = [ordered]@{
     github_cli    = [ordered]@{ probe = $ghProbe; verdict = $ghVerdict; reachable = $ghReachable }
     windows_credential_manager = [ordered]@{ entry_count = $credentialEntryCount; reachable = $credentialAuthorityReachable }
     host_credential_stores     = $storeResults
+    host_only_secret_files     = @($hostSecretResults)
     in_workspace_secret_files  = @($inWorkspaceReadable)
     workspace                  = $workspaceResults
     git_status_works           = $gitWorks
@@ -398,6 +458,7 @@ $report = [ordered]@{
     RAILWAY_AUTH_REACHABLE                = $railwayReachable
     GH_AUTH_REACHABLE                     = $ghReachable
     WINDOWS_CREDENTIAL_AUTHORITY_REACHABLE = $credentialAuthorityReachable
+    HOST_ONLY_SECRET_ROOT_REACHABLE       = $hostSecretReachable
     PRODUCTION_SECRET_FILES_REACHABLE     = $secretFilesReachable
     PRODUCTION_DEPLOY_REACHABLE           = $deployReachable
     PATH_STUB_SECURITY_ROLE               = 'NONE'
@@ -413,7 +474,8 @@ Write-Host '--- R5 principal isolation properties ---'
 foreach ($key in @(
     'CHILD_OS_PRINCIPAL', 'HOST_PROFILE_FILESYSTEM_REACHABLE', 'RAILWAY_AUTH_REACHABLE',
     'GH_AUTH_REACHABLE', 'WINDOWS_CREDENTIAL_AUTHORITY_REACHABLE',
-    'PRODUCTION_SECRET_FILES_REACHABLE', 'PRODUCTION_DEPLOY_REACHABLE', 'ISOLATION_ACCEPTANCE')) {
+    'HOST_ONLY_SECRET_ROOT_REACHABLE', 'PRODUCTION_SECRET_FILES_REACHABLE',
+    'PRODUCTION_DEPLOY_REACHABLE', 'ISOLATION_ACCEPTANCE')) {
     Write-Host ("{0,-40} = {1}" -f $key, $report[$key])
 }
 if ($blocking.Count -gt 0) {
