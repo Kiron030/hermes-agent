@@ -705,6 +705,47 @@ the `hermes tools` UI.
 
 Leaving the list empty, or omitting the key, is a no-op.
 
+## Final Callable-Surface Cap
+
+`agent.disabled_toolsets` is a subtraction, so it only removes what you can
+name in advance. `agent.final_allowed_toolsets` is the positive counterpart: an
+upper bound on the tool surface that is applied *after* every other resolution
+step, so nothing that runs earlier can exceed it.
+
+```yaml
+agent:
+  final_allowed_toolsets:
+    - memory
+    - todo
+    - file
+```
+
+With that in place, the callable surface is always a subset of those toolsets —
+whatever a caller passes as `--toolsets`, whatever `platform_toolsets` says, and
+whatever a plugin registers for itself. This is what makes it useful for
+locked-down deployments: you can hand out session-level toolset choice without
+handing out the ability to widen past the operator's bound.
+
+Semantics, exactly:
+
+- **Omitting the key, or setting it to `null`, means no cap** — resolution is
+  untouched.
+- It is an **intersection, never a replacement**. A caller that asks for less
+  than the cap keeps the smaller surface; the cap never adds a tool and never
+  brings back one that `disabled_toolsets` removed.
+- An **empty list is a real, empty allowlist**, not an absent one. It caps the
+  surface to nothing.
+- An **unknown toolset name contributes nothing** rather than being ignored, so
+  a typo shrinks the surface instead of silently widening it. A cap listing only
+  unknown names yields an empty surface. Unknown names are logged as warnings.
+- A **value that is not a list** (other than a single toolset name as a bare
+  string) is treated as an empty allowlist, for the same fail-closed reason.
+- Listing `all` or `*` resolves to every toolset, which is equivalent to no cap.
+
+Because the cap is read from config inside tool resolution rather than passed in
+by the caller, editing it takes effect on the next tool resolution; no restart
+is needed.
+
 ## Git Worktree Isolation
 
 Enable isolated git worktrees for running multiple agents in parallel on the same repo:
