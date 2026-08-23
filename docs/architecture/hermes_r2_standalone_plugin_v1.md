@@ -299,7 +299,7 @@ Do not start R3 from this slice.
 R2_STATUS = PASS
 
 BASE_SHA  = fc1700ccebe8a87f527084c7ba848aa8d0b7c692
-FINAL_SHA = (set at commit)
+FINAL_SHA = cbf972427bfa2add2dde25c3672abf5c290620b5
 
 PLUGIN_API      = ctx.register_tool
 PLUGIN_LOCATION = standalone/powerunits
