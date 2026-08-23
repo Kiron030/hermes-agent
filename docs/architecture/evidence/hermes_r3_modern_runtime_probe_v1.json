@@ -1,0 +1,175 @@
+{
+  "runtime_root": "W:\\cache\\hermes-r3-modern",
+  "runtime_model_tools": "W:\\cache\\hermes-r3-modern\\model_tools.py",
+  "fork_modules_leaked_into_runtime": [],
+  "boot_ms": 2826.61,
+  "production_authority_present": [],
+  "cap_patch_present": true,
+  "powerunits_references_in_runtime_model_tools": 0,
+  "plugin_load_ms": 249.65,
+  "plugin_loaded": true,
+  "plugin_tools_registered": [
+    "inventory_powerunits_bounded_coverage_v1",
+    "read_powerunits_coverage_snapshot_v1",
+    "read_powerunits_entsoe_bzn_price_readiness_v1",
+    "readiness_powerunits_option_d_bounded_window"
+  ],
+  "tool_search_bridge": {
+    "uncapped": false,
+    "capped": true
+  },
+  "uncapped": {
+    "callable": 42,
+    "unsafe_present": [
+      "delegate_task",
+      "execute_code",
+      "patch",
+      "process",
+      "read_file",
+      "search_files",
+      "session_search",
+      "terminal",
+      "write_file"
+    ],
+    "plugin_visible": [
+      "inventory_powerunits_bounded_coverage_v1",
+      "read_powerunits_coverage_snapshot_v1",
+      "read_powerunits_entsoe_bzn_price_readiness_v1",
+      "readiness_powerunits_option_d_bounded_window"
+    ]
+  },
+  "capped": {
+    "toolsets_all_callable": 4,
+    "caller_override_callable": 4,
+    "unsafe_present": [],
+    "plugin_visible": [
+      "inventory_powerunits_bounded_coverage_v1",
+      "read_powerunits_coverage_snapshot_v1",
+      "read_powerunits_entsoe_bzn_price_readiness_v1",
+      "readiness_powerunits_option_d_bounded_window"
+    ],
+    "narrow_caller_stays_narrow": [],
+    "plugin_self_expansion_blocked": true
+  },
+  "schema_cost": {
+    "capped_catalog": {
+      "tools": 4,
+      "schema_chars": 3389,
+      "estimated_tokens_at_4_chars": 847
+    },
+    "what_the_model_actually_receives": {
+      "tools": 3,
+      "schema_chars": 2250,
+      "estimated_tokens_at_4_chars": 562
+    }
+  },
+  "dispatch": {
+    "read_powerunits_coverage_snapshot_v1": {
+      "posted": true,
+      "scheme": "https",
+      "hostname": "bounded.example.test",
+      "path": "/internal/hermes/bounded/v1/coverage-snapshot",
+      "body_keys": [
+        "country_codes",
+        "version",
+        "window_end_utc",
+        "window_start_utc"
+      ],
+      "transport_field_in_body": false,
+      "response_keys": [
+        "chat_summary",
+        "correlation_id",
+        "effect_class",
+        "hermes_operator_note_v1",
+        "hermes_statement",
+        "http_status",
+        "http_status_from_repo_b",
+        "read_attempted",
+        "success",
+        "surface"
+      ],
+      "median_ms": 2.4158
+    },
+    "inventory_powerunits_bounded_coverage_v1": {
+      "posted": true,
+      "scheme": "https",
+      "hostname": "bounded.example.test",
+      "path": "/internal/hermes/bounded/v1/coverage-inventory",
+      "body_keys": [
+        "country_codes",
+        "version",
+        "window_end_utc",
+        "window_start_utc"
+      ],
+      "transport_field_in_body": false,
+      "response_keys": [
+        "chat_summary",
+        "correlation_id",
+        "effect_class",
+        "hermes_statement",
+        "http_status",
+        "http_status_from_repo_b",
+        "inventory_attempted",
+        "read_attempted",
+        "repo_b_inventory",
+        "success",
+        "surface"
+      ],
+      "median_ms": 2.5674
+    },
+    "read_powerunits_entsoe_bzn_price_readiness_v1": {
+      "posted": true,
+      "scheme": "https",
+      "hostname": "bounded.example.test",
+      "path": "/internal/hermes/bounded/v1/entsoe-bzn-price-readiness/read",
+      "body_keys": [
+        "country_codes",
+        "table_version",
+        "window_end_utc",
+        "window_start_utc"
+      ],
+      "transport_field_in_body": false,
+      "response_keys": [
+        "chat_summary",
+        "correlation_id",
+        "effect_class",
+        "hermes_operator_note_v1",
+        "hermes_statement",
+        "http_status",
+        "http_status_from_repo_b",
+        "read_attempted",
+        "success",
+        "surface"
+      ],
+      "median_ms": 2.5557
+    },
+    "readiness_powerunits_option_d_bounded_window": {
+      "posted": true,
+      "scheme": "https",
+      "hostname": "bounded.example.test",
+      "path": "/internal/hermes/bounded/v1/market-features-hourly/readiness-window",
+      "body_keys": [
+        "country_code",
+        "version",
+        "window_end_utc",
+        "window_start_utc"
+      ],
+      "transport_field_in_body": false,
+      "response_keys": [
+        "chat_summary",
+        "correlation_id",
+        "effect_class",
+        "hermes_statement",
+        "http_status",
+        "http_status_from_repo_b",
+        "read_attempted",
+        "readiness",
+        "readiness_attempted",
+        "slice",
+        "success",
+        "surface"
+      ],
+      "median_ms": 2.6559
+    }
+  }
+}

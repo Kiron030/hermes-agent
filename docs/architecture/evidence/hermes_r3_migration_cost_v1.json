@@ -1,0 +1,354 @@
+{
+  "fork_top_level_modules": {
+    "count": 5,
+    "lines": 774,
+    "files": [
+      {
+        "path": "powerunits_bounded_profiles_v1.py",
+        "lines": 358,
+        "symbols": 5
+      },
+      {
+        "path": "powerunits_capability_tier.py",
+        "lines": 59,
+        "symbols": 2
+      },
+      {
+        "path": "powerunits_operator_country_scope_v1.py",
+        "lines": 145,
+        "symbols": 4
+      },
+      {
+        "path": "powerunits_skill_draft_review_contract.py",
+        "lines": 34,
+        "symbols": 1
+      },
+      {
+        "path": "powerunits_telegram_overlays.py",
+        "lines": 178,
+        "symbols": 4
+      }
+    ]
+  },
+  "fork_tool_files": {
+    "total": 72,
+    "total_lines": 24748,
+    "tool_modules": 55,
+    "support_modules": 17,
+    "r2_wrapper_definition": {
+      "count": 35,
+      "lines": 12165
+    },
+    "http_wrappers": {
+      "count": 44,
+      "lines": 14781,
+      "files": [
+        "powerunits_baseline_layer_preview_tool.py",
+        "powerunits_bounded_coverage_inventory_tool.py",
+        "powerunits_bounded_coverage_snapshot_tool.py",
+        "powerunits_bounded_family_gates.py",
+        "powerunits_bounded_rollout_governance_tool.py",
+        "powerunits_de_stack_remediation_planner_tool.py",
+        "powerunits_entsoe_bzn_price_readiness_tool.py",
+        "powerunits_entsoe_bzn_prices_tool.py",
+        "powerunits_entsoe_empirical_candidate_validate_tool.py",
+        "powerunits_entsoe_forecast_bounded_execute_tool.py",
+        "powerunits_entsoe_forecast_bounded_preflight_tool.py",
+        "powerunits_entsoe_forecast_bounded_summary_tool.py",
+        "powerunits_entsoe_forecast_bounded_validate_tool.py",
+        "powerunits_entsoe_market_bounded_campaign_tool.py",
+        "powerunits_entsoe_market_bounded_coverage_scan_tool.py",
+        "powerunits_entsoe_market_bounded_execute_tool.py",
+        "powerunits_entsoe_market_bounded_preflight_tool.py",
+        "powerunits_entsoe_market_bounded_summary_tool.py",
+        "powerunits_entsoe_market_bounded_validate_tool.py",
+        "powerunits_era5_weather_bounded_campaign_tool.py",
+        "powerunits_era5_weather_bounded_coverage_scan_tool.py",
+        "powerunits_era5_weather_bounded_execute_tool.py",
+        "powerunits_era5_weather_bounded_preflight_tool.py",
+        "powerunits_era5_weather_bounded_summary_tool.py",
+        "powerunits_era5_weather_bounded_validate_tool.py",
+        "powerunits_execute_base_url_v1.py",
+        "powerunits_market_driver_features_bounded_de_execute_tool.py",
+        "powerunits_market_driver_features_bounded_de_readiness_tool.py",
+        "powerunits_market_driver_features_bounded_de_summary_tool.py",
+        "powerunits_market_driver_features_bounded_de_validate_tool.py",
+        "powerunits_market_features_bounded_de_execute_tool.py",
+        "powerunits_market_features_bounded_de_readiness_tool.py",
+        "powerunits_market_features_bounded_de_summary_tool.py",
+        "powerunits_market_features_bounded_de_validate_tool.py",
+        "powerunits_multi_country_data_health_tool.py",
+        "powerunits_option_d_execute_tool.py",
+        "powerunits_option_d_preflight_tool.py",
+        "powerunits_option_d_readiness_tool.py",
+        "powerunits_option_d_summary_tool.py",
+        "powerunits_option_d_validate_tool.py",
+        "powerunits_outage_awareness_bounded_summary_tool.py",
+        "powerunits_outage_awareness_bounded_validate_tool.py",
+        "powerunits_outage_repair_bounded_execute_tool.py",
+        "powerunits_worker_country_coverage_freshness_tool.py"
+      ]
+    },
+    "non_http": {
+      "count": 28,
+      "lines": 9967,
+      "files": [
+        "powerunits_baseline_layer_preview_slice.py",
+        "powerunits_bounded_effects_v1.py",
+        "powerunits_bounded_write_approval_v1.py",
+        "powerunits_docs_tool.py",
+        "powerunits_energy_web_research_tool.py",
+        "powerunits_entsoe_empirical_candidate_countries.py",
+        "powerunits_entsoe_forecast_bounded_countries.py",
+        "powerunits_entsoe_forecast_bounded_slice.py",
+        "powerunits_entsoe_market_bounded_countries.py",
+        "powerunits_entsoe_market_bounded_slice.py",
+        "powerunits_era5_tier1_countries.py",
+        "powerunits_era5_weather_bounded_slice.py",
+        "powerunits_github_docs_tool.py",
+        "powerunits_github_knowledge.py",
+        "powerunits_market_features_bounded_de_slice.py",
+        "powerunits_operator_posture_tool.py",
+        "powerunits_option_d_bounded_market_features.py",
+        "powerunits_outage_awareness_bounded_slice.py",
+        "powerunits_outage_repair_bounded_slice.py",
+        "powerunits_repo_b_read_tool.py",
+        "powerunits_tier1_workspace_analysis_tool.py",
+        "powerunits_tier2_allowlisted_locals_tool.py",
+        "powerunits_tier3_skills_integration_tool.py",
+        "powerunits_tier4a_skill_draft_proposals_tool.py",
+        "powerunits_tier4b_review_governance_tool.py",
+        "powerunits_tier5a_bounded_workflow_tool.py",
+        "powerunits_timescale_read_tool.py",
+        "powerunits_workspace_tool.py"
+      ]
+    }
+  },
+  "shared_core_domain_touchpoints": {
+    "files": 10,
+    "powerunits_lines": 341,
+    "rows": [
+      {
+        "path": "toolsets.py",
+        "powerunits_lines": 253,
+        "file_lines": 1671
+      },
+      {
+        "path": "gateway/run.py",
+        "powerunits_lines": 30,
+        "file_lines": 23162
+      },
+      {
+        "path": "hermes_cli/tools_config.py",
+        "powerunits_lines": 13,
+        "file_lines": 4838
+      },
+      {
+        "path": "hermes_cli/web_server.py",
+        "powerunits_lines": 12,
+        "file_lines": 19483
+      },
+      {
+        "path": "model_tools.py",
+        "powerunits_lines": 9,
+        "file_lines": 1500
+      },
+      {
+        "path": "gateway/config.py",
+        "powerunits_lines": 8,
+        "file_lines": 2566
+      },
+      {
+        "path": "hermes_cli/banner.py",
+        "powerunits_lines": 7,
+        "file_lines": 942
+      },
+      {
+        "path": "hermes_cli/commands.py",
+        "powerunits_lines": 4,
+        "file_lines": 2157
+      },
+      {
+        "path": "gateway/slash_commands.py",
+        "powerunits_lines": 4,
+        "file_lines": 4954
+      },
+      {
+        "path": "tools/registry.py",
+        "powerunits_lines": 1,
+        "file_lines": 830
+      }
+    ]
+  },
+  "modern_plugin": {
+    "files": 7,
+    "lines": 1134,
+    "rows": [
+      {
+        "path": "__init__.py",
+        "lines": 23,
+        "symbols": 1
+      },
+      {
+        "path": "client.py",
+        "lines": 188,
+        "symbols": 3
+      },
+      {
+        "path": "host.py",
+        "lines": 244,
+        "symbols": 4
+      },
+      {
+        "path": "operations.py",
+        "lines": 111,
+        "symbols": 2
+      },
+      {
+        "path": "plugin.yaml",
+        "lines": 23,
+        "symbols": 0
+      },
+      {
+        "path": "schemas.py",
+        "lines": 153,
+        "symbols": 0
+      },
+      {
+        "path": "tools.py",
+        "lines": 392,
+        "symbols": 9
+      }
+    ]
+  },
+  "modern_shared_core_patch": {
+    "files": 1,
+    "file": "model_tools.py",
+    "symbols": [
+      "_read_final_toolset_cap",
+      "_resolve_final_allowed_tools"
+    ],
+    "domain_specific": false,
+    "added_lines_measured_by_git": 96,
+    "helpers_present": true
+  },
+  "shared_core_toolset_registration": {
+    "file": "toolsets.py",
+    "powerunits_toolsets": 55,
+    "names": [
+      "powerunits_baseline_layer_preview",
+      "powerunits_bounded_coverage_inventory",
+      "powerunits_bounded_coverage_snapshot",
+      "powerunits_bounded_rollout_governance",
+      "powerunits_de_stack_remediation_planner",
+      "powerunits_docs",
+      "powerunits_energy_web_research",
+      "powerunits_entsoe_bzn_price_readiness",
+      "powerunits_entsoe_bzn_prices",
+      "powerunits_entsoe_empirical_candidate_validate",
+      "powerunits_entsoe_forecast_bounded_execute",
+      "powerunits_entsoe_forecast_bounded_preflight",
+      "powerunits_entsoe_forecast_bounded_summary",
+      "powerunits_entsoe_forecast_bounded_validate",
+      "powerunits_entsoe_market_bounded_campaign",
+      "powerunits_entsoe_market_bounded_coverage_scan",
+      "powerunits_entsoe_market_bounded_execute",
+      "powerunits_entsoe_market_bounded_preflight",
+      "powerunits_entsoe_market_bounded_summary",
+      "powerunits_entsoe_market_bounded_validate",
+      "powerunits_era5_weather_bounded_campaign",
+      "powerunits_era5_weather_bounded_coverage_scan",
+      "powerunits_era5_weather_bounded_execute",
+      "powerunits_era5_weather_bounded_preflight",
+      "powerunits_era5_weather_bounded_summary",
+      "powerunits_era5_weather_bounded_validate",
+      "powerunits_github_docs",
+      "powerunits_market_driver_features_bounded_de_execute",
+      "powerunits_market_driver_features_bounded_de_readiness",
+      "powerunits_market_driver_features_bounded_de_summary",
+      "powerunits_market_driver_features_bounded_de_validate",
+      "powerunits_market_features_bounded_de_execute",
+      "powerunits_market_features_bounded_de_readiness",
+      "powerunits_market_features_bounded_de_summary",
+      "powerunits_market_features_bounded_de_validate",
+      "powerunits_multi_country_data_health",
+      "powerunits_operator_posture",
+      "powerunits_option_d_execute",
+      "powerunits_option_d_preflight",
+      "powerunits_option_d_readiness",
+      "powerunits_option_d_summary",
+      "powerunits_option_d_validate",
+      "powerunits_outage_awareness_bounded_summary",
+      "powerunits_outage_awareness_bounded_validate",
+      "powerunits_outage_repair_bounded_execute",
+      "powerunits_repo_b_read",
+      "powerunits_tier1_analysis",
+      "powerunits_tier2_allowlisted_read",
+      "powerunits_tier3_skills_integration",
+      "powerunits_tier4a_skill_draft_proposals",
+      "powerunits_tier4b_review_governance",
+      "powerunits_tier5a_bounded_workflow_scaffolding",
+      "powerunits_timescale_read",
+      "powerunits_worker_country_coverage_freshness",
+      "powerunits_workspace"
+    ]
+  },
+  "support_module_importers": {
+    "powerunits_execute_base_url_v1": 40,
+    "powerunits_bounded_family_gates": 44
+  },
+  "test_burden": {
+    "files": 95,
+    "lines": 29866,
+    "excluding_r3_harness": {
+      "files": 90,
+      "lines": 29139
+    },
+    "r3_harness": {
+      "files": 5,
+      "lines": 727
+    },
+    "by_directory": {
+      "tests": {
+        "files": 7,
+        "lines": 1260
+      },
+      "tests/docker": {
+        "files": 1,
+        "lines": 347
+      },
+      "tests/gateway": {
+        "files": 1,
+        "lines": 2156
+      },
+      "tests/hermes_cli": {
+        "files": 6,
+        "lines": 11787
+      },
+      "tests/plugins/model_providers": {
+        "files": 1,
+        "lines": 160
+      },
+      "tests/powerunits_golden": {
+        "files": 14,
+        "lines": 1904
+      },
+      "tests/r1_modern_proof": {
+        "files": 1,
+        "lines": 296
+      },
+      "tests/r2_powerunits_plugin": {
+        "files": 10,
+        "lines": 891
+      },
+      "tests/r3_shadow_comparison": {
+        "files": 5,
+        "lines": 727
+      },
+      "tests/tools": {
+        "files": 49,
+        "lines": 10338
+      }
+    }
+  }
+}
