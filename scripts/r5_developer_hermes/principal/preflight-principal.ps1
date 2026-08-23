@@ -19,6 +19,11 @@ param(
     [string]   $AccountName    = 'hermes-dev',
     [string[]] $WorkspaceRoots = @('W:\Workbench\hermes-agent', 'W:\Workbench\EU-PP-Database'),
     [string]   $HostSecretRoot = (Join-Path $env:USERPROFILE '.powerunits\secrets'),
+
+    # The scoped root whose DACL is protected, so a volume-root deny cannot
+    # reach the workspace grants inside it. See hermes_r5_workspace_authority_v1.md.
+    [string]   $ScopedWorkspaceRoot = 'W:\hermes-dev',
+
     [string]   $ArtifactPath,
     [switch]   $CreateSentinel
 )
@@ -163,22 +168,152 @@ foreach ($root in $WorkspaceRoots) {
 $aclFacts = @{}
 foreach ($root in $WorkspaceRoots) { $aclFacts[$root] = Get-AclSummary $root }
 
-# Note whether the volume root already hands Modify to every authenticated user.
-$volumeGrants = @{}
-foreach ($root in $WorkspaceRoots) {
-    $volume = ($root -split ':')[0] + ':\'
-    if ($volumeGrants.ContainsKey($volume)) { continue }
-    $summary = Get-AclSummary $volume
-    $broad = @($summary.access | Where-Object {
-        $_.type -eq 'Allow' -and $_.sid -in @($SID_USERS, $SID_AUTH_USERS) -and $_.rights -match 'Modify|FullControl'
-    })
-    $volumeGrants[$volume] = [ordered]@{
-        volume                            = $volume
-        grants_modify_to_all_authenticated = ($broad.Count -gt 0)
-        entries                            = @($broad)
+# ------------------------------------ 2b. volume-wide write authority inventory
+#
+# The decisive question is not "does the workspace root grant Modify" but "can
+# the principal write anything OUTSIDE the two approved roots". On this host
+# every local volume root carries an inheritable Allow for Authenticated Users,
+# so a fresh standard account inherits write across whole volumes. Explicit
+# workspace grants do nothing about that.
+#
+# Fail-closed: while the account does not exist its effective denies cannot be
+# read, so broad write authority is reported as NOT_PROVEN, never as absent.
+
+$SID_EVERYONE = 'S-1-1-0'
+
+function Test-BroadWriteAllow {
+    <# Allow ACE for Users / Authenticated Users / Everyone carrying write. #>
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { $acl = Get-Acl -LiteralPath $Path } catch { return $null }
+    foreach ($ace in $acl.Access) {
+        if ($ace.AccessControlType -ne 'Allow') { continue }
+        $sid = try { $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { continue }
+        if ($sid -notin @($SID_USERS, $SID_AUTH_USERS, $SID_EVERYONE)) { continue }
+        # Generic-rights ACEs surface as negative numbers; the generic-write bit
+        # (0x40000000) is what actually propagates Modify into children.
+        $rights = [int]$ace.FileSystemRights
+        if ($ace.FileSystemRights.ToString() -match 'Modify|FullControl|Write') { return $true }
+        if (($rights -band 0x40000000) -ne 0 -or ($rights -band 0x10000000) -ne 0) { return $true }
     }
-    if ($broad.Count -gt 0) {
-        Add-Warning 'VOLUME_ROOT_ALREADY_GRANTS_MODIFY' "$volume already grants Modify to Users/Authenticated Users. $AccountName inherits Modify across the whole volume, not just the approved workspace roots. Explicit grants remain worthwhile so the boundary survives a later tightening of the volume root."
+    return $false
+}
+
+function Get-PrincipalWriteDeny {
+    <#
+      Effective (explicit or inherited) write-deny for one SID.
+      Returns $null when the answer is unknown (no SID yet, or ACL unreadable),
+      otherwise a record saying whether a deny exists and whether it propagates
+      to children. Inheritance is what lets a single root ACE cover a volume.
+    #>
+    param([string]$Path, [string]$Sid)
+    if (-not $Sid) { return $null }
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { $acl = Get-Acl -LiteralPath $Path } catch { return $null }
+    $found = $false
+    $inheritable = $false
+    foreach ($ace in $acl.Access) {
+        if ($ace.AccessControlType -ne 'Deny') { continue }
+        $aceSid = try { $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { continue }
+        if ($aceSid -ne $Sid) { continue }
+        $rights = [int]$ace.FileSystemRights
+        $carriesWrite = ($ace.FileSystemRights.ToString() -match 'Modify|FullControl|Write|Delete|TakeOwnership|ChangePermissions') `
+            -or (($rights -band 0x40000000) -ne 0) -or (($rights -band 0x10000000) -ne 0)
+        if (-not $carriesWrite) { continue }
+        $found = $true
+        if ($ace.InheritanceFlags -band [System.Security.AccessControl.InheritanceFlags]::ContainerInherit) {
+            $inheritable = $true
+        }
+    }
+    return [ordered]@{ denied = $found; inheritable = $inheritable; dacl_protected = $acl.AreAccessRulesProtected }
+}
+
+function Test-PrincipalWriteDenied {
+    param([string]$Path, [string]$Sid)
+    $deny = Get-PrincipalWriteDeny -Path $Path -Sid $Sid
+    if ($null -eq $deny) { return $null }
+    return $deny.denied
+}
+
+$principalSidForAcl = $null
+$principalAccountForAcl = Get-LocalUser -Name $AccountName -ErrorAction SilentlyContinue
+if ($principalAccountForAcl) { $principalSidForAcl = $principalAccountForAcl.SID.Value }
+
+$scopedRootNormalised = if ($ScopedWorkspaceRoot) { $ScopedWorkspaceRoot.TrimEnd('\').ToLower() } else { $null }
+
+$volumeAuthority = @{}
+$otherWriteOffenders = New-Object System.Collections.ArrayList
+$unreadableChildren = New-Object System.Collections.ArrayList
+
+foreach ($disk in (Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction SilentlyContinue)) {
+    $volume = "$($disk.DeviceID)\"
+    $rootDeny = Get-PrincipalWriteDeny -Path $volume -Sid $principalSidForAcl
+    $entry = [ordered]@{
+        volume                 = $volume
+        file_system            = $disk.FileSystem
+        hosts_workspace_root   = [bool](@($WorkspaceRoots | Where-Object { $_ -like "$($disk.DeviceID)*" }).Count)
+        hosts_scoped_root      = ($scopedRootNormalised -and $scopedRootNormalised.StartsWith($disk.DeviceID.ToLower()))
+        grants_broad_write     = (Test-BroadWriteAllow $volume)
+        root_write_denied      = if ($null -eq $rootDeny) { $null } else { $rootDeny.denied }
+        root_deny_inheritable  = if ($null -eq $rootDeny) { $null } else { $rootDeny.inheritable }
+        escaping_children      = @()
+        acl_unreadable_children = @()
+    }
+
+    if ($entry.grants_broad_write) {
+        # An inheritable root deny covers the volume. The only way a child can
+        # escape it is a protected DACL, so those are the ones worth listing.
+        $escaping = New-Object System.Collections.ArrayList
+        $unreadable = New-Object System.Collections.ArrayList
+        foreach ($dir in (Get-ChildItem -LiteralPath $volume -Directory -Force -ErrorAction SilentlyContinue)) {
+            $isScoped = ($scopedRootNormalised -and $dir.FullName.TrimEnd('\').ToLower() -eq $scopedRootNormalised)
+            if ($isScoped) { continue }
+            $childDeny = Get-PrincipalWriteDeny -Path $dir.FullName -Sid $principalSidForAcl
+            if ($null -eq $childDeny) {
+                [void]$unreadable.Add($dir.Name)
+                [void]$unreadableChildren.Add($dir.FullName)
+                continue
+            }
+            if ($childDeny.denied) { continue }
+            if ($childDeny.dacl_protected -or $entry.root_deny_inheritable -ne $true) {
+                [void]$escaping.Add($dir.Name)
+                [void]$otherWriteOffenders.Add($dir.FullName)
+            }
+        }
+        $entry.escaping_children = @($escaping)
+        $entry.acl_unreadable_children = @($unreadable)
+        if ($entry.root_write_denied -ne $true) { [void]$otherWriteOffenders.Add($volume) }
+    }
+
+    $volumeAuthority[$volume] = $entry
+}
+
+$broadWriteVolumes = @($volumeAuthority.Values | Where-Object { $_.grants_broad_write })
+$otherWriteAuthority = 'NO'
+if ($otherWriteOffenders.Count -gt 0) {
+    $otherWriteAuthority = if ($principalSidForAcl) { 'YES' } else { 'NOT_PROVEN' }
+}
+
+if ($otherWriteAuthority -eq 'NOT_PROVEN') {
+    Add-Blocker 'OTHER_WRITE_AUTHORITY_NOT_PROVEN' "$($broadWriteVolumes.Count) local volume(s) grant inheritable write to Authenticated Users ($((($broadWriteVolumes | ForEach-Object { $_.volume }) -join ', '))), and '$AccountName' does not exist yet, so its effective write-denies cannot be read. Explicit workspace grants alone do not produce workspace-only write authority."
+} elseif ($otherWriteAuthority -eq 'YES') {
+    Add-Blocker 'OTHER_WRITE_AUTHORITY_PRESENT' "'$AccountName' can write outside the approved workspace roots. No write-deny covers: $(($otherWriteOffenders | Select-Object -Unique -First 8) -join ', ')."
+}
+if ($unreadableChildren.Count -gt 0) {
+    Add-Warning 'CHILD_ACL_UNREADABLE_NON_ELEVATED' "$($unreadableChildren.Count) top-level container(s) could not be read from a non-elevated session (OS-managed containers such as `$Recycle.Bin and System Volume Information grant no write to Users in the first place). Re-run preflight elevated to record their effective deny state."
+}
+
+# A workspace root inside a denied volume only keeps its grant if its own DACL
+# is protected; otherwise the inherited deny wins and the grant is dead letter.
+foreach ($root in $WorkspaceRoots) {
+    if (-not (Test-Path -LiteralPath $root)) { continue }
+    $volume = ($root -split ':')[0] + ':\'
+    if (-not $volumeAuthority.ContainsKey($volume)) { continue }
+    if ($volumeAuthority[$volume].principal_write_denied -ne $true) { continue }
+    $protectedDacl = $false
+    try { $protectedDacl = (Get-Acl -LiteralPath $root).AreAccessRulesProtected } catch { }
+    if (-not $protectedDacl) {
+        Add-Blocker 'WORKSPACE_GRANT_DEFEATED_BY_INHERITED_DENY' "$root inherits a write-deny for $AccountName from $volume and its own DACL is not protected, so the workspace grant cannot take effect. Disable inheritance on the scoped root instead of removing the deny."
     }
 }
 
@@ -229,9 +364,15 @@ foreach ($required in @('python', 'git')) {
         Add-Blocker 'REQUIRED_TOOL_NOT_SYSTEM_WIDE' "$required resolves to $($toolFacts[$required].resolved_path) ($($toolFacts[$required].scope)); $AccountName cannot execute it."
     }
 }
-foreach ($optional in @('uv', 'node', 'npm')) {
+# uv is not a nice-to-have: harness.py prepare-runtime runs `uv sync --frozen`
+# to build the pinned modern-Hermes venv, so without it the R5 minimum
+# capability set cannot be reconstructed for the dedicated principal.
+if ($toolFacts['uv'].scope -ne 'SYSTEM_WIDE') {
+    Add-Blocker 'R5_MINIMUM_TOOLCHAIN_NOT_SYSTEM_WIDE' "uv resolves to $($toolFacts['uv'].resolved_path) ($($toolFacts['uv'].scope)). harness.py prepare-runtime runs 'uv sync --frozen', so $AccountName cannot rebuild the pinned venv. Install uv machine-wide; do NOT open the host profile to reach this copy."
+}
+foreach ($optional in @('node', 'npm')) {
     if ($toolFacts[$optional].on_host_path -and $toolFacts[$optional].scope -eq 'USER_PROFILE_ONLY') {
-        Add-Warning 'OPTIONAL_TOOL_NOT_SYSTEM_WIDE' "$optional resolves into a user profile and will be unavailable to $AccountName. This is a capability limitation, not a security defect; for node it is also what removes the host Railway CLI from reach."
+        Add-Warning 'POST_R5_DX_TOOL_NOT_SYSTEM_WIDE' "$optional resolves into a user profile and will be unavailable to $AccountName. This is POST_R5_DEVELOPER_DX, not R5 acceptance; it is also what keeps the host Railway CLI shim out of reach, so do not fix it by exposing the profile."
     }
 }
 
@@ -307,12 +448,81 @@ foreach ($root in $WorkspaceRoots) {
     }
 }
 
-$historySecrets = @($secretFindings | Where-Object { $_.in_git_history })
-if ($secretFindings.Count -gt 0) {
-    Add-Blocker 'SECRETS_INSIDE_APPROVED_WORKSPACE' "$($secretFindings.Count) secret-class file(s) live inside the workspace roots that $AccountName is required to have Modify on. An OS-principal boundary cannot make these unreadable while WORKSPACE_RW stays YES."
+# ------------------------- 4b. live vs proven-retired secret authority
+#
+# Not every historical blob still commands something. The classifier in
+# scripts/r5_developer_hermes/retired_authority.py holds the evidence contract:
+# one exact path at a time, every element verified against git metadata, and
+# anything unverifiable stays LIVE_OR_UNKNOWN. If it cannot run, every finding
+# is treated as live.
+
+function Invoke-SecretAuthorityClassifier {
+    param([array]$Findings)
+
+    $fallback = [ordered]@{
+        schema                                  = 'r5.secret_authority_classification.v1'
+        entries                                 = @()
+        ACTIVE_WORKSPACE_SECRET_FILES           = @($Findings | Where-Object { $_.size -gt 0 }).Count
+        UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY = @($Findings | Where-Object { $_.size -le 0 -and ($_.git_tracked -or $_.in_git_history) }).Count
+        HISTORICAL_DEAD_AUTHORITY               = 0
+        SECRET_AUTHORITY_BLOCKED                = ($Findings.Count -gt 0)
+        classifier                              = 'UNAVAILABLE_FAILED_CLOSED'
+    }
+
+    $python = (Get-Command 'python' -ErrorAction SilentlyContinue)
+    $module = Join-Path $RepoRoot 'scripts\r5_developer_hermes\retired_authority.py'
+    if (-not $python -or -not (Test-Path -LiteralPath $module)) {
+        Add-Blocker 'SECRET_CLASSIFIER_UNAVAILABLE' 'Cannot run retired_authority.py (python or module missing), so every secret-class finding stays classified as live authority.'
+        return $fallback
+    }
+
+    $dir = Join-Path $RepoRoot '.r5-dev\artifacts'
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    $inPath  = Join-Path $dir 'secret_findings.json'
+    $outPath = Join-Path $dir 'secret_authority_classification.json'
+
+    # Windows PowerShell collapses a single-element array and serialises a
+    # comma-wrapped one as {"value":[...],"Count":n}. Both shapes would reach
+    # the classifier as "no findings", so build the array text explicitly.
+    $items = @($Findings | ForEach-Object { $_ | ConvertTo-Json -Depth 6 -Compress })
+    Set-Content -LiteralPath $inPath -Value ('[' + ($items -join ',') + ']') -Encoding UTF8
+    & $python.Source $module --findings $inPath --out $outPath *> $null
+
+    if (-not (Test-Path -LiteralPath $outPath)) {
+        Add-Blocker 'SECRET_CLASSIFIER_FAILED' 'retired_authority.py produced no classification, so every secret-class finding stays classified as live authority.'
+        return $fallback
+    }
+    try {
+        return (Get-Content -LiteralPath $outPath -Raw | ConvertFrom-Json)
+    } catch {
+        Add-Blocker 'SECRET_CLASSIFIER_UNREADABLE' "Cannot parse the classification ($($_.Exception.GetType().Name)); findings stay classified as live authority."
+        return $fallback
+    }
 }
-if ($historySecrets.Count -gt 0) {
-    Add-Blocker 'SECRETS_IN_GIT_HISTORY' "$($historySecrets.Count) secret-class file(s) are reachable through git object storage. Denying read on the working-tree file does not close this, and denying read on .git would destroy the required GIT capability. Rotation is the only fix that holds."
+
+$classification = Invoke-SecretAuthorityClassifier -Findings @($secretFindings)
+
+# A classification that silently covers fewer findings than were scanned would
+# read as "clean". Treat any shortfall as unresolved authority.
+$classifiedCount = @($classification.entries).Count
+if ($classifiedCount -ne @($secretFindings).Count) {
+    Add-Blocker 'SECRET_CLASSIFICATION_INCOMPLETE' "The scan found $(@($secretFindings).Count) secret-class file(s) but the classifier returned $classifiedCount verdict(s). Unclassified findings are treated as live authority."
+}
+
+$activeSecretFiles   = [int]$classification.ACTIVE_WORKSPACE_SECRET_FILES
+$unresolvedAuthority = [int]$classification.UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY
+$deadAuthority       = [int]$classification.HISTORICAL_DEAD_AUTHORITY
+
+if ($activeSecretFiles -gt 0) {
+    Add-Blocker 'ACTIVE_WORKSPACE_SECRET_FILES' "$activeSecretFiles secret-class file(s) still hold content inside the workspace roots that $AccountName must be able to write. Relocate them to the host-only secret root; no OS boundary can hide a file in a tree the principal writes."
+}
+if ($unresolvedAuthority -gt 0) {
+    Add-Blocker 'UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY' "$unresolvedAuthority secret-class file(s) are reachable through git object storage with live or unknown authority. Denying read on the working-tree file does not close this, and denying read on .git would destroy the required GIT capability. Rotate the credential, or record verifiable retirement evidence."
+}
+foreach ($entry in @($classification.entries)) {
+    if ($entry.verdict -eq 'PROVEN_RETIRED_SECRET_AUTHORITY') {
+        Add-Warning 'HISTORICAL_DEAD_AUTHORITY' "$($entry.relative_path) remains in git history but its authority is proven retired ($($entry.authority_target)). Informational: it is not a security blocker while the evidence contract holds."
+    }
 }
 
 # ------------------------------------------------- 5. account / elevation state
@@ -443,6 +653,47 @@ if (-not $hostSecretFacts.root_exists) {
     Add-Warning 'HOST_SECRET_ROOT_ABSENT' "$HostSecretRoot does not exist yet. Run bootstrap-host-secrets.ps1 before relying on relocation."
 }
 
+# Reachability is decided by the ACL, so it can be answered before the account
+# exists: a root with no broad allow and no principal allow is out of reach.
+function Test-AnyAllowFor {
+    param([string]$Path, [string[]]$Sids)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { $acl = Get-Acl -LiteralPath $Path } catch { return $null }
+    foreach ($ace in $acl.Access) {
+        if ($ace.AccessControlType -ne 'Allow') { continue }
+        $sid = try { $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { continue }
+        if ($sid -in $Sids) { return $true }
+    }
+    return $false
+}
+
+$broadSids = @($SID_USERS, $SID_AUTH_USERS, $SID_EVERYONE)
+$secretRootSids = if ($principalSidForAcl) { $broadSids + @($principalSidForAcl) } else { $broadSids }
+$secretRootAllow = Test-AnyAllowFor -Path $HostSecretRoot -Sids $secretRootSids
+$hostSecretFacts.principal_or_broad_allow = $secretRootAllow
+$hostSecretRootReachable = switch ($secretRootAllow) {
+    $true   { 'YES' }
+    $false  { 'NO' }
+    default { 'NOT_PROVEN' }
+}
+$hostSecretFacts.reachable_by_principal = $hostSecretRootReachable
+if ($hostSecretRootReachable -eq 'YES') {
+    Add-Blocker 'HOST_ONLY_SECRET_ROOT_REACHABLE' "$HostSecretRoot carries an allow ACE for a group $AccountName belongs to (or for the account itself). The relocation gains nothing while that stands."
+} elseif ($hostSecretRootReachable -eq 'NOT_PROVEN') {
+    Add-Blocker 'HOST_ONLY_SECRET_ROOT_NOT_PROVEN' "Cannot read the ACL of $HostSecretRoot, so its unreachability is unproven."
+}
+
+$hostProfileRoot = (Resolve-Path -LiteralPath $env:USERPROFILE).Path
+$hostProfileAllow = Test-AnyAllowFor -Path $hostProfileRoot -Sids $secretRootSids
+$hostProfileReadDesign = switch ($hostProfileAllow) {
+    $true   { 'YES' }
+    $false  { 'NO' }
+    default { 'NOT_PROVEN' }
+}
+if ($hostProfileReadDesign -ne 'NO') {
+    Add-Blocker 'HOST_PROFILE_READABLE_BY_DESIGN' "$hostProfileRoot does not provably exclude $AccountName (allow-for-broad-group = $hostProfileAllow). Do not widen this; the default profile ACL is what carries the boundary."
+}
+
 # A relocation that leaves a link behind restores exactly the reachability it
 # was meant to remove, so the origins are checked for reparse points.
 $relocationOrigins = @(
@@ -460,20 +711,77 @@ foreach ($origin in $relocationOrigins) {
     }
 }
 
+# ------------------------------------------------------- 9. authority gates
+#
+# A READY result must mean the intended authority boundary, not merely that
+# explicit workspace ACEs could be added. Each gate is derived from evidence
+# collected above and fails closed.
+
+$workspaceDesign = @{}
+foreach ($root in $WorkspaceRoots) {
+    $verdict = 'YES'
+    $detail  = 'grantable: local fixed NTFS, no inherited deny in the way'
+    if (-not (Test-Path -LiteralPath $root)) {
+        $verdict = 'NO'; $detail = 'workspace root does not exist'
+    } elseif ($driveFacts[$root].drive_type -ne 'LOCAL_FIXED' -or $driveFacts[$root].is_subst -or $driveFacts[$root].file_system -ne 'NTFS') {
+        $verdict = 'NO'; $detail = "unsuitable volume ($($driveFacts[$root].drive_type)/$($driveFacts[$root].file_system), subst=$($driveFacts[$root].is_subst))"
+    } else {
+        $volume = ($root -split ':')[0] + ':\'
+        $inheritedDeny = ($volumeAuthority.ContainsKey($volume) -and $volumeAuthority[$volume].principal_write_denied -eq $true)
+        $protectedDacl = $false
+        try { $protectedDacl = (Get-Acl -LiteralPath $root).AreAccessRulesProtected } catch { }
+        if ($inheritedDeny -and -not $protectedDacl) {
+            $verdict = 'NO'; $detail = "inherited write-deny from $volume would defeat the grant; protect this DACL instead"
+        }
+    }
+    $workspaceDesign[$root] = [ordered]@{ root = $root; rw_design = $verdict; detail = $detail }
+}
+
+$orderedRoots = @($WorkspaceRoots)
+$repoARwDesign = if ($orderedRoots.Count -ge 1) { $workspaceDesign[$orderedRoots[0]].rw_design } else { 'NO' }
+$repoBRwDesign = if ($orderedRoots.Count -ge 2) { $workspaceDesign[$orderedRoots[1]].rw_design } else { 'NO' }
+
+$gates = [ordered]@{
+    ACTIVE_WORKSPACE_SECRET_FILES                 = $activeSecretFiles
+    UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY       = $unresolvedAuthority
+    HISTORICAL_DEAD_AUTHORITY                     = $deadAuthority
+    HOST_ONLY_SECRET_ROOT_REACHABLE_BY_HERMES_DEV = $hostSecretRootReachable
+    OTHER_WRITE_AUTHORITY                         = $otherWriteAuthority
+    REPO_A_RW_DESIGN                              = $repoARwDesign
+    REPO_B_RW_DESIGN                              = $repoBRwDesign
+    HOST_PROFILE_READ_DESIGN                      = $hostProfileReadDesign
+    R5_MINIMUM_TOOLCHAIN                          = if ($toolFacts['uv'].scope -eq 'SYSTEM_WIDE' -and $toolFacts['python'].scope -eq 'SYSTEM_WIDE' -and $toolFacts['git'].scope -eq 'SYSTEM_WIDE') { 'AVAILABLE' } else { 'INCOMPLETE' }
+}
+
+$gatesPassed = (
+    $gates.ACTIVE_WORKSPACE_SECRET_FILES -eq 0 -and
+    $gates.UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY -eq 0 -and
+    $gates.HOST_ONLY_SECRET_ROOT_REACHABLE_BY_HERMES_DEV -eq 'NO' -and
+    $gates.OTHER_WRITE_AUTHORITY -eq 'NO' -and
+    $gates.REPO_A_RW_DESIGN -eq 'YES' -and
+    $gates.REPO_B_RW_DESIGN -eq 'YES' -and
+    $gates.HOST_PROFILE_READ_DESIGN -eq 'NO' -and
+    $gates.R5_MINIMUM_TOOLCHAIN -eq 'AVAILABLE'
+)
+
 # ------------------------------------------------------------------ report
 
 $report = [ordered]@{
-    schema                   = 'r5.principal_preflight.v1'
+    schema                   = 'r5.principal_preflight.v2'
     generated_utc            = (Get-Date).ToUniversalTime().ToString('o')
     repo_root                = $RepoRoot
     account                  = $accountFacts
     workspace_roots          = $WorkspaceRoots
     drives                   = $driveFacts
     workspace_acls           = $aclFacts
-    volume_root_grants       = $volumeGrants
+    scoped_workspace_root    = $ScopedWorkspaceRoot
+    volume_authority         = $volumeAuthority
+    other_write_offenders    = @($otherWriteOffenders | Select-Object -Unique)
+    workspace_rw_design      = $workspaceDesign
     toolchain                = $toolFacts
     pinned_runtime           = $runtimeFacts
     in_workspace_secret_files = @($secretFindings)
+    secret_authority         = $classification
     host_secret_layout       = $hostSecretFacts
     workspace_links_into_secret_root = @($linkFindings)
     host_credential_stores   = $storeFacts
@@ -481,13 +789,17 @@ $report = [ordered]@{
     host_profile_sentinel    = $sentinelFacts
     warnings                 = @($warnings)
     blockers                 = @($blockers)
-    PREFLIGHT_RESULT         = if ($blockers.Count -eq 0) { 'READY_FOR_PROVISIONING' } else { 'BLOCKED' }
+    gates                    = $gates
+    PREFLIGHT_RESULT         = if ($blockers.Count -eq 0 -and $gatesPassed) { 'READY_FOR_PROVISIONING' } else { 'BLOCKED' }
 }
 
 $artifactDir = Split-Path $ArtifactPath -Parent
 if (-not (Test-Path -LiteralPath $artifactDir)) { New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null }
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ArtifactPath -Encoding UTF8
 
+Write-Host ''
+Write-Host '--- authority gates ---'
+foreach ($key in $gates.Keys) { Write-Host ("{0,-46} = {1}" -f $key, $gates[$key]) }
 Write-Host ''
 Write-Host "PREFLIGHT_RESULT = $($report.PREFLIGHT_RESULT)"
 Write-Host "artifact         = $ArtifactPath"

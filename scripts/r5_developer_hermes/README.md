@@ -81,6 +81,10 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap-host-secrets.ps1 -Relocate
 powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1 -WhatIf
 powershell -ExecutionPolicy Bypass -File .\provision-principal.ps1
 
+# ELEVATED: scope its write authority. Backs up every DACL first.
+powershell -ExecutionPolicy Bypass -File .\scope-workspace-authority.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\scope-workspace-authority.ps1
+
 # ordinary account again; runas prompts for the password and never caches it
 powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode verify
 powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode probes
@@ -88,6 +92,30 @@ powershell -ExecutionPolicy Bypass -File .\launch-developer-hermes.ps1 -Mode pro
 
 Do not authenticate `gh` or `railway` as `hermes-dev`, and do not copy SSH keys
 or Credential Manager state into that profile. Their absence is the boundary.
+
+## Workspace-only write authority
+
+Creating the account and granting the two repositories is not enough. Every
+local volume root on this class of host carries an inheritable `Authenticated
+Users` write ACE, so a fresh standard account inherits write across whole volumes
+before any grant exists. That ACE cannot simply be removed — in an unelevated
+token the host user's `Administrators` membership is deny-only, so it is the only
+entry giving the human write access to their own data.
+
+`scope-workspace-authority.ps1` scopes from the other side instead, adding
+nothing to any existing principal: a scoped root created with inheritance
+**disabled** (so a volume-root deny cannot reach the grants inside it), plus a
+principal-specific inheritable **write**-deny at each volume root. Read and
+execute stay intact, so no tool, service or traversal breaks.
+
+`rollback-workspace-authority.ps1` restores the DACLs from the backup the scoping
+script writes before its first mutation. Design, evidence and the ordered human
+runbook: [`hermes_r5_workspace_authority_v1.md`](../../docs/architecture/hermes_r5_workspace_authority_v1.md).
+
+`uv` must be installed machine-wide: `harness.py prepare-runtime` runs
+`uv sync --frozen`. Node and npm resolve through a symlink into the host profile
+and stay out of reach — that is also what keeps the host Railway CLI shim
+unreachable, so do not "fix" it by exposing the profile.
 
 ## Secrets must leave the workspace first
 

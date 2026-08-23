@@ -96,48 +96,60 @@ Cleared:
   principal loses the deploy CLI as a side effect of the boundary, not because
   of a stub.
 
-Open:
+### Blockers — resolved in Phase B2
 
-- `uv`, `node` and `npm` are user-profile-only, so `hermes-dev` cannot re-sync
-  the pinned venv or run the Node-based LSP. Capability limitation, not a
-  security defect.
-- `W:\` already grants `Modify` to Authenticated Users, so `hermes-dev` inherits
-  Modify across the whole volume. Explicit grants are still added so the
-  boundary survives a later tightening of the volume root.
-- Two blockers below.
+The two original blockers were secret-class files inside the tree that R5
+requires to be read/write. Both are now closed:
 
-### Blockers
+| Path (Repo B) | Was | Now |
+|---|---|---|
+| `.env` | 3796 bytes, untracked | relocated → `repo-b.env` (32 keys) |
+| `app/.env.local` | 209 bytes, untracked | relocated → `app.env` (2 keys) |
+| `scripts/mapbox/.env.local` | 179 bytes, untracked | relocated → `mapbox.env` (3 keys) |
+| `.env.pgurl` | 0 in tree, 91 in history, tracked | `PROVEN_RETIRED_SECRET_AUTHORITY` |
 
-```text
-[SECRETS_INSIDE_APPROVED_WORKSPACE]  4 files
-[SECRETS_IN_GIT_HISTORY]             1 file
-```
+The three untracked files were never committed, so moving them out of the tree
+was sufficient. The human has done that; the workspace sources no longer exist.
 
-Repo B carries secret-class files inside the tree that R5 requires to be
-read/write:
-
-| Path (Repo B) | Size | Tracked | In history | Remediation |
-|---|---|---|---|---|
-| `.env` | 3796 | no | no | relocate → `repo-b.env` |
-| `app/.env.local` | 209 | no | no | relocate → `app.env` |
-| `scripts/mapbox/.env.local` | 179 | no | no | relocate → `mapbox.env` |
-| `.env.pgurl` | 0 in tree, **91 in `HEAD`** | **yes** | **yes** (`1ee4b5f`) | rotate, then untrack |
-
-No OS-principal boundary can close this. `WORKSPACE_REPO_B_RW = YES` and
-`PRODUCTION_SECRET_FILES_REACHABLE = NO` are contradictory while a live
-credential lives inside the mounted workspace. The three untracked files were
-never committed, so moving them out of the tree is sufficient; that is the
-relocation half of the remediation.
-
-`.env.pgurl` is the different case. Its working-tree copy is now empty, but the
-tracked 91-byte blob in `1ee4b5f` is still readable — `git show HEAD:.env.pgurl`
-needs no working-tree file, a deny ACE on the file changes nothing, and denying
-read on `.git` would cost the required `GIT` capability. Rotation is the only
-mitigation that holds; untracking is hygiene that follows it. The credential
-points at the legacy `trolley.proxy.rlwy.net:47583` sandbox, not the production
-Timescale SoT.
+`.env.pgurl` was the harder case and was not solved by hiding it. Its target —
+the legacy Railway PostgreSQL sandbox, not the production Timescale SoT — was
+deleted by a human operator, and Repo-B PR #547 (merge
+`7bd3f9a09d94cfa1c26ccc9486920ec23f84699c`) removed the file from canonical
+`main`. Preflight now classifies it through a five-element evidence contract
+verified against git metadata on every run, so it reports as
+`HISTORICAL_DEAD_AUTHORITY` (informational) instead of a rotation blocker. There
+is no wholesale history-secret exemption, and every other secret-class finding
+still blocks. Details:
+[`hermes_r5_workspace_authority_v1.md`](./hermes_r5_workspace_authority_v1.md).
 
 Contents were never read; this inventory is names, sizes and git metadata only.
+
+### Blockers — remaining, both human OS actions
+
+```text
+[OTHER_WRITE_AUTHORITY_NOT_PROVEN]        C:\, D:\, W:\ grant inheritable write
+                                          to Authenticated Users
+[R5_MINIMUM_TOOLCHAIN_NOT_SYSTEM_WIDE]    uv resolves inside the host profile
+```
+
+`W:\` carries an inherit-only generic-write ACE for `Authenticated Users`, so a
+fresh standard account inherits write across the whole volume before any grant
+is made. Explicit workspace grants do not change that — which is exactly the
+mistake the earlier version of this report made. That ACE cannot simply be
+removed: the host user's `Administrators` membership is deny-only in an
+unelevated token, so it is the only entry giving the human write access to their
+own data. The design therefore scopes from the other side: a scoped workspace
+root with inheritance disabled, plus a principal-specific inheritable write-deny
+at each volume root. Read access is left intact, so nothing breaks.
+
+`uv` is a hard requirement, not a nicety: `harness.py prepare_runtime()` runs
+`uv sync --frozen`, so without a machine-wide `uv` the principal cannot rebuild
+its pinned venv. Node and npm remain profile-only and are classified
+`POST_R5_DEVELOPER_DX` — which is also what keeps the host Railway CLI shim out
+of reach, since `C:\nvm4w\nodejs` is a symlink into the host profile.
+
+Design, evidence, human runbook and rollback:
+[`hermes_r5_workspace_authority_v1.md`](./hermes_r5_workspace_authority_v1.md).
 
 ### Secret relocation and blast radius
 
@@ -269,22 +281,33 @@ Hermes warned: linked 3.38.4 is vulnerable to the WAL-reset bug and used
 
 ## Human action required
 
-Phase C cannot run until the secrets are out of the workspace *and* the
-principal exists. Creating the principal first would only produce a `FAIL` on
-the in-workspace secret checks, so the order matters:
+Steps 1–5 are done. What remains is the authority boundary itself: creating the
+principal before its write authority is scoped would only produce a `FAIL` on
+the outside-write probes, so the order matters.
 
 ```text
-1. bootstrap-host-secrets.ps1              create the host-only secret root
-2. bootstrap-host-secrets.ps1 -Relocate    move the three untracked files out
-3. run-with-host-secrets.ps1               confirm human local dev still works
-4. rotate the legacy trolley DB credential (Railway UI)
-5. untrack .env.pgurl                      Repo-B change, separate PR
-6. provision-principal.ps1                 ELEVATED; creates hermes-dev
-7. launch-developer-hermes.ps1 -Mode verify / -Mode probes
+DONE  bootstrap-host-secrets.ps1              host-only secret root created
+DONE  bootstrap-host-secrets.ps1 -Relocate    three untracked files moved out
+DONE  run-with-host-secrets.ps1               human local dev confirmed working
+DONE  legacy trolley DB service deleted       (Railway; supersedes rotation)
+DONE  .env.pgurl untracked on main            Repo-B PR #547, merged
+
+0. install uv machine-wide                    ELEVATED; R5 minimum capability
+1. provision-principal.ps1                    ELEVATED; creates hermes-dev
+2. scope-workspace-authority.ps1              ELEVATED; scoped root + write-deny
+3. clone Repo A / Repo B into the scoped root  as the host user
+4. preflight-principal.ps1 -CreateSentinel     ELEVATED; expect READY
+5. launch-developer-hermes.ps1 -Verify         Phase C property proof
 ```
 
-Exact commands, expected failures and confirmation points:
+Exact commands, expected output, acceptance criteria and the full rollback:
+[`hermes_r5_workspace_authority_v1.md`](./hermes_r5_workspace_authority_v1.md#human_runbook).
+Secret-relocation specifics remain in
 [`hermes_r5_secret_relocation_v1.md`](./hermes_r5_secret_relocation_v1.md#runbook-human-execution).
+
+Every ACL this touches is exported to `.r5-dev/acl-backups/` before the first
+mutation, and `rollback-workspace-authority.ps1` restores from that export. No
+existing ACL entry is modified or removed at any point.
 
 The password is entered interactively and never stored. Do not authenticate
 `gh` or `railway` for `hermes-dev`, and do not copy SSH keys or Credential
@@ -294,7 +317,7 @@ Manager state into it — their absence is the point.
 
 ```text
 python -m pytest tests/r5_developer_hermes -q
-32 passed
+64 passed
 ```
 
 New coverage: boundary fails closed without principal evidence; the boundary is
@@ -305,6 +328,18 @@ profile rather than hardcoded; relocation moves and never copies; no principal
 script creates a link back into the workspace; the launcher writes no value to
 disk and refuses to run as the dedicated principal; provisioning refuses to
 grant the secret root and never widens a toolchain ACL.
+
+Phase B2 added the retired-authority contract and the authority boundary: an
+unknown historical credential, a live credential, a different historical secret
+and missing or stale retirement evidence each still block, while the exact
+`.env.pgurl` contract does not; every one of the five evidence elements is proven
+load-bearing individually; the shipped evidence file is asserted to hold exactly
+one entry and no wildcard; broad volume write is a preflight blocker and every
+required gate is proven to be part of the pass expression; the scoping script
+never removes an existing ACE, backs up every DACL before mutating, denies write
+but never read, and refuses to protect a pre-existing directory; rollback
+restores only the DACL and deletes nothing; Phase C proves write isolation by
+attempting a write rather than reading an ACL.
 
 ---
 

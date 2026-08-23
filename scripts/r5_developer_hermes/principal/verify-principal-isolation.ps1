@@ -421,6 +421,71 @@ if (-not $gitWorks) {
     Add-Finding 'HIGH' 'GIT_UNAVAILABLE' "git status failed for the dedicated principal ($($gitProbe.output)). If this is a dubious-ownership refusal, the bootstrap safe.directory step did not run."
 }
 
+# ------------------------------------- H2. write authority outside the workspace
+#
+# The design claim is that the principal writes the approved roots and nothing
+# else. An ACL read states the intent; only an attempted write proves it. Every
+# probe below is expected to FAIL, and each one that succeeds is a real hole.
+
+$scopedRoot = if ($preflight -and $preflight.scoped_workspace_root) { $preflight.scoped_workspace_root } else { $null }
+$approvedPrefixes = @(@($workspaceRoots) + @($scopedRoot) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\').ToLower() })
+
+function Test-IsApproved([string]$Path) {
+    $candidate = $Path.TrimEnd('\').ToLower()
+    foreach ($prefix in $approvedPrefixes) {
+        if ($candidate -eq $prefix -or $candidate.StartsWith("$prefix\")) { return $true }
+    }
+    return $false
+}
+
+function Test-CanWrite([string]$Directory) {
+    $probe = Join-Path $Directory ".r5-authority-probe-$([guid]::NewGuid().ToString('N').Substring(0, 8)).tmp"
+    try {
+        Set-Content -LiteralPath $probe -Value 'r5' -Encoding ASCII -ErrorAction Stop
+        Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+$writeProbes = New-Object System.Collections.ArrayList
+$unexpectedWrites = New-Object System.Collections.ArrayList
+foreach ($disk in (Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction SilentlyContinue)) {
+    $volume = "$($disk.DeviceID)\"
+    $targets = @($volume) + @(
+        Get-ChildItem -LiteralPath $volume -Directory -Force -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.FullName }
+    )
+    foreach ($target in $targets) {
+        if (Test-IsApproved $target) { continue }
+        $writable = Test-CanWrite $target
+        [void]$writeProbes.Add([ordered]@{ path = $target; writable = $writable })
+        if ($writable) { [void]$unexpectedWrites.Add($target) }
+    }
+}
+
+$otherWriteAuthority = if ($unexpectedWrites.Count -gt 0) { 'YES' } else { 'NO' }
+if ($unexpectedWrites.Count -gt 0) {
+    Add-Finding 'CRITICAL' 'OTHER_WRITE_AUTHORITY_PRESENT' "The dedicated principal wrote to $($unexpectedWrites.Count) location(s) outside the approved workspace: $(($unexpectedWrites | Select-Object -First 6) -join ', '). Workspace-only write authority does not hold."
+}
+
+# ------------------------------------------- H3. R5 minimum developer toolchain
+
+$toolchainResults = @{}
+foreach ($tool in @('python', 'git', 'uv')) {
+    $command = Get-Command $tool -ErrorAction SilentlyContinue
+    $toolchainResults[$tool] = [ordered]@{
+        available = [bool]$command
+        path      = if ($command) { $command.Source } else { $null }
+    }
+}
+$toolchainComplete = -not (@($toolchainResults.Values | Where-Object { -not $_.available }).Count)
+if (-not $toolchainComplete) {
+    $missing = @($toolchainResults.Keys | Where-Object { -not $toolchainResults[$_].available })
+    Add-Finding 'HIGH' 'R5_MINIMUM_TOOLCHAIN_MISSING' "$($missing -join ', ') unavailable to the dedicated principal. harness.py prepare-runtime needs uv, python and git; do not fix this by opening the host profile."
+}
+
 # ------------------------------------------------------------------- verdict
 
 $blocking = @($findings | Where-Object { $_.severity -in @('CRITICAL', 'HIGH') })
@@ -434,6 +499,8 @@ $acceptanceMet = (
     $hostSecretReachable -eq 'NO' -and
     $secretFilesReachable -eq 'NO' -and
     $deployReachable -eq 'NO' -and
+    $otherWriteAuthority -eq 'NO' -and
+    $toolchainComplete -and
     $gitWorks -and
     @($workspaceResults.Values | Where-Object { -not $_.writable }).Count -eq 0
 )
@@ -450,6 +517,10 @@ $report = [ordered]@{
     host_only_secret_files     = @($hostSecretResults)
     in_workspace_secret_files  = @($inWorkspaceReadable)
     workspace                  = $workspaceResults
+    scoped_workspace_root      = $scopedRoot
+    outside_write_probes       = @($writeProbes)
+    unexpected_writes          = @($unexpectedWrites)
+    developer_toolchain        = $toolchainResults
     git_status_works           = $gitWorks
     findings                   = @($findings)
 
@@ -461,6 +532,8 @@ $report = [ordered]@{
     HOST_ONLY_SECRET_ROOT_REACHABLE       = $hostSecretReachable
     PRODUCTION_SECRET_FILES_REACHABLE     = $secretFilesReachable
     PRODUCTION_DEPLOY_REACHABLE           = $deployReachable
+    OTHER_WRITE_AUTHORITY                 = $otherWriteAuthority
+    R5_MINIMUM_TOOLCHAIN                  = if ($toolchainComplete) { 'AVAILABLE' } else { 'INCOMPLETE' }
     PATH_STUB_SECURITY_ROLE               = 'NONE'
     ISOLATION_ACCEPTANCE                  = if ($acceptanceMet) { 'PASS' } else { 'FAIL' }
 }
@@ -475,7 +548,8 @@ foreach ($key in @(
     'CHILD_OS_PRINCIPAL', 'HOST_PROFILE_FILESYSTEM_REACHABLE', 'RAILWAY_AUTH_REACHABLE',
     'GH_AUTH_REACHABLE', 'WINDOWS_CREDENTIAL_AUTHORITY_REACHABLE',
     'HOST_ONLY_SECRET_ROOT_REACHABLE', 'PRODUCTION_SECRET_FILES_REACHABLE',
-    'PRODUCTION_DEPLOY_REACHABLE', 'ISOLATION_ACCEPTANCE')) {
+    'PRODUCTION_DEPLOY_REACHABLE', 'OTHER_WRITE_AUTHORITY', 'R5_MINIMUM_TOOLCHAIN',
+    'ISOLATION_ACCEPTANCE')) {
     Write-Host ("{0,-40} = {1}" -f $key, $report[$key])
 }
 if ($blocking.Count -gt 0) {

@@ -223,6 +223,8 @@ def test_principal_provisioning_scripts_are_present() -> None:
         "verify-principal-isolation.ps1",
         "bootstrap-host-secrets.ps1",
         "run-with-host-secrets.ps1",
+        "scope-workspace-authority.ps1",
+        "rollback-workspace-authority.ps1",
     )
     for name in expected:
         assert (PRINCIPAL_SCRIPTS / name).is_file(), name
@@ -319,6 +321,142 @@ def test_secret_relocation_doc_carries_no_secret_values() -> None:
     doc = REPO_ROOT / "docs" / "architecture" / "hermes_r5_secret_relocation_v1.md"
     text = doc.read_text(encoding="utf-8").lower()
     for needle in ("postgres://", "postgresql://", "sk-", "sk.ey", "ghp_", "pk.ey"):
+        assert needle not in text, needle
+
+
+def test_authority_scoping_never_removes_an_existing_ace() -> None:
+    """The broad Authenticated Users grant is the host user's only write path."""
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "scope-workspace-authority.ps1")
+    assert "RemoveAccessRule" not in code
+    assert "PurgeAccessRules" not in code
+    assert "existing_ace_removed  = $false" in code
+    assert "broad_ace_modified    = $false" in code
+
+
+def test_authority_scoping_backs_up_every_dacl_before_mutating() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "scope-workspace-authority.ps1")
+    backup_at = code.index("r5.acl_backup.v1")
+    first_mutation = min(code.index("Set-Acl"), code.index("New-Item -ItemType Directory -Force -Path $ScopedWorkspaceRoot"))
+    assert backup_at < first_mutation, "the ACL backup must be captured before any mutation"
+    assert "IsInRole" in code, "ACL mutation demands an elevated session"
+
+
+def test_authority_scoping_denies_write_but_never_read() -> None:
+    """Denying read would break machine-wide tools and traversal."""
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "scope-workspace-authority.ps1")
+    assert "read_access_denied    = $false" in code
+    deny_block = code[code.index("$WRITE_DENY_RIGHTS ="):code.index("function Test-HasWriteDeny")]
+    for right in ("Write", "Delete", "ChangePermissions", "TakeOwnership"):
+        assert right in deny_block, right
+    for right in ("FullControl", "ReadData", "ReadAndExecute"):
+        assert right not in deny_block, right
+
+
+def test_authority_scoping_refuses_to_protect_a_pre_existing_directory() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "scope-workspace-authority.ps1")
+    assert "AreAccessRulesProtected" in code
+    assert "it already exists with an inheriting DACL" in code
+    # The scoped grant only survives the volume deny if inheritance is dropped.
+    assert "SetAccessRuleProtection($true, $false)" in code
+
+
+def test_rollback_restores_only_the_dacl_and_deletes_nothing() -> None:
+    path = PRINCIPAL_SCRIPTS / "rollback-workspace-authority.ps1"
+    assert path.is_file()
+    code = _powershell_code(path)
+    assert "SetSecurityDescriptorSddlForm($entry.sddl, 'Access')" in code
+    assert "Mandatory = $true" in code, "a rollback without a backup would be a guess"
+    assert "refusing to guess a prior ACL" in code
+    for line in code.splitlines():
+        if "Remove-Item" in line:
+            assert line.strip().startswith("Write-Host"), line
+
+
+def test_broad_volume_write_authority_is_a_preflight_blocker() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "preflight-principal.ps1")
+    assert "OTHER_WRITE_AUTHORITY_NOT_PROVEN" in code
+    assert "OTHER_WRITE_AUTHORITY_PRESENT" in code
+    # Explicit workspace ACLs must not be mistaken for a boundary.
+    assert "WORKSPACE_GRANT_DEFEATED_BY_INHERITED_DENY" in code
+
+
+def test_every_required_preflight_gate_is_load_bearing() -> None:
+    """A gate that is reported but not asserted would let READY lie."""
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "preflight-principal.ps1")
+    start = code.index("$gatesPassed = (")
+    gate_expression = code[start:code.index("$report = [ordered]", start)]
+    for gate in (
+        "ACTIVE_WORKSPACE_SECRET_FILES",
+        "UNRESOLVED_GIT_HISTORY_SECRET_AUTHORITY",
+        "HOST_ONLY_SECRET_ROOT_REACHABLE_BY_HERMES_DEV",
+        "OTHER_WRITE_AUTHORITY",
+        "REPO_A_RW_DESIGN",
+        "REPO_B_RW_DESIGN",
+        "HOST_PROFILE_READ_DESIGN",
+        "R5_MINIMUM_TOOLCHAIN",
+    ):
+        assert gate in gate_expression, gate
+    assert "$blockers.Count -eq 0 -and $gatesPassed" in code
+
+
+def test_preflight_classifies_history_secrets_instead_of_blanket_blocking() -> None:
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "preflight-principal.ps1")
+    assert "retired_authority.py" in code
+    # The old blanket blockers are gone, replaced by classified verdicts.
+    assert "SECRETS_IN_GIT_HISTORY" not in code
+    assert "SECRETS_INSIDE_APPROVED_WORKSPACE" not in code
+    # A classification covering fewer findings than were scanned must not read
+    # as clean, and an unavailable classifier must not either.
+    assert "SECRET_CLASSIFICATION_INCOMPLETE" in code
+    assert "UNAVAILABLE_FAILED_CLOSED" in code
+
+
+def test_no_script_offers_a_wholesale_history_secret_exemption() -> None:
+    for script in PRINCIPAL_SCRIPTS.glob("*.ps1"):
+        lowered = _powershell_code(script).lower()
+        for escape in ("ignore_git_history", "skip_history_secrets", "allow_history_secrets"):
+            assert escape not in lowered, (script.name, escape)
+
+
+def test_developer_capability_is_accounted_for_not_silently_dropped() -> None:
+    preflight = _powershell_code(PRINCIPAL_SCRIPTS / "preflight-principal.ps1")
+    verify = _powershell_code(PRINCIPAL_SCRIPTS / "verify-principal-isolation.ps1")
+
+    # uv is required (prepare-runtime runs `uv sync --frozen`), node/npm are not.
+    assert "R5_MINIMUM_TOOLCHAIN_NOT_SYSTEM_WIDE" in preflight
+    assert "POST_R5_DX_TOOL_NOT_SYSTEM_WIDE" in preflight
+    # Reaching the host copy by opening the profile is explicitly not the fix.
+    assert "do NOT open the host profile" in preflight
+    assert "R5_MINIMUM_TOOLCHAIN_MISSING" in verify
+
+
+def test_phase_c_proves_write_isolation_by_attempting_a_write() -> None:
+    """An ACL read states intent; only a failed write proves the boundary."""
+    code = _powershell_code(PRINCIPAL_SCRIPTS / "verify-principal-isolation.ps1")
+    assert "function Test-CanWrite" in code
+    assert "OTHER_WRITE_AUTHORITY_PRESENT" in code
+    assert "$otherWriteAuthority -eq 'NO' -and" in code, "the probe must gate acceptance"
+
+
+def test_workspace_authority_design_is_documented() -> None:
+    doc = REPO_ROOT / "docs" / "architecture" / "hermes_r5_workspace_authority_v1.md"
+    assert doc.is_file()
+    text = doc.read_text(encoding="utf-8")
+    for marker in (
+        "RECOMMENDED_WORKSPACE_AUTHORITY_DESIGN = DEDICATED_SCOPED_WORKSPACE",
+        "W_VOLUME_ROOT_BROAD_MODIFY = YES",
+        "HUMAN_RUNBOOK",
+        "ROLLBACK_RUNBOOK",
+        "CURRENT_PGURL_CLASSIFICATION",
+        "HISTORICAL_PGURL_CLASSIFICATION",
+    ):
+        assert marker in text, marker
+
+
+def test_workspace_authority_doc_carries_no_secret_values() -> None:
+    doc = REPO_ROOT / "docs" / "architecture" / "hermes_r5_workspace_authority_v1.md"
+    text = doc.read_text(encoding="utf-8").lower()
+    for needle in ("postgres://", "postgresql://", "sk-", "ghp_", "password ="):
         assert needle not in text, needle
 
 
