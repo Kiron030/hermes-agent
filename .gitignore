@@ -150,6 +150,9 @@ docs/superpowers/*
 # R1 isolated modern-Hermes proof (scratch homes + pinned upstream worktree)
 .r1-proof/
 
+# R5 developer instance (isolated HERMES_HOME, scratch git, optional worktree)
+.r5-dev/
+
 # Interrupted-update breadcrumb + recovery lock written next to the shared venv
 # by `hermes update` / launch-time self-heal. Runtime state, never a code change
 # — ignore so `git status` stays clean and update's autostash skips them.

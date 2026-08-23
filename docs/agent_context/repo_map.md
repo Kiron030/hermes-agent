@@ -16,6 +16,7 @@
 | Access matrix | [`ACCESS_MATRIX.md`](../../ACCESS_MATRIX.md) |
 | Stage 1 soul / runbook | `SOUL.hermes.md`, `RUNBOOK.hermes-trusted-analyst.md` |
 | Repo B allowlist | `config/powerunits_repo_b_read_allowlist.json` |
+| Developer Hermes (R5) | [`hermes_r5_developer_hermes_v1.md`](../architecture/hermes_r5_developer_hermes_v1.md) |
 
 ## Task → entry points
 
@@ -27,6 +28,7 @@
 | Powerunits operator posture | `docs/powerunits_*` | First-safe; env-gated tools |
 | Timescale bounded read | docs + tool allowlist | Not general SQL |
 | Repo B product changes | **do in Repo B** | Schemas/pipelines/API |
+| Powerful developer Hermes | `scripts/r5_developer_hermes/` | Workspace R/W, no production authority |
 
 ## Labels
 
