@@ -5,6 +5,10 @@
 **Base:** `origin/powerunits-internal-setup` @ `d7dbb7e64072659d3ebd27aaaee197c91ce3fa6c`
 **Worktree:** `W:\cache\hermes-r3` (branch `r3-shadow-comparison`, dedicated — the
 parallel R5 tree on `r5-developer-hermes` was never switched or mutated)
+**Status:** `GATE_3 = CLOSED` — the human decision of 2026-08-23 is
+`PROCEED_WITH_CONDITIONS`, recorded verbatim in §18. Sections 1–17 are the
+pre-decision analysis and are unchanged apart from the status lines §18
+supersedes.
 
 R3 measures and decides. It removes no wrapper, removes no clamp, ports no
 transport, and changes no production behaviour. Everything below is either a
@@ -525,8 +529,11 @@ R5_ISOLATION_STATUS  = PARTIAL_PENDING_ISOLATION
 ```
 
 R5 was not a blocker for constructing this comparison, and its isolation is not
-scored as a pass. If R5 closes before the human decision, §14's condition C6
-falls away; until then the caveat stands.
+scored as a pass. R5 did **not** close before the human decision, so §14.2's
+condition C6 did not fall away: it carried into the binding set as
+`C4 — DEVELOPER_HERMES_ISOLATION` (§18.3), still OPEN, recorded there as
+`PARTIAL_PENDING_HUMAN_ISOLATION`. The caveat stands, and Developer Hermes is
+**not** production-isolated today.
 
 ---
 
@@ -629,6 +636,11 @@ This is not a penalty. A 96-line domain-agnostic seam with a credible upstream
 path is a categorically different liability from 341 domain lines across 10
 shared files plus a 43-file upgrade conflict surface.
 
+The human decision (§18) settles this dimension: `ZERO_CORE_FORK` is explicitly
+**not required**, and `THIN_GENERIC_FORK` is the accepted strategy, on condition
+that the remaining one-file seam stays domain-agnostic, tested and
+upstream-near.
+
 ---
 
 ## 14. Decision
@@ -677,10 +689,20 @@ MIGRATION_RECOMMENDATION = PROCEED_WITH_CONDITIONS
 | C6 | R5 isolation must close (`DEDICATED_WINDOWS_OS_PRINCIPAL`) before the modern developer runtime is used with production authority. Operator migration does not depend on it. |
 | C7 | Telegram transport migration stays out of the bounded-read slices. |
 
+C1–C7 above are R3's *engineering* conditions — what the measurement says a
+migration would have to satisfy. They are not the binding gate. The human
+decision accepted the recommendation and reduced the binding set to four
+conditions, `C1`–`C4` in §18; the mapping between the two lists is given there.
+Where the numbering differs, §18 governs.
+
 ```text
-GATE_3 = READY_FOR_HUMAN_DECISION
-R4_READY = NO   (R4 requires a human PROCEED first)
+GATE_3 = CLOSED   (human decision 2026-08-23, §18)
+GATE_3_DECISION = PROCEED_WITH_CONDITIONS
+R4_READY = NO_PENDING_PARITY_CONDITIONS
 ```
+
+`R4_READY` is not a gate failure. The migration *strategy* is accepted; R4
+*implementation* waits on the named parity conditions in §18.
 
 ---
 
@@ -761,6 +783,147 @@ production `.env`, `app/.env.local`, `scripts/mapbox/.env.local`, `.env.pgurl` o
 host credential store was read. No live model call was required, so no human
 model smoke was requested.
 
+None of the §18.3 conditions C1–C4 was implemented, and the
+`OPERATOR_PARITY_MATRIX` slice was not started. §18 records a decision; it does
+not act on one.
+
 Changes are additive only: `tests/r3_shadow_comparison/`,
 `scripts/r3_shadow_comparison/`, `docs/architecture/evidence/`, and this
 document.
+
+---
+
+## 18. Human decision — Gate 3 closed
+
+This section is not analysis. It is the record of a **binding human decision**
+taken on the evidence in §1–§17. Where an earlier section stated a pre-decision
+status, this section supersedes it.
+
+| Field | Value |
+|---|---|
+| Decision date | 2026-08-23 |
+| Decided by | human operator (formal acceptance of the R3 evidence) |
+| Evidence under review | this document, R3 final SHA `c558918752` |
+| Base at decision time | `powerunits-internal-setup` @ `d7dbb7e64072659d3ebd27aaaee197c91ce3fa6c` |
+| Scope of the decision | migration **strategy**, not migration implementation |
+
+### 18.1 The decision
+
+```text
+MODERN_HERMES_PROOF = PASS
+MIGRATION_RECOMMENDATION = PROCEED_WITH_CONDITIONS
+FUTURE_CORE_STRATEGY = THIN_GENERIC_FORK
+GATE_3 = CLOSED
+GATE_3_DECISION = PROCEED_WITH_CONDITIONS
+R4_READY = NO_PENDING_PARITY_CONDITIONS
+NEXT_MAIN_SLICE = OPERATOR_PARITY_MATRIX
+```
+
+Two readings of this block are wrong and are ruled out explicitly:
+
+- `R4_READY = NO_PENDING_PARITY_CONDITIONS` is **not** a Gate-3 failure and not
+  a rejection. Gate 3 is closed and the recommendation is accepted. What waits
+  is R4 *implementation*, and it waits on the named parity conditions in §18.3 —
+  nothing else.
+- `ZERO_CORE_FORK` is **not required**. The human decision accepts that the
+  remaining one-file generic final-cap seam (§13 — one file, two symbols, 96
+  lines, zero domain terms) is economically acceptable, **provided** it stays
+  domain-agnostic, tested and upstream-near. `THIN_GENERIC_FORK` is therefore
+  the accepted target state, not a tolerated shortfall.
+
+### 18.2 Accepted scores and dimension verdicts
+
+The §14.1 scorecard is accepted as scored, unweighted, without adjustment:
+
+```text
+CURRENT_FORK_SCORE   = 25 / 45
+MODERN_HERMES_SCORE  = 37 / 45
+```
+
+| Dimension | Accepted verdict |
+|---|---|
+| Security | PASS |
+| Maintainability | PASS |
+| Upstream proximity | PASS |
+| Capability | PASS |
+| Performance | PASS |
+| Model cost | PASS |
+| Developer experience | PASS |
+| Correctness | **MIXED** |
+| Migration cost | **QUANTIFIED_NON_TRIVIAL** |
+
+`CORRECTNESS = MIXED` (§4.3) is accepted as-is and is **not** softened by this
+decision: 4 of 5 corpus intents answered on both sides, the methodology intent
+unported, and 2 of 4 ported operations losing fork-local derived or export
+fields. The §15 threats to validity and the R5 caveat in §5 likewise stand
+unchanged.
+
+### 18.3 Accepted conditions — all four OPEN
+
+These four are the binding condition set. All are **OPEN / pending** and all are
+owned by the **next stage**. None of them was implemented in R3, and R3 must not
+be reopened to implement them.
+
+| # | Condition | Status | Owner |
+|---|---|---|---|
+| C1 | `DOMAIN_SEMANTIC_PARITY` | OPEN | next stage |
+| C2 | `METHODOLOGY_READ_EQUIVALENT` | OPEN | next stage |
+| C3 | `OPERATOR_SURFACE_PARITY` | OPEN | next stage |
+| C4 | `DEVELOPER_HERMES_ISOLATION` | OPEN | next stage (R5 remediation) |
+
+**C1 — DOMAIN SEMANTIC PARITY.** The modern path currently loses
+operator-relevant derived fields on part of the corpus: `readiness_go`,
+`dominant_blocker`, `reason_codes` (§4.2). These must **not** be recreated as
+PowerUnits-specific logic inside Hermes core. Their proper authoritative home
+must be determined and implemented before Operator migration — preferably
+**Repo B**, where domain truth belongs.
+
+**C2 — METHODOLOGY READ EQUIVALENT.** The modern capped plugin has no safe
+equivalent for the methodology/documentation question (§3 case 5). A
+**bounded / allowlisted** methodology-read path is required before full Operator
+parity may be declared. No arbitrary filesystem path.
+
+**C3 — OPERATOR SURFACE PARITY.** 33 of 37 bounded operations remain unported
+(§10.2). All 37 are explicitly **not** required before R4. The required order of
+work is:
+
+1. derive the actual `CURRENT_OPERATOR_REQUIRED_SURFACE` from the **deployed**
+   first_safe / Telegram operator path;
+2. classify every operation as `REQUIRED_FOR_R4_PARITY`, `OPTIONAL_LATER` or
+   `WRITE_DEFERRED`;
+3. migrate the **minimum complete read-only surface** needed for R4a Telegram
+   parity, in bounded waves.
+
+**C4 — DEVELOPER HERMES ISOLATION.** R5 *capability* evidence remains valid.
+R5 *production isolation* remains `PARTIAL_PENDING_HUMAN_ISOLATION` until a
+dedicated Windows principal passes independent re-review. Developer Hermes is
+therefore **not** production-isolated today, and nothing in this document should
+be read as claiming otherwise. This does **not** invalidate the Operator
+migration decision, which does not depend on it.
+
+### 18.4 How the binding set maps onto §14.2
+
+§14.2's C1–C7 are R3's engineering conditions. The binding set above is
+narrower. The mapping, so neither list is read as contradicting the other:
+
+| §14.2 condition | Disposition under this decision |
+|---|---|
+| C1 — Option D verdict ownership | becomes binding **C1** (`DOMAIN_SEMANTIC_PARITY`) |
+| C2 — methodology path under the cap | becomes binding **C2** (`METHODOLOGY_READ_EQUIVALENT`) |
+| C3 — port the remaining 33 operations in gated slices | becomes binding **C3** (`OPERATOR_SURFACE_PARITY`), with the classification step added and all 37 explicitly not required for R4 |
+| C4 — land the cap upstream **or** accept `THIN_GENERIC_FORK` | **decided**: `THIN_GENERIC_FORK` consciously accepted (§18.1); upstreaming stays desirable, not blocking |
+| C5 — collapse the legacy first_safe clamp later, as its own slice | unchanged and **not** a Gate-3 condition; the legacy clamp stays in place for now |
+| C6 — R5 isolation must close before production authority | becomes binding **C4** (`DEVELOPER_HERMES_ISOLATION`) |
+| C7 — Telegram transport migration stays out of bounded-read slices | absorbed into **C3**'s `WRITE_DEFERRED` / `OPTIONAL_LATER` classification |
+
+### 18.5 What happens next
+
+```text
+NEXT_MAIN_SLICE = OPERATOR_PARITY_MATRIX
+NEXT_MAIN_SLICE_STATUS = NOT_STARTED
+```
+
+`OPERATOR_PARITY_MATRIX` is the C3 step-1/step-2 work: derive the deployed
+operator-required surface and classify all 37 bounded operations. It is **not
+started**, and no part of it — nor of C1, C2 or C4 — was begun in R3. R4
+implementation begins only once the parity conditions above are satisfied.
