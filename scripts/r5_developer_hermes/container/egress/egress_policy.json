@@ -1,0 +1,144 @@
+{
+  "_comment": [
+    "R5 Developer-Hermes outbound destination policy.",
+    "",
+    "This file is the human-reviewable security decision. It names the",
+    "destination CLASSES Developer Hermes may reach and the concrete hosts",
+    "in each class. Anything not listed here is denied by the broker.",
+    "",
+    "Adding a host is a security decision, not a convenience fix. A new",
+    "entry changes the egress contract hash, which changes the runtime",
+    "convergence state, which forces a deliberate broker rebuild.",
+    "",
+    "Never put credential VALUES in this file. Credentials reach the broker",
+    "through its own environment and never through policy."
+  ],
+  "schema": "r5-egress-policy-v1",
+  "policy_version": 1,
+  "default_decision": "DENY",
+  "unknown_destination_class": "DENY",
+  "allowed_ports": [80, 443],
+  "classes": {
+    "MODEL_PROVIDER": {
+      "decision": "ALLOW",
+      "approved_processor": true,
+      "content_sent": "Task context and repository source by design — inference requires it.",
+      "rationale": "Developer Hermes calls one configured inference provider. The real provider key lives in the broker only; the sandbox holds an opaque proxy token.",
+      "hosts": ["api.openai.com"]
+    },
+    "RESEARCH_PROCESSOR": {
+      "decision": "ALLOW",
+      "approved_processor": true,
+      "content_sent": "Search queries and, for extract, the URLs to fetch. The processor performs the external retrieval; the sandbox never connects to the researched site.",
+      "rationale": "The pinned runtime's real research path is upstream's keyless MCP tier (plugins/web/keyless_mcp.py). ddgs is NOT installed in /opt/hermes/.venv, so the ddgs provider reports unavailable and never runs. Exa is pinned as the entry vendor; Parallel is its immediate successor in upstream's _KEYLESS_RING and is approved so free-tier throttling degrades to a second reviewed processor instead of to no research at all.",
+      "denied_ring_vendors": {
+        "_comment": "Upstream's ring is (exa, parallel, tavily, firecrawl, keenable). The remaining three are deliberately NOT approved: two named processors already cover throttling, and each additional vendor is another party receiving our queries. Throttling past Parallel fails closed with an honest error.",
+        "hosts": ["api.tavily.com", "api.firecrawl.dev", "api.keenable.ai"]
+      },
+      "hosts": [
+        "mcp.exa.ai",
+        "search.parallel.ai"
+      ]
+    },
+    "SOURCE_CONTROL_READ": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Requests only. The sandbox holds no GitHub credential and no push authority.",
+      "rationale": "HTTPS read/fetch/clone plus release-asset and raw-content retrieval. No SSH, ever.",
+      "hosts": [
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com"
+      ]
+    },
+    "LANGUAGE_PACKAGE_REGISTRY": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Requests only. The sandbox holds no publish credential.",
+      "rationale": "PyPI metadata plus its file CDN, and the npm registry. Arbitrary package URLs on other hosts stay denied on purpose.",
+      "hosts": ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
+    },
+    "OS_PACKAGE_REGISTRY": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Requests only.",
+      "rationale": "The pinned image resolves both trixie and trixie-security through deb.debian.org over plain HTTP with GPG-signed indexes, so the broker must forward plain HTTP for this host.",
+      "hosts": ["deb.debian.org"]
+    },
+    "SUPPLY_CHAIN_SAFETY": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Package names only.",
+      "rationale": "Class exists so a vulnerability-lookup service can be approved later by review. Deliberately empty: nothing in the proven environment needs it today.",
+      "hosts": []
+    },
+    "RUNTIME_ARTIFACT": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Requests only.",
+      "rationale": "Class exists for pinned toolchain downloads. Deliberately empty: Developer Hermes runs pinned pure upstream from /opt/hermes and updates by image rebuild, not by runtime download.",
+      "hosts": []
+    },
+    "OTHER_ARBITRARY_NETWORK": {
+      "decision": "DENY",
+      "approved_processor": false,
+      "content_sent": "none",
+      "rationale": "Everything else, including raw TCP/UDP, SSH, arbitrary DNS resolvers, host and LAN addresses, and any hostname nobody approved.",
+      "hosts": []
+    }
+  },
+  "credential_mediation": {
+    "mode": "BROKER_ONLY",
+    "mechanism": "upstream iron-proxy secrets transform (proxy-token substitution)",
+    "mediated_credentials": [
+      { "env_name": "OPENAI_API_KEY", "class": "MODEL_PROVIDER" }
+    ],
+    "require_token_on_provider_hosts": false,
+    "_comment": [
+      "The sandbox receives an opaque proxy token under the provider env name.",
+      "The broker swaps it for the real credential, and only for the hosts of",
+      "the class the credential belongs to.",
+      "",
+      "require_token_on_provider_hosts is upstream's 'reject a request to an",
+      "approved provider that carries no proxy token' flag. It is off here",
+      "because iron-proxy 0.39 evaluates the secrets transform on the CONNECT",
+      "request, which by construction carries no Authorization header, so the",
+      "flag rejects every HTTPS model call before the inner request exists.",
+      "Measured, not assumed: rejected_by=secrets on CONNECT api.openai.com:443.",
+      "",
+      "What this costs: a real provider key obtained some other way could be",
+      "used against the approved provider host. That is quota abuse against an",
+      "already-approved destination, which the architecture never claimed to",
+      "prevent, and the sandbox holds no such key. What it does not cost: the",
+      "sandbox still never receives the real credential."
+    ]
+  },
+  "ssrf_deny_cidrs": [
+    "127.0.0.0/8",
+    "::1/128",
+    "169.254.0.0/16",
+    "fe80::/10",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "fc00::/7",
+    "::ffff:0:0/96",
+    "100.64.0.0/10",
+    "198.18.0.0/15"
+  ],
+  "audit": {
+    "mode": "METADATA_ONLY",
+    "recorded": ["timestamp", "destination host", "destination port", "protocol", "policy decision"],
+    "never_recorded": [
+      "request body",
+      "response body",
+      "Authorization headers",
+      "cookies",
+      "API keys",
+      "prompts",
+      "repository contents"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "Pinned identity of the R5 egress broker.",
+    "",
+    "The broker is the security boundary for outbound traffic, so nothing",
+    "about it may float. The base image is the same pinned Hermes digest the",
+    "Developer image uses, which is what makes the upstream egress component",
+    "importable without adding a second supply chain.",
+    "",
+    "iron-proxy is the official upstream Hermes egress component",
+    "(agent/proxy_sources/iron_proxy.py pins 0.39.0). We download the exact",
+    "release asset and verify it against the SHA-256 published in the",
+    "release's checksums.txt."
+  ],
+  "contract_version": "r5-egress-broker-v1",
+  "broker_image": "r5-egress-broker:v1",
+  "base_image_digest": "sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
+  "iron_proxy_version": "0.39.0",
+  "iron_proxy_asset": "iron-proxy_0.39.0_linux_amd64.tar.gz",
+  "iron_proxy_sha256": "0ab2e031074a01410caecaa2769c0b38f69cbdf4b6333bce498fe73919f6f9f6",
+  "iron_proxy_source": "https://github.com/ironsh/iron-proxy/releases/download/v0.39.0",
+  "iron_proxy_license": "Apache-2.0",
+  "upstream_pin_origin": "agent/proxy_sources/iron_proxy.py::_IRON_PROXY_VERSION in hermes-agent 0.20.5",
+  "network": {
+    "internal_network": "r5-dev-internal",
+    "internal_subnet": "172.31.240.0/28",
+    "broker_internal_ip": "172.31.240.2",
+    "egress_network": "r5-dev-egress",
+    "tunnel_port": 9090,
+    "plain_http_port": 9091,
+    "developer_external_network_attachment": "NO",
+    "broker_dual_homed": "YES"
+  },
+  "volumes": {
+    "broker_state": "r5-egress-broker-state",
+    "ca_public": "r5-egress-ca-pub",
+    "_comment_broker_home": "The pinned base image declares VOLUME /opt/data. Naming it keeps every broker recreate from stranding another anonymous volume, and lets the trust-boundary check assert by name that the broker never receives the Developer's HERMES_HOME.",
+    "broker_home": "r5-egress-broker-home"
+  }
+}

@@ -1,0 +1,44 @@
+# NON-AUTHORITATIVE EXAMPLE ONLY.
+# Canonical launch contract: docker_run_argv() in contract.py, executed by launch.py.
+# Do not `docker compose up` this file. Tests exercise docker_run_argv, not compose.
+# Sandbox infrastructure around pinned upstream Hermes. Not Hermes-core.
+name: r5-developer-hermes
+
+services:
+  developer-hermes:
+    image: r5-developer-hermes:dx-v1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: r5-developer-hermes
+    user: "0:0"
+    privileged: false
+    network_mode: bridge
+    working_dir: /workspace
+    environment:
+      HERMES_HOME: /opt/data
+      HOME: /opt/data
+      TERM: xterm
+      LANG: C.UTF-8
+      GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
+      GIT_CONFIG_NOSYSTEM: "1"
+      HERMES_DOCKER_EXEC_AS_ROOT: "1"
+      HERMES_WRITE_SAFE_ROOT: /workspace:/opt/data
+    volumes:
+      - type: volume
+        source: r5-developer-hermes-home
+        target: /opt/data
+      - type: bind
+        source: W:/hermes-dev/workspace/hermes-agent
+        target: /workspace/hermes-agent
+        read_only: false
+      - type: bind
+        source: W:/hermes-dev/workspace/EU-PP-Database
+        target: /workspace/EU-PP-Database
+        read_only: false
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  r5-developer-hermes-home:
+    name: r5-developer-hermes-home
