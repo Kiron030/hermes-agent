@@ -558,13 +558,18 @@ UPSTREAM_UPDATE_EGRESS_CHECKS =
   3. Check for new package-management behaviour executed at runtime.
   4. Check for new gateway or networking assumptions, including any newly
      required inbound port.
-  5. Re-run the full adversarial matrix in §13 against the rebuilt image.
+  5. Run class-proportionate egress evidence against the rebuilt image.
+     ROUTINE does not replay the full §13 matrix. MATERIAL re-runs only
+     the affected rows. TRUST_BOUNDARY_CHANGE proves the new path.
   6. Confirm no new raw-socket or WebSocket path bypasses the broker.
   7. Confirm the allowlist still covers everything the smoke test needs;
      a new required destination is a policy decision, not a silent addition.
 ```
 
-This feeds `R5_UPSTREAM_UPDATE_CONTRACT_XS`.
+Canonical classes, workflow, and cost policy:
+[`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)
+§ Upstream update contract. Do not reopen `R5_GATE` for ordinary
+maintenance.
 
 Two known interactions to carry forward. MCP stdio servers receive a
 filtered environment (`tools/mcp_tool.py`, `_SAFE_ENV_KEYS`) that excludes

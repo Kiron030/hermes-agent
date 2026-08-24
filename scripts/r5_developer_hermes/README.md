@@ -233,3 +233,28 @@ python -m pytest tests/r5_developer_hermes -q
 
 Delete `.r5-dev/` (or `HERMES_R5_PROOF_ROOT`). Production is untouched
 because it was never attached.
+
+## Upstream update
+
+Pin the new upstream Hermes version/digest, rebuild the Developer image,
+prove convergence, run update-class-proportionate Egress/regression
+checks, smoke the real runtime if warranted, then raise a focused PR for
+human merge without deployment.
+
+```text
+ROUTINE | MATERIAL | TRUST_BOUNDARY_CHANGE
+AUTO_MERGE                          = NO
+DEVELOPER_UPDATE_IMPLIES_DEPLOYMENT = NO
+DEFAULT_IMPLEMENTATION_MODEL        = Grok 4.6
+R5_GATE                             = CLOSED
+```
+
+Developer Hermes is the local Docker development/research runtime.
+Operator Hermes is a separate Railway runtime. Updating Developer Hermes
+is not a Railway action.
+
+Operational contract:
+[`hermes_r5_developer_dx_v1.md`](../../docs/architecture/hermes_r5_developer_dx_v1.md)
+§ Upstream update contract.
+Closeout:
+[`hermes_r5_closeout_v1.md`](../../docs/architecture/hermes_r5_closeout_v1.md).

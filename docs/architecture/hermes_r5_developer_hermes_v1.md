@@ -4,8 +4,11 @@
 **Date:** 2026-08-23  
 **Depends on:** `GATE_1 = CLOSED` (R1)  
 **Status:** developer environment only — no production mutation.
-`R5_GATE = CLOSED_PENDING_HUMAN_MERGE`. Entry point:
+`R5_GATE = CLOSED` (PR #67 human-merged). Entry point:
 [`hermes_r5_closeout_v1.md`](./hermes_r5_closeout_v1.md).
+Ordinary upstream maintenance follows the update contract in
+[`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)
+and does not reopen this gate.
 
 ```text
 SECURITY_OBJECTIVE =

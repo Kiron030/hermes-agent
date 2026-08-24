@@ -2,19 +2,21 @@
 
 **Slice:** `R5_CLOSE`  
 **Date:** 2026-08-24  
-**PR:** [#67](https://github.com/Kiron030/hermes-agent/pull/67) — open, not merged  
-**Status:** `R5_GATE = CLOSED_PENDING_HUMAN_MERGE`
+**PR:** [#67](https://github.com/Kiron030/hermes-agent/pull/67) — human-merged into `powerunits-internal-setup` on 2026-08-24  
+**Status:** `R5_GATE = CLOSED`
 
 This is the single entry point for the closed R5 architecture/security
 milestone. Detailed reasoning stays in the linked docs. Future agents must
 not need chat transcripts. Machine-specific proof stays in
-`.r5-dev/artifacts/` (gitignored).
+`.r5-dev/artifacts/` (gitignored). Ordinary upstream maintenance follows
+the update contract and does **not** reopen this gate.
 
 ```text
 R5_CLOSE                         = PASS
+R5_GATE                          = CLOSED
 R5_EGRESS_VERIFIED               = YES
-R5_CLOSE_READY                   = YES
-PR_67_MERGE_RECOMMENDATION       = MERGE
+PR_67                            = HUMAN_MERGED
+UPSTREAM_UPDATE_CONTRACT         = ESTABLISHED
 ```
 
 Pinned runtime at closeout:
@@ -39,7 +41,16 @@ Developer Hermes =
   + PERSISTENT ISOLATED HERMES_HOME
   + ENFORCED EGRESS BROKER
   + NO PRODUCTION AUTHORITY
+  = LOCAL DOCKER DEVELOPMENT / RESEARCH RUNTIME
+
+Operator Hermes =
+  SEPARATE RAILWAY RUNTIME / SERVICE
 ```
+
+Developer Hermes remains a local Docker development/research agent. It
+does not need deployment. Operator Hermes is a different trust and
+capability model. Developer-Hermes-only maintenance must not implicitly
+require or trigger an Operator/Railway deployment.
 
 | Boundary | Mechanism | Authority |
 |---|---|---|
@@ -178,42 +189,33 @@ historical early-slice report, not current gate status.
 
 ---
 
-## 6. Upstream-update handoff
+## 6. Upstream-update contract
 
 ```text
-UPSTREAM_UPDATE_HANDOFF_READY = YES
+UPSTREAM_UPDATE_CONTRACT         = ESTABLISHED
+R5_REOPENED_BY_ROUTINE_UPDATE    = NO
 ```
 
-This is **not** the updater. The next slice
-(`R5_UPSTREAM_UPDATE_CONTRACT_XS`) must use these already-proven
-foundations:
+The post-merge update contract is established. Routine upstream Hermes
+maintenance uses the already-proven foundations and does **not** reopen
+`R5_GATE`. Reopen R5 only on a new material regression or a new
+trust-boundary change.
+
+Foundations that stay load-bearing:
 
 - pinned upstream digest (`pin.json`); no floating tags; never `docker pull latest`
 - image-input fingerprint + image labels + running-image convergence
 - egress policy contract + egress-policy hash/convergence
-- R5 regression suite
+- class-proportionate R5 regression (not a full historical replay by default)
 - real Hermes smoke when an upstream change materially affects runtime behavior
 
-Future update flow:
-
-```text
-discover release
-  -> verify tag / SHA / digest
-  -> inspect security/network changes
-  -> update pin
-  -> rebuild
-  -> convergence proof
-  -> regression
-  -> egress tests
-  -> bounded real Hermes smoke where required
-  -> PR
-  -> human merge
-```
-
-Network-review checklist and state machine:
+Canonical classification, cost policy, and operational sequence:
 [`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)
-§ Upstream update state machine.
-Egress-specific update checks:
+§ Upstream update contract.
+Runbook one-liner:
+[`scripts/r5_developer_hermes/README.md`](../../scripts/r5_developer_hermes/README.md)
+§ Upstream update.
+Egress-specific checks remain
 [`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md) §14.
 
 ---
@@ -224,10 +226,11 @@ Egress-specific update checks:
 POST_R5_ROADMAP_DOCUMENTED = YES
 ```
 
-Immediate canonical sequence. Do **not** implement these in the closeout.
+Immediate canonical sequence. Items 1–2 are done. Do **not** implement
+the remainder from this document.
 
-1. R5 human merge (PR #67)
-2. `R5_UPSTREAM_UPDATE_CONTRACT_XS`
+1. R5 human merge (PR #67) — done 2026-08-24
+2. Post-merge upstream update contract — established
 3. Desktop container integration
 4. Bot Mode / Telegram integration
 5. Model routing
