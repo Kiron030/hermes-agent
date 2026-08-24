@@ -137,7 +137,9 @@ R5 intentionally preserves:
 - GitHub HTTPS read
 
 No remote push. No production authority. No Docker daemon authority inside
-the sandbox. Desktop, Bot Mode, and model routing remain unimplemented.
+the sandbox. Official Desktop is inbound UI transport only
+(`OFFICIAL_REMOTE_GATEWAY`). Bot Mode and model routing remain
+unimplemented.
 
 ---
 
@@ -231,7 +233,8 @@ the remainder from this document.
 
 1. R5 human merge (PR #67) — done 2026-08-24
 2. Post-merge upstream update contract — established
-3. Desktop container integration
+3. Desktop container integration — first functional slice (official
+   Remote Gateway + localhost sidecar; Developer container unchanged)
 4. Bot Mode / Telegram integration
 5. Model routing
 6. PowerUnits-specific Developer-Hermes Skills / Memory / operating model
@@ -245,10 +248,10 @@ Sol       = explicit difficult-task escalation
 future    = approved OpenRouter/free models, then local open-weight models
 ```
 
-Desktop and Bot Mode remain `NEEDS_REMEDIATION`. Transport constraint for
-Desktop: the Developer container stays on the internal network; a future
-localhost-only authenticated sidecar is the dual-homed party, not the
-sandbox itself. See
+Desktop is `OFFICIAL_REMOTE_GATEWAY`. Bot Mode remains
+`NEEDS_REMEDIATION`. Transport constraint: the Developer container stays
+on the internal network; the localhost-only authenticated sidecar is the
+dual-homed party, not the sandbox itself. See
 [`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md) §15.
 
 This Developer-Hermes sequence is independent of the Stage-1 operator

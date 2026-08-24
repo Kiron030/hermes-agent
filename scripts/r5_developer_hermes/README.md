@@ -87,9 +87,18 @@ python scripts/r5_developer_hermes/harness.py all
 python scripts/r5_developer_hermes/container/launch.py plan
 python scripts/r5_developer_hermes/container/launch.py prove
 python scripts/r5_developer_hermes/container/launch.py prove-dx
+python scripts/r5_developer_hermes/container/launch.py desktop-up
+python scripts/r5_developer_hermes/container/launch.py prove-desktop
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
 ```
+
+Official Desktop (unchanged) uses Remote Gateway
+`http://127.0.0.1:19119`. Credentials are minted once at
+`W:\hermes-dev\credentials\developer-hermes-desktop.env` and are never
+mounted. The Developer container stays on the internal network; a
+localhost sidecar publishes the loopback port.
 
 Egress:
 

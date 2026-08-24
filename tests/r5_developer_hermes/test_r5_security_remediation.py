@@ -66,7 +66,7 @@ def test_developer_runtime_is_pinned_pure_upstream_not_operator_cap() -> None:
     # enforced by the egress broker, so the contract must no longer describe it
     # as pending.
     assert R5_F06_STATUS == "ENFORCED_EGRESS_POLICY"
-    assert DESKTOP_CONTAINER_COMPATIBILITY == "NEEDS_REMEDIATION"
+    assert DESKTOP_CONTAINER_COMPATIBILITY == "OFFICIAL_REMOTE_GATEWAY"
     assert BOT_MODE_CONTAINER_COMPATIBILITY == "NEEDS_REMEDIATION"
     assert GIT_HOOKS_POSTURE == "CONTAINED_CODE_EXECUTION"
     assert LINUX_CAPABILITY_HARDENING == "DEFERRED_WITH_RATIONALE"

@@ -43,7 +43,7 @@ RESET_DEVELOPER_HERMES_HOME      = launch-developer-hermes.ps1 -Mode reset
 LINUX_CAPABILITY_HARDENING       = DEFERRED_WITH_RATIONALE
 R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
 EGRESS_MODE                      = PRIVATE_DEVELOPER_EGRESS_ENFORCED (or OFFLINE)
-DESKTOP_CONTAINER_COMPATIBILITY  = NEEDS_REMEDIATION
+DESKTOP_CONTAINER_COMPATIBILITY  = OFFICIAL_REMOTE_GATEWAY
 BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 ```
 
@@ -259,13 +259,22 @@ reach the two approved repo mounts without widening host paths.
 ## Desktop / Bot Mode
 
 ```text
-DESKTOP_CONTAINER_COMPATIBILITY  = NEEDS_REMEDIATION
+DESKTOP_CONTAINER_COMPATIBILITY  = OFFICIAL_REMOTE_GATEWAY
 BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 MODEL_ROUTING_CONFIGURABLE_WITHOUT_CORE_FORK = YES
+WINDOWS_COMPUTER_USE_ENABLED     = NO
 ```
 
-Not implemented in this slice. Inventory only: Desktop can later act as a
-remote-gateway control surface; Bot Mode can later run headlessly via
-outbound platform polling. Do not widen mounts or publish ports for those
-features here. Future routing intent remains Terra default, Luna
-cheap/auxiliary, Sol explicit escalation.
+Official Hermes Desktop (unchanged) connects as a Remote Gateway client to
+`http://127.0.0.1:19119`. The Developer container stays on the internal
+Docker network. A localhost-only authenticated sidecar is the dual-homed
+party. Credentials live in
+`W:\hermes-dev\credentials\developer-hermes-desktop.env` and are never
+mounted. Do not install a second Hermes runtime on Windows and do not
+enable Computer Use. Bot Mode remains unimplemented. Future routing
+intent remains Terra default, Luna cheap/auxiliary, Sol explicit
+escalation.
+
+```powershell
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop
+```
