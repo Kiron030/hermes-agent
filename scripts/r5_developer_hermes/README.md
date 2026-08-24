@@ -62,6 +62,8 @@ python scripts/r5_developer_hermes/harness.py authority-proof
 python scripts/r5_developer_hermes/harness.py developer-probes
 python scripts/r5_developer_hermes/harness.py all
 python scripts/r5_developer_hermes/container/launch.py prove
+python scripts/r5_developer_hermes/container/launch.py prove-dx
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1
 ```
 
 `prepare-runtime` reuses a matching R1 upstream worktree/venv when present.

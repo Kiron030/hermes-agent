@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!entrypoint.sh
+!seed_home.py
+!skills/
+!skills/**/*

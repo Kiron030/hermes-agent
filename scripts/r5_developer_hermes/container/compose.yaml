@@ -4,19 +4,28 @@ name: r5-developer-hermes
 
 services:
   developer-hermes:
-    image: nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+    image: r5-developer-hermes:dx-v1
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: r5-developer-hermes
+    user: "0:0"
     privileged: false
     network_mode: bridge
     working_dir: /workspace
-    entrypoint: ["/bin/bash", "-lc"]
-    command: ["mkdir -p /tmp/r5-hermes-home /workspace && exec sleep infinity"]
     environment:
-      HERMES_HOME: /tmp/r5-hermes-home
-      HOME: /tmp/r5-hermes-home
+      HERMES_HOME: /opt/data
+      HOME: /opt/data
       TERM: xterm
       LANG: C.UTF-8
+      GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
+      GIT_CONFIG_NOSYSTEM: "1"
+      HERMES_DOCKER_EXEC_AS_ROOT: "1"
+      HERMES_WRITE_SAFE_ROOT: /workspace:/opt/data
     volumes:
+      - type: volume
+        source: r5-developer-hermes-home
+        target: /opt/data
       - type: bind
         source: W:/hermes-dev/workspace/hermes-agent
         target: /workspace/hermes-agent
@@ -25,7 +34,9 @@ services:
         source: W:/hermes-dev/workspace/EU-PP-Database
         target: /workspace/EU-PP-Database
         read_only: false
-    tmpfs:
-      - /opt/data:rw,noexec,nosuid,size=64m
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  r5-developer-hermes-home:
+    name: r5-developer-hermes-home

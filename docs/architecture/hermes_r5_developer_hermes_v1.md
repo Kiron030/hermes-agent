@@ -27,6 +27,8 @@ workspace_acl_script_role   = FALLBACK_ONLY
 ```
 
 Empirical Linux-container proof: [`hermes_r5_container_boundary_v1.md`](./hermes_r5_container_boundary_v1.md).
+Developer DX (persistent home, fullstack tooling, one-command launch):
+[`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md).
 The dedicated `hermes-dev` account and `scope-workspace-authority.ps1` remain
 defense in depth. Do not run the ACL script against `C:\`, `D:\`, or `W:\`.
 

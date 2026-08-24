@@ -28,7 +28,10 @@ filesystems stay outside the mount set.
 
 `W:\Workbench\...` is not the Developer-Hermes runtime workspace.
 
-`HERMES_HOME` is container-local: `/tmp/r5-hermes-home`.
+`HERMES_HOME` started as disposable `/tmp/r5-hermes-home` for the boundary
+proof. Developer DX persists it on the named volume
+`r5-developer-hermes-home` at `/opt/data`. See
+[`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md).
 
 ## Launcher
 

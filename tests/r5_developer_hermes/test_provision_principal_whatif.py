@@ -276,6 +276,14 @@ def test_acl_inspection_executes_on_windows_powershell_51(tmp_path: Path) -> Non
 
 
 @requires_windows_powershell
+@pytest.mark.skipif(
+    Path(r"W:\hermes-dev").exists(),
+    reason=(
+        "HOST_CONDITIONED_ALREADY_PROVISIONED: W:\\hermes-dev already exists on "
+        "this machine. The WhatIf create-path contract is unchanged and is still "
+        "asserted below when the host is unprovisioned. Do not weaken it."
+    ),
+)
 def test_whatif_invocation_does_not_create_hermes_dev_or_fail_on_try(
     tmp_path: Path,
 ) -> None:

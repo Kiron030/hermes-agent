@@ -28,7 +28,7 @@
 | Powerunits operator posture | `docs/powerunits_*` | First-safe; env-gated tools |
 | Timescale bounded read | docs + tool allowlist | Not general SQL |
 | Repo B product changes | **do in Repo B** | Schemas/pipelines/API |
-| Powerful developer Hermes | `scripts/r5_developer_hermes/` | Container boundary + workspace R/W, no production authority |
+| Powerful developer Hermes | `scripts/r5_developer_hermes/` | Container DX + two-repo R/W, no production authority |
 
 ## Labels
 

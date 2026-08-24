@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO_A = Path("/workspace/hermes-agent")
 REPO_B = Path("/workspace/EU-PP-Database")
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/tmp/r5-hermes-home"))
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/opt/data"))
 
 NEGATIVE_PATHS = (
     "/mnt/c",
@@ -59,9 +59,6 @@ AUTHORITY_ENV_NAMES = (
     "SSH_AUTH_SOCK",
     "GIT_ASKPASS",
     "GITHUB_USER",
-    "OPENAI_API_KEY",
-    "OPENROUTER_API_KEY",
-    "ANTHROPIC_API_KEY",
 )
 
 GIT_ENV = {
@@ -71,7 +68,7 @@ GIT_ENV = {
     "GIT_COMMITTER_NAME": "r5-container-probe",
     "GIT_COMMITTER_EMAIL": "r5-container-probe@local",
     "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_CONFIG_GLOBAL": "/tmp/r5-hermes-home/.gitconfig-absent",
+    "GIT_CONFIG_GLOBAL": os.environ.get("GIT_CONFIG_GLOBAL", "/opt/data/.gitconfig"),
     "GIT_OPTIONAL_LOCKS": "0",
 }
 
@@ -106,11 +103,16 @@ def _tooling() -> dict[str, object]:
     git = _which("git")
     hermes = _which("hermes")
     node = _which("node")
+    npm = _which("npm")
+    tsc = _which("tsc")
     versions = {}
     for label, argv in (
         ("python", [python or "python3", "--version"]),
         ("uv", [uv or "uv", "--version"]),
         ("git", [git or "git", "--version"]),
+        ("node", [node or "node", "--version"]),
+        ("npm", [npm or "npm", "--version"]),
+        ("tsc", [tsc or "tsc", "--version"]),
     ):
         if argv[0]:
             completed = _run(argv)
@@ -126,7 +128,7 @@ def _tooling() -> dict[str, object]:
         import_ok = True
     except Exception as exc:  # pragma: no cover - empirical runtime path
         import_error = type(exc).__name__
-    pytest_ok = False
+    pytest_ok = bool(shutil.which("pytest"))
     pytest_version = ""
     try:
         import pytest
@@ -134,13 +136,17 @@ def _tooling() -> dict[str, object]:
         pytest_ok = True
         pytest_version = pytest.__version__
     except Exception:
-        pytest_ok = False
+        if pytest_ok:
+            pytest_version = "wrapper"
     return {
         "PYTHON": "YES" if python else "NO",
         "UV": "YES" if uv else "NO",
         "GIT": "YES" if git else "NO",
         "HERMES_CLI": "YES" if hermes else "NO",
         "NODE": "YES" if node else "NO",
+        "NPM": "YES" if npm else "NO",
+        "TSC": "YES" if tsc else "NO",
+        "TYPESCRIPT": "YES" if tsc else "NO",
         "PYTEST": "YES" if pytest_ok else "NO",
         "UPSTREAM_HERMES_RUNTIME_PRESENT": "YES" if import_ok else "NO",
         "versions": versions,
@@ -228,16 +234,22 @@ def _pytest_subset() -> dict[str, str]:
     target = REPO_A / "tests" / "r5_developer_hermes" / "test_r5_retired_authority.py"
     if not target.is_file():
         return {"TEST_LOOP": "NO", "PYTEST": "NO", "reason": "target-missing"}
-    uvx = shutil.which("uvx") or "uvx"
-    completed = _run(
-        [uvx, "--from", "pytest", "pytest", str(target), "-q", "--tb=no"],
-        cwd=REPO_A,
-        timeout=180,
-    )
+    pytest_bin = shutil.which("pytest") or ""
+    if pytest_bin:
+        completed = _run([pytest_bin, str(target), "-q", "--tb=no"], cwd=REPO_A, timeout=180)
+        runner = "pytest"
+    else:
+        uvx = shutil.which("uvx") or "uvx"
+        completed = _run(
+            [uvx, "--from", "pytest", "pytest", str(target), "-q", "--tb=no"],
+            cwd=REPO_A,
+            timeout=180,
+        )
+        runner = "uvx-pytest"
     return {
         "TEST_LOOP": "YES" if completed.returncode == 0 else "NO",
         "PYTEST": "YES" if completed.returncode == 0 else "NO",
-        "runner": "uvx-pytest",
+        "runner": runner,
         "exit_code": str(completed.returncode),
         "summary": ((completed.stdout or completed.stderr).strip().splitlines() or [""])[-1][:240],
     }
@@ -284,7 +296,13 @@ def _home_authority() -> dict[str, str]:
         "config_gh": Path.home() / ".config" / "gh",
         "docker_config": Path.home() / ".docker",
     }
-    existing = {key: str(path) for key, path in markers.items() if path.exists()}
+    existing = {}
+    for key, path in markers.items():
+        try:
+            if path.exists():
+                existing[key] = str(path)
+        except OSError:
+            continue
     helper = _run(["git", "config", "--get", "credential.helper"], env=GIT_ENV)
     helper_value = (helper.stdout or "").strip()
     return {

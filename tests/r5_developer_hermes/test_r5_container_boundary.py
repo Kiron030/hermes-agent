@@ -7,7 +7,9 @@ import json
 from r5_developer_hermes.container.contract import (
     BIND_MOUNTS,
     CONTAINER_HERMES_HOME,
+    DEVELOPER_IMAGE,
     FORBIDDEN_HOST_SOURCES,
+    HERMES_HOME_VOLUME,
     PINNED_DIGEST,
     PINNED_IMAGE,
     REPO_A_CONTAINER,
@@ -64,8 +66,8 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
     joined = " ".join(argv)
     assert argv[:3] == ["docker", "run", "--detach"]
     assert "--privileged=false" in argv
-    assert "--tmpfs" in argv
-    assert any(item.startswith("/opt/data") for item in argv)
+    assert "--tmpfs" not in argv
+    assert f"type=volume,src={HERMES_HOME_VOLUME},dst={CONTAINER_HERMES_HOME}" in argv
     assert "--network" in argv and "bridge" in argv
     assert "host" not in argv[argv.index("--network") + 1]
     assert "--pid" not in argv
@@ -73,9 +75,10 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
     assert "/var/run/docker.sock" not in joined
     assert r"\\.\pipe\docker_engine" not in joined
     assert "--entrypoint" in argv
-    assert argv[argv.index("--entrypoint") + 1] == "/bin/bash"
-    assert PINNED_IMAGE in argv
-    assert argv.count("--mount") == 2
+    assert argv[argv.index("--entrypoint") + 1] == "/opt/r5-developer/entrypoint.sh"
+    assert DEVELOPER_IMAGE in argv
+    assert PINNED_IMAGE not in argv  # derived image; pin lives in Dockerfile FROM
+    assert argv.count("--mount") == 3
     assert f"type=bind,src={BIND_MOUNTS[0][0]},dst={REPO_A_CONTAINER}" in argv
     assert f"type=bind,src={BIND_MOUNTS[1][0]},dst={REPO_B_CONTAINER}" in argv
     assert any(item == f"HERMES_HOME={CONTAINER_HERMES_HOME}" or item.endswith(
@@ -88,8 +91,10 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
 
 def test_compose_contract_matches_the_launcher() -> None:
     text = (CONTAINER_DIR / "compose.yaml").read_text(encoding="utf-8")
-    assert PINNED_IMAGE in text
-    assert PINNED_DIGEST in text
+    dockerfile = (CONTAINER_DIR / "Dockerfile").read_text(encoding="utf-8")
+    assert DEVELOPER_IMAGE in text
+    assert PINNED_IMAGE in dockerfile
+    assert PINNED_DIGEST in dockerfile
     assert "privileged: false" in text
     assert "network_mode: bridge" in text
     assert "pid: host" not in text
@@ -104,17 +109,20 @@ def test_compose_contract_matches_the_launcher() -> None:
     assert "source: W:/hermes-dev/workspace/EU-PP-Database" in text
     assert "target: /workspace/EU-PP-Database" in text
     assert text.count("type: bind") == 2
-    assert "HERMES_HOME: /tmp/r5-hermes-home" in text
+    assert "type: volume" in text
+    assert "HERMES_HOME: /opt/data" in text
     assert "/opt/data" in text
     assert "/init" not in text
 
 
 def test_container_files_add_no_hermes_core() -> None:
     names = {path.name for path in CONTAINER_DIR.iterdir()}
-    assert "Dockerfile" not in names
     assert (CONTAINER_DIR / "launch.py").is_file()
     assert (CONTAINER_DIR / "isolation_probe.py").is_file()
     assert (CONTAINER_DIR / "compose.yaml").is_file()
+    assert (CONTAINER_DIR / "Dockerfile").is_file()
+    dockerfile = (CONTAINER_DIR / "Dockerfile").read_text(encoding="utf-8")
+    assert f"FROM {PINNED_IMAGE}" in dockerfile
 
 
 def test_isolation_boundary_claims_container_only_on_proof(
