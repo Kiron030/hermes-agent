@@ -22,7 +22,7 @@
   "generic_final_toolset_cap_active": "NO",
   "repo_a_repo_b_same_trust_domain": "YES",
   "canonical_launch_contract": "docker_run_argv",
-  "r5_f06_status": "OPEN_POLICY_DECISION",
+  "r5_f06_status": "ENFORCED_EGRESS_POLICY",
   "desktop_container_compatibility": "NEEDS_REMEDIATION",
   "bot_mode_container_compatibility": "NEEDS_REMEDIATION",
   "hermes_home_mechanism": "DOCKER_NAMED_VOLUME",

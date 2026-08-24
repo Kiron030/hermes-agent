@@ -17,7 +17,7 @@ COMPOSE_FILE_ROLE                = NON_AUTHORITATIVE_EXAMPLE
 DEDICATED_CONTAINER_CLONES       = DO_NOT_EXECUTE_ON_HOST
 GIT_HOOKS                        = CONTAINED_CODE_EXECUTION
 RESET_DEVELOPER_HERMES_HOME      = launch-developer-hermes.ps1 -Mode reset
-R5_F06_STATUS                    = OPEN_POLICY_DECISION
+R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
 scope-workspace-authority.ps1    = FALLBACK_ONLY
 ```
 
@@ -134,5 +134,6 @@ file tool can edit the two approved repo mounts. Host paths stay unmounted.
 The primary boundary is the bind-source allowlist.
 
 Desktop and Bot Mode isolation are not claimed by this sandbox
-(`NEEDS_REMEDIATION`). Outbound egress policy is an open decision
-(`R5_F06_STATUS = OPEN_POLICY_DECISION`).
+(`NEEDS_REMEDIATION`). Outbound egress is enforced
+(`R5_F06_STATUS = ENFORCED_EGRESS_POLICY`). Closeout:
+[`hermes_r5_closeout_v1.md`](../../../docs/architecture/hermes_r5_closeout_v1.md).

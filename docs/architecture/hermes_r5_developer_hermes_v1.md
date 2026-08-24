@@ -3,7 +3,9 @@
 **Slice:** R5  
 **Date:** 2026-08-23  
 **Depends on:** `GATE_1 = CLOSED` (R1)  
-**Status:** developer environment only — no production mutation
+**Status:** developer environment only — no production mutation.
+`R5_GATE = CLOSED_PENDING_HUMAN_MERGE`. Entry point:
+[`hermes_r5_closeout_v1.md`](./hermes_r5_closeout_v1.md).
 
 ```text
 SECURITY_OBJECTIVE =

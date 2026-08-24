@@ -57,7 +57,7 @@ DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
 GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
 REPO_A_REPO_B_SAME_TRUST_DOMAIN  = YES
 DEDICATED_CONTAINER_CLONES       = DO_NOT_EXECUTE_ON_HOST
-R5_F06_STATUS                    = OPEN_POLICY_DECISION
+R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
 ```
 
 The container executes pinned `/opt/hermes`, not the mounted checkout.
