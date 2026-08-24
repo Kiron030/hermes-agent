@@ -7,11 +7,16 @@
 **This report does not start R2 or R3.**
 
 ```text
-R5_STATUS = PARTIAL_PENDING_ISOLATION
+R5_STATUS = CONTAINER_BOUNDARY_PROVEN
 CAPABILITY_RESULT = PASS
 GATE_1_CLOSED = YES
 SECURITY_OBJECTIVE = POWERFUL_IN_WORKSPACE / NOT_POWERFUL_IN_PRODUCTION
+ISOLATION_BOUNDARY = CONTAINER
 ```
+
+Canonical empirical container proof:
+[`hermes_r5_container_boundary_v1.md`](./hermes_r5_container_boundary_v1.md).
+The Windows principal path remains defense in depth / `FALLBACK_ONLY`.
 
 > **Isolation claim withdrawn.** An independent review disproved the original
 > `PROCESS_CONSTRUCTED_ENV` boundary on this host. The capability result stands

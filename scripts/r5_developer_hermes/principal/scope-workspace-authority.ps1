@@ -1,8 +1,11 @@
 <#
 .SYNOPSIS
-    Scopes the dedicated principal's write authority to one workspace root, by
-    creating that root with a protected DACL and denying write everywhere else
-    on the local fixed volumes.
+    FALLBACK_ONLY. Scopes the dedicated principal's write authority to one
+    workspace root, by creating that root with a protected DACL and denying
+    write everywhere else on the local fixed volumes.
+
+    The canonical R5 primary boundary is the Linux container. Do not execute
+    this script against C:\, D:\, or W:\.
 
 .DESCRIPTION
     provision-principal.ps1 is strictly additive: it grants, never removes. That

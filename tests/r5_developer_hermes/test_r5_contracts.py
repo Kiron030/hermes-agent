@@ -49,8 +49,10 @@ def test_pin_matches_r1_immutable_identities() -> None:
     assert "latest" not in pin["upstream_image_ref"]
     assert pin["approvals_mode"] == "off"
     assert pin["ordinary_workspace_approvals"] == 0
-    assert pin["isolation_boundary"] == "DEDICATED_OS_PRINCIPAL"
+    assert pin["isolation_boundary"] == "CONTAINER"
+    assert pin["isolation_boundary_fallback"] == "DEDICATED_OS_PRINCIPAL"
     assert pin["isolation_boundary_rejected"] == "PROCESS_CONSTRUCTED_ENV"
+    assert pin["workspace_acl_script_role"] == "FALLBACK_ONLY"
     assert pin["path_stub_security_role"] == "NONE"
 
 

@@ -1,0 +1,31 @@
+# Developer-Hermes container contract.
+# Sandbox infrastructure around pinned upstream Hermes. Not Hermes-core.
+name: r5-developer-hermes
+
+services:
+  developer-hermes:
+    image: nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09
+    container_name: r5-developer-hermes
+    privileged: false
+    network_mode: bridge
+    working_dir: /workspace
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["mkdir -p /tmp/r5-hermes-home /workspace && exec sleep infinity"]
+    environment:
+      HERMES_HOME: /tmp/r5-hermes-home
+      HOME: /tmp/r5-hermes-home
+      TERM: xterm
+      LANG: C.UTF-8
+    volumes:
+      - type: bind
+        source: W:/hermes-dev/workspace/hermes-agent
+        target: /workspace/hermes-agent
+        read_only: false
+      - type: bind
+        source: W:/hermes-dev/workspace/EU-PP-Database
+        target: /workspace/EU-PP-Database
+        read_only: false
+    tmpfs:
+      - /opt/data:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true

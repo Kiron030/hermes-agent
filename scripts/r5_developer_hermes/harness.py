@@ -70,6 +70,7 @@ SAFE_ENV_PASSTHROUGH = (
 DEPLOY_CLI_STUB_SECURITY_CONTROL = False
 
 PRINCIPAL_ISOLATION_ARTIFACT = "principal_isolation.json"
+CONTAINER_ISOLATION_ARTIFACT = "container_boundary.json"
 
 
 def load_pin() -> dict[str, Any]:
@@ -390,32 +391,56 @@ def principal_isolation_evidence() -> dict[str, Any] | None:
         return None
 
 
+def container_boundary_evidence() -> dict[str, Any] | None:
+    """Load the empirical Linux-container boundary proof, if any."""
+    path = artifacts_dir() / CONTAINER_ISOLATION_ARTIFACT
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def isolation_boundary_status() -> dict[str, Any]:
     """Describe the boundary honestly, and fail closed when it is unproven."""
     docker = shutil.which("docker")
     principal = os_principal_status()
+    container = container_boundary_evidence()
     evidence = principal_isolation_evidence()
-    proven = bool(
+    container_proven = bool(
+        container
+        and container.get("ISOLATION_BOUNDARY") == "CONTAINER"
+        and container.get("ISOLATION_ACCEPTANCE") == "PASS"
+    )
+    principal_proven = bool(
         evidence
         and evidence.get("CHILD_OS_PRINCIPAL") == "SEPARATE_PRINCIPAL"
         and evidence.get("ISOLATION_ACCEPTANCE") == "PASS"
     )
+    if container_proven:
+        boundary = "CONTAINER"
+    elif principal_proven:
+        boundary = "DEDICATED_OS_PRINCIPAL"
+    else:
+        boundary = "PROCESS_CONSTRUCTED_ENV"
     return {
-        "ISOLATION_BOUNDARY": "DEDICATED_OS_PRINCIPAL" if proven else "PROCESS_CONSTRUCTED_ENV",
-        "BOUNDARY_SUFFICIENT": "YES" if proven else "NO",
+        "ISOLATION_BOUNDARY": boundary,
+        "BOUNDARY_SUFFICIENT": "YES" if container_proven or principal_proven else "NO",
         "PATH_STUB_SECURITY_ROLE": "NONE",
+        "workspace_acl_script_role": "FALLBACK_ONLY",
         "docker_binary": docker,
         "docker_available": bool(docker),
-        "container_used": False,
+        "container_used": container_proven,
+        "container_evidence_present": container is not None,
         "os_principal": principal,
         "principal_evidence_present": evidence is not None,
         "note": (
-            "A constructed child environment is not an authority boundary: the "
-            "child keeps the host logon token, so it keeps host ACL rights and "
-            "any credential store discovered through the Windows known-folder "
-            "API rather than through environment variables. Isolation is "
-            "claimed only when scripts/r5_developer_hermes/principal has proven "
-            "a separate, non-administrative OS principal."
+            "The canonical R5 isolation boundary is a Linux container with an "
+            "explicit two-repository bind-mount allowlist. A constructed child "
+            "environment is not an authority boundary. The dedicated Windows "
+            "principal and scope-workspace-authority.ps1 remain defense in "
+            "depth / FALLBACK_ONLY."
         ),
     }
 

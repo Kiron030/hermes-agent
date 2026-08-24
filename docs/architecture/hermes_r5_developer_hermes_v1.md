@@ -19,11 +19,17 @@ the process does not possess production authority.
 ## Isolation boundary
 
 ```text
-ISOLATION_BOUNDARY          = DEDICATED_OS_PRINCIPAL
+ISOLATION_BOUNDARY          = CONTAINER
+ISOLATION_BOUNDARY_FALLBACK = DEDICATED_OS_PRINCIPAL
 ISOLATION_BOUNDARY_REJECTED = PROCESS_CONSTRUCTED_ENV
-DOCKER_ON_THIS_HOST         = UNAVAILABLE
 PATH_STUB_SECURITY_ROLE     = NONE
+workspace_acl_script_role   = FALLBACK_ONLY
 ```
+
+Empirical Linux-container proof: [`hermes_r5_container_boundary_v1.md`](./hermes_r5_container_boundary_v1.md).
+The dedicated `hermes-dev` account and `scope-workspace-authority.ps1` remain
+defense in depth. Do not run the ACL script against `C:\`, `D:\`, or `W:\`.
+
 
 ### Why the first boundary was withdrawn
 
@@ -44,22 +50,20 @@ boundary on this host:
 - The old proof resolved the CLI with `shutil.which` while the stub directory
   was first on PATH, so it measured its own stub rather than the host CLI.
 
-Environment absence is not authority absence. Only a different OS security
-principal changes ACL authority and credential-store discovery at once.
+Environment absence is not authority absence.
 
 ### The boundary that replaces it
 
-Developer Hermes runs as a dedicated, non-administrative local Windows
-account (`hermes-dev`) with explicit `Modify` on the two approved workspace
-roots and nothing in the host profile. The host user's Railway session, GitHub
-CLI configuration, Credential Manager entries and cloud CLI stores all sit
-under `C:\Users\<host>`, which a standard second account cannot traverse — the
-protection is a consequence of default NTFS ownership, not of an enumerated
-deny list.
+The canonical primary boundary is now a **Linux container** with an explicit
+two-repository bind-mount allowlist. Production authority is absent because
+it is not mounted, copied, or inherited. See
+[`hermes_r5_container_boundary_v1.md`](./hermes_r5_container_boundary_v1.md).
 
-Provisioning and proof scripts live in
-`scripts/r5_developer_hermes/principal/`. Docker is still not required and is
-still not installed on this host.
+The dedicated non-administrative local Windows account (`hermes-dev`) is
+kept as defense in depth. Host Railway/GitHub/cloud CLI stores still sit
+under `C:\Users\<host>`. Provisioning scripts remain in
+`scripts/r5_developer_hermes/principal/`.
+`scope-workspace-authority.ps1` is `FALLBACK_ONLY`.
 
 Pinned modern runtime (unchanged from R1):
 

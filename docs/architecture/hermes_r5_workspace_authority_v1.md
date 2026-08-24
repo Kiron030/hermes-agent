@@ -1,5 +1,10 @@
 # R5 Developer Hermes — workspace authority boundary (v1)
 
+**Disposition (2026-08-24):** the Linux container is the canonical R5
+primary isolation boundary. This document and
+`scope-workspace-authority.ps1` are `FALLBACK_ONLY`. Do not execute the
+ACL script against `C:\`, `D:\`, or `W:\`.
+
 Phase B2 of the R5 isolation remediation. Two preflight blockers stood between
 the prepared artifacts and a provisionable boundary: a historical secret that no
 longer commands anything, and a volume ACL that would hand the future principal

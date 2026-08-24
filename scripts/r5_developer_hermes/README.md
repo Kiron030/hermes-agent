@@ -14,9 +14,11 @@ the process, not "discouraged" by policy text.
 ## Isolation boundary
 
 ```text
-ISOLATION_BOUNDARY          = DEDICATED_OS_PRINCIPAL
+ISOLATION_BOUNDARY          = CONTAINER
+ISOLATION_BOUNDARY_FALLBACK = DEDICATED_OS_PRINCIPAL
 ISOLATION_BOUNDARY_REJECTED = PROCESS_CONSTRUCTED_ENV
 PATH_STUB_SECURITY_ROLE     = NONE
+workspace_acl_script_role   = FALLBACK_ONLY
 ```
 
 The developer child is still spawned with an environment **constructed** from a
@@ -26,16 +28,18 @@ review showed the child keeps the host logon token, so it keeps host ACL rights,
 and CLIs that resolve credentials through the Windows known-folder API stay
 authenticated no matter what `HOME`, `USERPROFILE` or `APPDATA` say.
 
-Isolation therefore comes from running Hermes as a **separate, non-administrative
-local account** (`hermes-dev`) that has `Modify` on the two approved workspace
-roots and no access to the host profile. See [`principal/`](./principal).
+Isolation therefore comes from a **Linux container** with an explicit
+two-repository bind-mount allowlist. See [`container/`](./container).
+The dedicated `hermes-dev` account remains defense in depth; see
+[`principal/`](./principal). `scope-workspace-authority.ps1` is
+`FALLBACK_ONLY` and must not be executed against `C:\`, `D:\`, or `W:\`.
 
 The `railway` / `vercel` PATH stubs remain only as a visible nudge for a careless
 interactive command. `SECURITY_CONTROL = NO`: they are bypassed by any absolute
 path, they live in a directory the instance can write to, and nothing in the
 authority proof may depend on them.
 
-Docker is optional and absent on this host; that does not change the above.
+Docker Desktop Linux containers are the canonical R5 primary boundary.
 
 Pinned modern runtime (from R1):
 
@@ -57,6 +61,7 @@ python scripts/r5_developer_hermes/harness.py sqlite-probe
 python scripts/r5_developer_hermes/harness.py authority-proof
 python scripts/r5_developer_hermes/harness.py developer-probes
 python scripts/r5_developer_hermes/harness.py all
+python scripts/r5_developer_hermes/container/launch.py prove
 ```
 
 `prepare-runtime` reuses a matching R1 upstream worktree/venv when present.
