@@ -93,71 +93,131 @@ Red-team findings that changed architecture belong in these docs, not only
 in old transcripts. D-01: a matching image tag is not proof that the
 running container was built from the current checked-in runtime contract.
 
-## Upstream update state machine (foundation only)
-
-This is **not** the completed upstream-update slice. A later agent must
-implement the update deterministically. Required conceptual sequence:
-
-1. Discover a candidate upstream Hermes release.
-2. Verify tag, commit, and image digest. No floating tags. Do not
-   `docker pull latest`.
-3. **Review the release for network-behavior changes** (see below).
-4. Update the canonical pin (`pin.json`, `contract.py`, Dockerfile
-   `FROM`, and `image_inputs/build_contract.json`) together.
-5. Update the approved egress policy **only where the review justified it**.
-   A new upstream default is a reason to look, never a reason to approve.
-6. Rebuild the Developer DX image *and* the egress broker through the
-   canonical launcher.
-7. Prove image-fingerprint convergence
-   (`EXPECTED_IMAGE_FINGERPRINT == RUNNING_IMAGE_FINGERPRINT`) and egress
-   convergence (`EGRESS_CONTRACT_FINGERPRINT` matches the running labels).
-8. Run baseline regression suites.
-9. Run R5 container/security suites.
-10. Run the egress adversarial suite (`launch.py prove-egress`).
-11. Run real Hermes smoke where required.
-12. Compare upstream behavior / release notes.
-13. Produce a PR.
-14. Human merge gate.
-
-### Network review checklist (step 3)
-
-An upstream update can move the egress boundary without touching a single R5
-file, because the *code that dials out* is upstream's. Before changing the
-pin, check whether the new version introduces:
-
-- new model-provider hosts, or a changed default provider
-- new web/research endpoints, or a changed vendor ring/failover order
-- new package or runtime-artifact hosts, including lazy/at-first-use downloads
-- new raw-network behavior that does not honor proxy configuration
-- new gateway, telemetry, or update-check destinations
-- a new or upgraded egress component (upstream's own `iron-proxy` pin)
-- new proxy-bypass paths, or new DNS assumptions
-
-The research path is the one that bites hardest: it is a *ring* of vendors,
-and upstream may reorder it, add a vendor, or change which one an
-unconfigured install starts on. Re-read
-`plugins/web/keyless_mcp.py` and `tools/web_tools.py::_get_backend` on every
-update, and re-check that `RESEARCH_BACKEND` in
-`scripts/r5_developer_hermes/container/egress/host.py` still names an approved
-processor. If it does not, research fails closed — safe, but broken.
-
-Two rules make this survivable rather than tedious. First, a destination the
-new version wants is not automatically approved; it goes through the same
-human policy decision as any other. Second, when a new upstream version ships
-a *better* egress mechanism than the one we pinned, record it as
-`UPSTREAM_NATIVE_REPLACEMENT_CANDIDATE` and handle it in its own slice — never
-by silently upgrading inside an unrelated change.
+## Upstream update contract
 
 ```text
-DEVELOPER_UPDATE_RUNBOOK_FOUNDATION      = YES
-UPSTREAM_UPDATE_RUNBOOK_EGRESS_INTEGRATED = YES
+UPSTREAM_UPDATE_CONTRACT                 = ESTABLISHED
+R5_GATE                                  = CLOSED
+R5_REOPENED_BY_ROUTINE_UPDATE            = NO
 NO_FLOATING_TAGS                         = YES
 DOCKER_PULL_LATEST                       = FORBIDDEN
 EGRESS_POLICY_WIDENED_BY_UPDATE          = HUMAN_DECISION_ONLY
+AUTO_MERGE                               = NO
+DEVELOPER_UPDATE_IMPLIES_DEPLOYMENT      = NO
+DEFAULT_IMPLEMENTATION_MODEL             = Grok 4.6
+GROK_FIRST                               = YES
+OPUS_ROUTINE_USAGE                       = NO
 ```
 
-Dedicated clones under `W:\hermes-dev` are container workspaces. Do not
-execute them on the host. Reset the named volume
+Pin the new upstream Hermes version/digest, rebuild the Developer image,
+prove convergence, run update-class-proportionate Egress/regression
+checks, smoke the real runtime if warranted, then raise a focused PR for
+human merge without deployment.
+
+This is the post-merge Developer-Hermes maintenance contract. It does
+not reopen R5. Developer Hermes is the local Docker
+development/research runtime; Operator Hermes is a separate Railway
+runtime. A Developer-Hermes pin/rebuild is not a Railway action and
+must not enable Auto Deploy or deploy Operator Hermes.
+
+### Update classes
+
+Classify every upstream change before gathering evidence. The class
+sets the evidence budget. Do not replay the historical R5 adversarial
+campaign on a routine pin.
+
+| Class | When | Evidence | Review |
+|---|---|---|---|
+| `ROUTINE` | Normal upstream Hermes release or the dependency refresh inherent to that pin. No new privileges, destinations, host mounts, production authority, or trust-boundary change. | Update pin/digest → rebuild → convergence → focused regression on changed areas → small real-Hermes smoke only if warranted → focused PR → human merge. | Grok-first. No broad security review. |
+| `MATERIAL` | Behavior changes enough that existing contracts need targeted re-proof, but no fundamentally new trust boundary. Examples: meaningful runtime restructuring, changed networking or tool-execution behavior, material package/install semantics, changes that affect filesystem or Egress enforcement assumptions, a major version jump with relevant architecture. | Identify the affected existing contracts. Run targeted regression/adversarial checks **only** for those contracts. Document the delta. Keep scope bounded. | Grok remains the default. No automatic broad re-audit unless evidence actually points to one. |
+| `TRUST_BOUNDARY_CHANGE` | A genuinely new high-impact capability or authority. Examples: new host filesystem access, Docker daemon access, remote Git push, production credentials or authority, arbitrary/direct Internet Egress, a new unmediated network path, a new secret-bearing execution boundary, or combining Developer-Hermes general terminal capability with production authority. | Explicit architectural review, explicit Human GO, narrowly scoped security analysis, and dedicated tests/proofs for the **new** boundary. | Only here may a narrowly scoped Opus review be considered, and only if the change genuinely warrants it. Opus is not routinely required. |
+
+An ordinary upstream version bump starts as `ROUTINE`. Promote only on
+observed evidence, not on version-number anxiety.
+
+### Deterministic workflow
+
+```text
+new upstream version / pin / digest
+  -> update checked-in inputs
+     (pin.json, contract.py, Dockerfile FROM, image_inputs/build_contract.json)
+  -> rebuild Developer DX image and egress broker via the canonical launcher
+  -> runtime convergence verification
+     CHECKED_IN_RUNTIME_CONTRACT
+     == BUILT_IMAGE_IDENTITY
+     == RUNNING_CONTAINER_IMAGE_IDENTITY
+     plus EGRESS_CONTRACT_FINGERPRINT on the running labels
+  -> Egress-aware focused regression, proportionate to the update class
+  -> small real-Hermes smoke if warranted
+  -> focused PR
+  -> human review
+  -> human merge
+```
+
+No automatic merge. No deployment. No Railway action is part of a
+Developer-Hermes update. If Railway Auto Deploy is disabled, leave it
+disabled.
+
+### Egress-aware update requirement
+
+An upstream update can move the outbound-confidentiality boundary
+without touching a single R5 file, because the *code that dials out* is
+upstream's. When relevant to the class, determine whether the new
+version changes assumptions around:
+
+- provider endpoints or the default provider
+- DNS behavior
+- package repositories, including lazy/at-first-use downloads
+- proxy semantics and TLS/proxy behavior
+- GitHub HTTPS read
+- network tooling
+- subprocess/tool execution that could bypass intended mediation
+- new gateway, telemetry, or update-check destinations
+- a new or upgraded egress component (upstream's own `iron-proxy` pin)
+
+`ROUTINE` still requires pin/rebuild/convergence and a look at release
+notes plus the checklist below when the delta could touch networking.
+It does **not** require the full historical R5 adversarial campaign.
+`MATERIAL` re-runs only the affected egress/filesystem rows.
+`TRUST_BOUNDARY_CHANGE` proves the new path.
+
+A destination the new version wants is not automatically approved; it
+goes through the same human policy decision as any other. When a new
+upstream version ships a *better* egress mechanism than the one we
+pinned, record it as `UPSTREAM_NATIVE_REPLACEMENT_CANDIDATE` and handle
+it in its own slice — never by silently upgrading inside an unrelated
+change.
+
+The research path is the one that bites hardest: it is a *ring* of
+vendors, and upstream may reorder it, add a vendor, or change which one
+an unconfigured install starts on. Re-read
+`plugins/web/keyless_mcp.py` and `tools/web_tools.py::_get_backend` when
+the class warrants it, and re-check that `RESEARCH_BACKEND` in
+`scripts/r5_developer_hermes/container/egress/host.py` still names an
+approved processor. If it does not, research fails closed — safe, but
+broken.
+
+Detail for the checklist items:
+[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md) §14.
+
+### Cost policy
+
+```text
+DEFAULT_IMPLEMENTATION_MODEL = Grok 4.6
+```
+
+Use Grok for routine implementation, documentation, update work,
+focused regression analysis, Desktop, Bot Mode, model-routing
+implementation, and small reviews.
+
+Avoid giant prompts, broad repeated security campaigns, repeatedly
+proving already-closed R5 facts, and routine Opus usage.
+
+Opus is an exception for genuinely new high-impact trust-boundary
+decisions only, and even then prompts and reviews stay narrow.
+
+Dedicated clones under `W:\hermes-dev` remain container workspaces. Do
+not execute them on the host. Reset the named volume
 `r5-developer-hermes-home` after suspected prompt injection or poisoned
 persistent state. Egress policy is decided **and enforced** — see
 [`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md).
