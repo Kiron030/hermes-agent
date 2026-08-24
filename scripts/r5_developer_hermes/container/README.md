@@ -24,6 +24,21 @@ scope-workspace-authority.ps1    = FALLBACK_ONLY
 The running controller is pinned upstream Hermes in `/opt/hermes`. The
 mounted checkout is an editable workspace, not the executing runtime.
 
+```text
+CHECKED_IN_RUNTIME_CONTRACT
+== BUILT_IMAGE_IDENTITY
+== RUNNING_CONTAINER_IMAGE_IDENTITY
+```
+
+`launch.py up` / the one-command launcher rebuilds when the checked-in
+image-input fingerprint disagrees with the stamped image labels, and
+recreates the container when the running image ID is stale. A missing
+identity label is never trusted. Matching identities reuse the current
+image and container. Live `prove` fails closed on disagreement.
+
+Versioned docs/tests are the reusable contract. `.r5-dev/artifacts` is
+machine-specific evidence and remains gitignored.
+
 The running container may bind-mount exactly two host paths:
 
 ```text

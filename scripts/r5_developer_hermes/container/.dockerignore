@@ -4,3 +4,5 @@
 !seed_home.py
 !skills/
 !skills/**/*
+!image_inputs/
+!image_inputs/**/*

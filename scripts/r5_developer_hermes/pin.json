@@ -16,6 +16,7 @@
   "isolation_boundary_rejected_reason": "Independent review proved a constructed environment keeps the host logon token, so host ACL rights and known-folder credential stores stay reachable and PATH stubs are bypassed by any absolute path.",
   "workspace_acl_script_role": "FALLBACK_ONLY",
   "developer_image": "r5-developer-hermes:dx-v1",
+  "developer_image_contract_version": "r5-dx-image-v1",
   "developer_hermes_controller": "PINNED_PURE_UPSTREAM",
   "developer_runtime_source": "/opt/hermes",
   "generic_final_toolset_cap_active": "NO",

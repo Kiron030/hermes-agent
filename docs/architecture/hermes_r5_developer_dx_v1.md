@@ -52,6 +52,72 @@ on every test run. `cap_drop ALL` is deferred: the container already runs
 unprivileged as root only so Windows bind-mount Git works, and a guessed
 capability subset would risk the proven DX.
 
+## Runtime identity
+
+Future Developer-Hermes runtime claims must refer to the **actual running
+image**, not merely Dockerfile contents, the image tag, expected config, or
+the source commit.
+
+```text
+CHECKED_IN_RUNTIME_CONTRACT
+== BUILT_IMAGE_IDENTITY
+== RUNNING_CONTAINER_IMAGE_IDENTITY
+```
+
+The launcher computes `DEVELOPER_IMAGE_INPUT_FINGERPRINT` from the minimum
+material image-input set (`Dockerfile`, `.dockerignore`, `entrypoint.sh`,
+`seed_home.py`, the bundled skill, and `image_inputs/build_contract.json`).
+The built image is stamped with:
+
+```text
+io.powerunits.r5.input-sha256
+io.powerunits.r5.hermes-base-digest
+io.powerunits.r5.contract-version
+```
+
+`up`, `prove`, and the default shell launch compare expected fingerprint,
+tagged image ID, and running container image ID. Missing image → build.
+Fingerprint or missing label → rebuild (fail closed). Same tag, old image
+ID → recreate container. Identities match → reuse; no unnecessary rebuild.
+
+Live proofs fail closed unless `EXPECTED_IMAGE_FINGERPRINT` equals
+`RUNNING_IMAGE_FINGERPRINT` and both image IDs agree.
+
+## Knowledge retention
+
+Versioned docs under `docs/architecture/` and tests under
+`tests/r5_developer_hermes/` are the canonical reusable knowledge.
+`.r5-dev/artifacts` is machine-specific evidence and stays gitignored.
+Red-team findings that changed architecture belong in these docs, not only
+in old transcripts. D-01: a matching image tag is not proof that the
+running container was built from the current checked-in runtime contract.
+
+## Upstream update state machine (foundation only)
+
+This is **not** the completed upstream-update slice. A later agent must
+implement the update deterministically. Required conceptual sequence:
+
+1. Discover a candidate upstream Hermes release.
+2. Verify tag, commit, and image digest. No floating tags. Do not
+   `docker pull latest`.
+3. Update the canonical pin (`pin.json`, `contract.py`, Dockerfile
+   `FROM`, and `image_inputs/build_contract.json`) together.
+4. Rebuild the Developer DX image through the canonical launcher.
+5. Prove image-fingerprint convergence
+   (`EXPECTED_IMAGE_FINGERPRINT == RUNNING_IMAGE_FINGERPRINT`).
+6. Run baseline regression suites.
+7. Run R5 container/security suites.
+8. Run real Hermes smoke where required.
+9. Compare upstream behavior / release notes.
+10. Produce a PR.
+11. Human merge gate.
+
+```text
+DEVELOPER_UPDATE_RUNBOOK_FOUNDATION = YES
+NO_FLOATING_TAGS                    = YES
+DOCKER_PULL_LATEST                  = FORBIDDEN
+```
+
 Dedicated clones under `W:\hermes-dev` are container workspaces. Do not
 execute them on the host. Reset the named volume
 `r5-developer-hermes-home` after suspected prompt injection or poisoned

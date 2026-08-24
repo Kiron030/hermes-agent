@@ -18,9 +18,21 @@ RUN npm install -g typescript@7.0.2 \
 COPY entrypoint.sh /opt/r5-developer/entrypoint.sh
 COPY seed_home.py /opt/r5-developer/seed_home.py
 COPY skills/r5-dev-skill /opt/r5-developer/skills/r5-dev-skill
+COPY image_inputs/build_contract.json /opt/r5-developer/image_inputs/build_contract.json
 RUN sed -i 's/\r$//' /opt/r5-developer/entrypoint.sh \
     && chmod 0755 /opt/r5-developer/entrypoint.sh \
     && chown -R hermes:hermes /opt/r5-developer
+
+# Identity labels are applied last so a fingerprint-only rebuild does not
+# invalidate the pinned TypeScript / pytest layer.
+ARG R5_INPUT_SHA256
+ARG R5_HERMES_BASE_DIGEST
+ARG R5_CONTRACT_VERSION
+ARG R5_SOURCE_GIT_SHA=""
+LABEL io.powerunits.r5.input-sha256="${R5_INPUT_SHA256}" \
+      io.powerunits.r5.hermes-base-digest="${R5_HERMES_BASE_DIGEST}" \
+      io.powerunits.r5.contract-version="${R5_CONTRACT_VERSION}" \
+      io.powerunits.r5.source-git-sha="${R5_SOURCE_GIT_SHA}"
 
 # Runtime user is root inside an unprivileged container. Windows bind-mount
 # `.git/objects` is not writable by uid 10000; local Git commits require this.

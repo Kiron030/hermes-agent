@@ -60,6 +60,12 @@ until `R5_EGRESS_POLICY_GATE`. Do not claim R5 fully closed while
 repository-confidentiality policy is undefined. Desktop and Bot Mode stay
 `NEEDS_REMEDIATION`.
 
+Runtime proofs must also show source/image/container identity convergence.
+See [`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)
+(`CHECKED_IN_RUNTIME_CONTRACT == BUILT_IMAGE_IDENTITY ==
+RUNNING_CONTAINER_IMAGE_IDENTITY`). Versioned docs and tests are canonical;
+`.r5-dev/artifacts` is gitignored host evidence only.
+
 
 ### Why the first boundary was withdrawn
 

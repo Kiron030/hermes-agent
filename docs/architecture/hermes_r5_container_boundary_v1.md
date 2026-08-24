@@ -54,7 +54,10 @@ proof. Developer DX persists it on the named volume
 
 `scripts/r5_developer_hermes/container/launch.py` / `docker_run_argv()` is
 the canonical launch contract. `compose.yaml` is a non-authoritative
-example only. The launcher starts the pinned image with
+example only. Before `up` / `prove` / default launch the launcher
+converges the running image to the checked-in image-input fingerprint
+(see [`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)).
+The launcher starts the pinned image with
 `--privileged=false`, bridge networking, no host PID namespace, no
 Docker socket, and an explicit environment allowlist. Inspect diagnostics
 emit environment **names** only, never values. A host user with Docker

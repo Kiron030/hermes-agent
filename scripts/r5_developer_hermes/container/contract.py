@@ -100,6 +100,10 @@ LINUX_CAPABILITY_HARDENING_RATIONALE = (
 )
 TYPESCRIPT_PIN = "7.0.2"
 PYTEST_PIN = "9.1.1"
+IMAGE_CONTRACT_VERSION = "r5-dx-image-v1"
+IMAGE_LABEL_INPUT_SHA256 = "io.powerunits.r5.input-sha256"
+IMAGE_LABEL_HERMES_BASE_DIGEST = "io.powerunits.r5.hermes-base-digest"
+IMAGE_LABEL_CONTRACT_VERSION = "io.powerunits.r5.contract-version"
 
 ENV_ALLOWLIST: dict[str, str] = {
     "HERMES_HOME": CONTAINER_HERMES_HOME,
