@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 from pathlib import Path
 
 import pytest
@@ -131,6 +133,51 @@ def test_launcher_exposes_opt_in_desktop_mode() -> None:
     sidecar = (CONTAINER_DIR / "desktop_sidecar.py").read_text(encoding="utf-8")
     assert "create_connection" in sidecar
     assert "HTTP CONNECT" in sidecar or "not an HTTP CONNECT" in sidecar.lower() or "not an HTTP" in sidecar
+
+
+def test_sidecar_upstream_is_fixed_and_not_a_generic_proxy() -> None:
+    """Destination comes from launch env only. Clients cannot pick a relay dest."""
+    assert set(inspect.signature(desktop_gw.sidecar_run_argv).parameters) == {"image", "name"}
+    argv = desktop_gw.sidecar_run_argv(image=DEVELOPER_IMAGE)
+    env_vals = [argv[index + 1] for index, item in enumerate(argv) if item == "--env"]
+    assert env_vals == [
+        f"R5_DESKTOP_BACKEND_HOST={desktop_gw.BACKEND_DNS_NAME}",
+        f"R5_DESKTOP_BACKEND_PORT={desktop_gw.CONTAINER_SERVE_PORT}",
+        f"R5_DESKTOP_LISTEN_PORT={desktop_gw.SIDECAR_LISTEN_PORT}",
+    ]
+    assert desktop_gw.BACKEND_DNS_NAME == "r5-developer-hermes"
+    assert desktop_gw.CONTAINER_SERVE_PORT == 9119
+
+    source = (CONTAINER_DIR / "desktop_sidecar.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".", 1)[0])
+    assert imported <= {"__future__", "os", "socket", "threading"}
+
+    create_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create_connection"
+    ]
+    assert len(create_calls) == 1
+    dest = create_calls[0].args[0]
+    assert isinstance(dest, ast.Tuple)
+    names = [elt.id for elt in dest.elts if isinstance(elt, ast.Name)]
+    assert names == ["BACKEND_HOST", "BACKEND_PORT"]
+
+    assert "argparse" not in source
+    assert "sys.argv" not in source
+    assert "socks" not in source.lower()
+    assert "urllib" not in source
+    assert "requests" not in source
+    assert source.count("CONNECT") == 1
+    assert "not an HTTP CONNECT" in source
 
 
 def test_docs_state_official_desktop_remote_gateway() -> None:

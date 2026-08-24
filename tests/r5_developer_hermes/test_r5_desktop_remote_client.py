@@ -45,6 +45,7 @@ def test_helper_does_not_construct_local_bootstrap_argv() -> None:
     for command in FORBIDDEN_HOST_COMMANDS:
         assert f"subprocess.run([{command!r}" not in text
         assert f'subprocess.run(["{command}"' not in text
+    assert "install.ps1" in FORBIDDEN_HOST_COMMANDS
 
 
 def test_official_connection_schema_is_remote_oauth_only() -> None:

@@ -287,6 +287,19 @@ pinned source, `npm run pack`, and pre-seed
 `authMode=oauth` is the official cookie / ws-ticket gate (including
 password-login). Do not switch the gateway to token auth for this path.
 
+Post-merge host residue is not a merge blocker. Distinguish three
+classes and clean them only after merge, never from the PR:
+
+- Pre-existing Hermes HOME (`%APPDATA%\Hermes` and any older
+  `%LOCALAPPDATA%\hermes` profile) predates this slice. Leave it unless
+  a human confirms it is unused.
+- Aborted website-installer / bootstrap residue under
+  `%LOCALAPPDATA%\hermes` is leftover from the rejected Setup /
+  `install.ps1` path. Do not delete it as part of this merge.
+- Official source-built Desktop pack artifacts live under
+  `W:\cache\hermes-desktop-official-v2026.8.19`. Those are generated
+  host outputs, not repo truth, and stay untracked.
+
 Bot Mode remains unimplemented. Future routing intent remains Terra
 default, Luna cheap/auxiliary, Sol explicit escalation.
 
