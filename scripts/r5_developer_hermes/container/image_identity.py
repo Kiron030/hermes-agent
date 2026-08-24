@@ -156,6 +156,10 @@ class ConvergenceObservation:
     container_present: bool
     container_running: bool = False
     dx_ready: bool = True
+    # False when the running container was created under a different egress
+    # policy, contract or mode than the checked-in one.
+    egress_converged: bool = True
+    egress_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -252,6 +256,16 @@ def decide_convergence(observation: ConvergenceObservation) -> ConvergenceDecisi
         return ConvergenceDecision(
             action="RECREATE",
             reason="STALE_CONTAINER_IMAGE_ID",
+            expected_fingerprint=expected,
+            actual_image_fingerprint=actual,
+            current_tag_image_id=tag_id,
+            running_container_image_id=running_id,
+            trusted=False,
+        )
+    if not observation.egress_converged:
+        return ConvergenceDecision(
+            action="RECREATE",
+            reason=observation.egress_reason or "EGRESS_CONTRACT_MISMATCH",
             expected_fingerprint=expected,
             actual_image_fingerprint=actual,
             current_tag_image_id=tag_id,

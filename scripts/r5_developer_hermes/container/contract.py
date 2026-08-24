@@ -11,8 +11,15 @@ They are not an Operator-Hermes generic-final-toolset claim.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
+
+_CONTAINER_DIR = Path(__file__).resolve().parent
+if str(_CONTAINER_DIR.parents[1]) not in sys.path:
+    sys.path.insert(0, str(_CONTAINER_DIR.parents[1]))
+
+from r5_developer_hermes.container.egress import host as egress  # noqa: E402
 
 
 PINNED_IMAGE = (
@@ -84,7 +91,11 @@ GENERIC_FINAL_TOOLSET_CAP_ACTIVE = "NO"
 CONTAINER_MOUNT_BOUNDARY = "PRIMARY"
 HERMES_WRITE_SAFE_ROOT_ROLE = "DEFENSE_IN_DEPTH"
 REPO_A_REPO_B_SAME_TRUST_DOMAIN = "YES"
-R5_F06_STATUS = "OPEN_POLICY_DECISION"
+# F06 is closed in the runtime, not only on paper: the sandbox now attaches to
+# an internal-only network and every approved destination is named in
+# egress/egress_policy.json.
+R5_F06_STATUS = "ENFORCED_EGRESS_POLICY"
+EGRESS_BOUNDARY_ROLE = "OUTBOUND_CONFIDENTIALITY_BOUNDARY"
 CANONICAL_LAUNCH_CONTRACT = "docker_run_argv"
 COMPOSE_FILE_ROLE = "NON_AUTHORITATIVE_EXAMPLE"
 DESKTOP_CONTAINER_COMPATIBILITY = "NEEDS_REMEDIATION"
@@ -230,6 +241,15 @@ def sanitize_container_inspect(payload: dict[str, Any]) -> dict[str, Any]:
         "network_mode": host_config.get("NetworkMode") or "",
         "runtime": host_config.get("Runtime") or "",
         "env_names": env_names_only(list(config.get("Env") or [])),
+        "labels": {
+            str(key): str(value)
+            for key, value in (config.get("Labels") or {}).items()
+            if value is not None
+        },
+        "networks": sorted(
+            str(name)
+            for name in ((payload.get("NetworkSettings") or {}).get("Networks") or {})
+        ),
         "working_dir": config.get("WorkingDir"),
         "mounts": bind_mounts,
     }
@@ -497,10 +517,19 @@ def docker_run_argv(
     image: str = DEVELOPER_IMAGE,
     name: str = CONTAINER_NAME,
     model_env: dict[str, str] | None = None,
+    egress_mode: str | None = None,
+    egress_token: str | None = None,
 ) -> list[str]:
-    """Deterministic ``docker run`` argument vector. Host env is not forwarded."""
+    """Deterministic ``docker run`` argument vector. Host env is not forwarded.
+
+    The network argument is the security boundary. Under the enforced mode the
+    container joins the internal-only network and has no second route out;
+    under ``OFFLINE`` it joins no network at all. There is no branch that
+    attaches the sandbox to the default bridge.
+    """
     sources = tuple(source for source, _destination in BIND_MOUNTS)
     assert_bind_sources_exactly_approved(sources)
+    mode = egress.normalize_mode(egress_mode)
     argv = [
         "docker",
         "run",
@@ -510,8 +539,7 @@ def docker_run_argv(
         "--user",
         "0:0",
         "--privileged=false",
-        "--network",
-        "bridge",
+        *egress.developer_network_args(mode=mode),
         "--workdir",
         CONTAINER_WORKDIR,
         "--entrypoint",
@@ -519,17 +547,29 @@ def docker_run_argv(
         "--security-opt",
         "no-new-privileges:true",
     ]
+    for key, value in egress.developer_egress_labels(mode=mode).items():
+        argv.extend(["--label", f"{key}={value}"])
     for key, value in ENV_ALLOWLIST.items():
         argv.extend(["--env", f"{key}={value}"])
+    for key, value in egress.developer_egress_env(mode=mode, token=egress_token).items():
+        argv.extend(["--env", f"{key}={value}"])
+    mediated = set(egress.mediated_env_names())
     if model_env:
         for key, value in model_env.items():
             if key not in MODEL_KEY_ALLOWLIST:
                 raise ValueError(f"refusing to inject non-allowlisted model key {key}")
             if key in AUTHORITY_ENV_NAMES:
                 raise ValueError(f"refusing to inject production-authority name {key}")
+            # A mediated credential lives in the broker. Injecting the real
+            # value here would silently undo credential mediation, so the
+            # broker-issued token — already added above — is the only value
+            # the sandbox sees for these names.
+            if mode == egress.MODE_ENFORCED and key in mediated:
+                continue
             argv.extend(["--env", f"{key}={value}"])
     for volume, destination in VOLUME_MOUNTS:
         argv.extend(["--mount", f"type=volume,src={volume},dst={destination}"])
+    argv.extend(egress.developer_egress_mounts(mode=mode))
     for source, destination in BIND_MOUNTS:
         argv.extend(["--mount", f"type=bind,src={source},dst={destination}"])
     argv.extend([image, "sleep", "infinity"])

@@ -58,7 +58,10 @@ def test_developer_runtime_is_pinned_pure_upstream_not_operator_cap() -> None:
     assert GENERIC_FINAL_TOOLSET_CAP_ACTIVE == "NO"
     assert HERMES_WRITE_SAFE_ROOT_ROLE == "DEFENSE_IN_DEPTH"
     assert REPO_A_REPO_B_SAME_TRUST_DOMAIN == "YES"
-    assert R5_F06_STATUS == "OPEN_POLICY_DECISION"
+    # F06 was the open outbound-network policy decision. It is now resolved and
+    # enforced by the egress broker, so the contract must no longer describe it
+    # as pending.
+    assert R5_F06_STATUS == "ENFORCED_EGRESS_POLICY"
     assert DESKTOP_CONTAINER_COMPATIBILITY == "NEEDS_REMEDIATION"
     assert BOT_MODE_CONTAINER_COMPATIBILITY == "NEEDS_REMEDIATION"
     assert GIT_HOOKS_POSTURE == "CONTAINED_CODE_EXECUTION"
@@ -69,7 +72,7 @@ def test_developer_runtime_is_pinned_pure_upstream_not_operator_cap() -> None:
     assert "DEVELOPER_HERMES_CONTROLLER" in doc and "PINNED_PURE_UPSTREAM" in doc
     assert "GENERIC_FINAL_TOOLSET_CAP_ACTIVE" in doc
     assert "REPO_A_REPO_B_SAME_TRUST_DOMAIN" in doc
-    assert "R5_F06_STATUS" in doc and "OPEN_POLICY_DECISION" in doc
+    assert "R5_F06_STATUS" in doc and "ENFORCED_EGRESS_POLICY" in doc
 
 
 def test_bind_mounts_equal_literal_independent_allowlist() -> None:

@@ -37,11 +37,19 @@ DEVELOPER_HERMES_CONTROLLER      = PINNED_PURE_UPSTREAM
 DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
 GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
 OPERATOR_HERMES_TARGET           = UPSTREAM_NEAR + GENERIC_FINAL_TOOLSET_CAP
-CONTAINER_MOUNT_BOUNDARY         = PRIMARY SECURITY BOUNDARY
+CONTAINER_MOUNT_BOUNDARY         = HOST/FILESYSTEM BOUNDARY
+EGRESS_BOUNDARY                  = OUTBOUND CONFIDENTIALITY BOUNDARY
 HERMES_WRITE_SAFE_ROOT           = DEFENSE IN DEPTH
 REPO_A_REPO_B_SAME_TRUST_DOMAIN  = YES
-R5_F06_STATUS                    = OPEN_POLICY_DECISION
+R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
 ```
+
+The sandbox has **two** boundaries, and confusing them is the fastest way to
+reason wrongly about this system. The mount contract decides what of the
+**host** is reachable. The network topology decides where data may **go**.
+Neither substitutes for the other: a perfect mount boundary still lets a
+compromised process upload the repository, and a perfect egress boundary still
+lets it read whatever you mounted.
 
 Developer Hermes runs the pinned official image (`Hermes Agent v0.20.5`,
 SHA `fcbd1076a93841fa88855acce810e342a5b78101`) from `/opt/hermes`. It does
@@ -55,12 +63,17 @@ intentionally RW. Cross-repo mutation is expected. The two host bind mounts
 define the outer host boundary; they do not isolate the repos from each
 other.
 
-`R5_F06_STATUS = OPEN_POLICY_DECISION`: outbound egress is still unrestricted
-in the running container. The confidentiality contract itself is no longer
-undefined — `R5_EGRESS_POLICY_GATE = PASS` decided it in
-[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md).
-The constant flips when `R5_EGRESS_POLICY_SMALL` enforces the policy. Do not
-claim R5 fully closed until then. Desktop and Bot Mode stay
+`R5_F06_STATUS = ENFORCED_EGRESS_POLICY`: outbound traffic now leaves only
+through the egress broker, and only to destinations a human approved in
+[`egress_policy.json`](../../scripts/r5_developer_hermes/container/egress/egress_policy.json).
+Arbitrary direct egress is denied by the Docker topology, not by proxy
+environment variables. Public web research stays available because it is
+**provider-mediated**: the sandbox sends a query to an approved processor,
+which performs the external retrieval; the sandbox never connects to the
+researched site. Approving a processor is an explicit human trust decision and
+does not approve the sites it reads. See
+[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md)
+for the decision and the evidence. Desktop and Bot Mode stay
 `NEEDS_REMEDIATION`.
 
 ```text
@@ -253,7 +266,6 @@ See `scripts/r5_developer_hermes/README.md`.
 
 No production Railway/Vercel deploy. No production DB. No execute secret.
 No `.env` harvest. No R2 plugin work. No R3 shadow comparison.
-No egress policy in this slice (`R5_F06_STATUS = OPEN_POLICY_DECISION`).
 No Desktop, Bot Mode, or model-routing implementation.
 `DESKTOP_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`
 `BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`

@@ -17,6 +17,7 @@ from r5_developer_hermes.container.contract import (
     docker_run_argv,
     is_forbidden_host_source,
 )
+from r5_developer_hermes.container.egress.host import INTERNAL_NETWORK
 from r5_developer_hermes.harness import (
     REPO_ROOT,
     isolation_boundary_status,
@@ -68,8 +69,13 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
     assert "--privileged=false" in argv
     assert "--tmpfs" not in argv
     assert f"type=volume,src={HERMES_HOME_VOLUME},dst={CONTAINER_HERMES_HOME}" in argv
-    assert "--network" in argv and "bridge" in argv
-    assert "host" not in argv[argv.index("--network") + 1]
+    # The sandbox joins the internal egress network. "bridge" would give it a
+    # default route to the public Internet, which is exactly what the egress
+    # contract removes.
+    assert "--network" in argv
+    network = argv[argv.index("--network") + 1]
+    assert network == INTERNAL_NETWORK
+    assert network not in {"bridge", "host", "none"}
     assert "--pid" not in argv
     assert "--env-file" not in argv
     assert "/var/run/docker.sock" not in joined
@@ -78,7 +84,10 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
     assert argv[argv.index("--entrypoint") + 1] == "/opt/r5-developer/entrypoint.sh"
     assert DEVELOPER_IMAGE in argv
     assert PINNED_IMAGE not in argv  # derived image; pin lives in Dockerfile FROM
-    assert argv.count("--mount") == 3
+    assert [item for item in argv if item.startswith("type=bind,")] == [
+        f"type=bind,src={BIND_MOUNTS[0][0]},dst={REPO_A_CONTAINER}",
+        f"type=bind,src={BIND_MOUNTS[1][0]},dst={REPO_B_CONTAINER}",
+    ]
     assert f"type=bind,src={BIND_MOUNTS[0][0]},dst={REPO_A_CONTAINER}" in argv
     assert f"type=bind,src={BIND_MOUNTS[1][0]},dst={REPO_B_CONTAINER}" in argv
     assert any(item == f"HERMES_HOME={CONTAINER_HERMES_HOME}" or item.endswith(

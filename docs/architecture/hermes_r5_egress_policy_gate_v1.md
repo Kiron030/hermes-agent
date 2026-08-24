@@ -4,11 +4,11 @@
 **Date:** 2026-08-24
 **Depends on:** `R5_CONTAINER_BOUNDARY_XS = PASS`, `R5_DEVELOPER_DX_XS = PASS`,
 `R5_SECURITY_DELTA_REATTACK = PASS_WITH_FINDINGS`, `R5_RUNTIME_CONVERGENCE_XS = PASS`
-**Status:** `R5_EGRESS_POLICY_GATE = PASS` — design gate, nothing implemented here
-**Decides:** F06. The runtime constant `R5_F06_STATUS` deliberately stays
-`OPEN_POLICY_DECISION` until `R5_EGRESS_POLICY_SMALL` lands, because the
-running container still has unrestricted egress. The *decision* is closed
-here; the *runtime state* is not.
+**Status:** `R5_EGRESS_POLICY_GATE = PASS` (design) →
+`R5_EGRESS_POLICY_SMALL = PASS` (implemented and enforced)
+**Decides:** F06, now closed in both senses. The decision was made here; the
+runtime constant `R5_F06_STATUS` is `ENFORCED_EGRESS_POLICY` and the running
+container reaches only approved destinations.
 
 ```text
 R5_CONFIDENTIALITY_CONTRACT      = HOST_AND_PRODUCTION_ISOLATION
@@ -20,6 +20,10 @@ EGRESS_HERMES_CORE_CHANGES_REQUIRED = 0
 DOCKER_AUTHORITY_REMAINS_ABSENT  = YES
 IMPLEMENTATION_MAGNITUDE         = SMALL
 ```
+
+Sections 1–17 are the decision and its reasoning, written before anything was
+built. **Section 18 is the implemented state** — what exists, what was
+measured, and the two places where reality corrected the design.
 
 This document is the reusable architectural truth for Developer-Hermes
 outbound networking. A future agent must not need the originating chat
@@ -590,6 +594,23 @@ sidecar. That is a solvable design task, which is why this is `MANAGEABLE`
 rather than `GOOD`, and it is better discovered now than during Desktop
 remediation.
 
+The future shape is therefore fixed even though Desktop is not implemented:
+
+```text
+DESKTOP_TRANSPORT_FUTURE_REQUIREMENT =
+  Desktop -> localhost-only authenticated transport sidecar
+          -> internal Docker network -> Developer Hermes gateway
+  host exposure bound to 127.0.0.1 only
+  authentication / pairing mandatory
+  no local-host tool-execution fallback
+  workspace resolver stays /workspace/*
+PORT_9119_OPENED_IN_THIS_SLICE = NO
+```
+
+The sidecar is the dual-homed party, exactly as the broker is. Desktop must
+not be solved by attaching the Developer container to a routable network —
+that would trade the confidentiality boundary for a convenience.
+
 **Bot Mode.** Outbound polling with no public inbound port fits this
 architecture directly: add the platform API to the allowlist and nothing
 else changes. Bot Mode also *strengthens* the case for the policy, because
@@ -615,6 +636,10 @@ would convert the boundary into a suggestion.
 ---
 
 ## 16. Open questions
+
+Questions 1–3 were answered by the implementation; see §18.4 (research
+processor), §18.1 (broker choice) and §18.2 (TLS interception, where the
+answer below was reversed). Questions 4 and 5 remain open.
 
 1. Which retrieval provider becomes the approved `RESEARCH_PROCESSOR`, and
    under which credential? Provider selection is a separate decision from
@@ -655,3 +680,182 @@ The container mount allowlist remains the primary host boundary. This
 document adds a second boundary of a different kind: the mount allowlist
 decides what the sandbox may *read*, and the egress policy decides where
 what it read may *go*.
+
+---
+
+## 18. Implemented state (`R5_EGRESS_POLICY_SMALL`)
+
+Everything below was measured against the running system, not derived from
+the design. Machine-specific values live in `.r5-dev/artifacts/` (gitignored).
+
+### 18.1 What is actually enforcing the boundary
+
+The security boundary is the Docker topology. `r5-dev-internal` is created
+`internal: true`, so it has no default route and no gateway to anywhere. The
+Developer container attaches to that network and nothing else. The broker is
+the only dual-homed container, holding a second interface on `r5-dev-egress`.
+
+This is why deleting `HTTP_PROXY` inside the sandbox changes nothing: the
+proxy variables are convenience routing for well-behaved clients, and
+removing them leaves the process on a network with no way out at all. It is
+also why Node's global `fetch` — which ignores proxy variables entirely — is
+denied without any special handling.
+
+```text
+UPSTREAM_EGRESS_COMPONENT   = iron-proxy 0.39.0 (agent/proxy_sources/iron_proxy.py)
+PINNED_HERMES_NATIVE_EGRESS_SUPPORT = FULL
+EGRESS_HERMES_CORE_FILES_CHANGED    = 0
+CUSTOM_EGRESS_CODE_MAGNITUDE        = SMALL
+```
+
+The broker is upstream's own egress component. The pinned Hermes image ships
+`iron-proxy` with destination allowlisting, an SSRF CIDR guard and
+proxy-token substitution already implemented, and `hermes egress` as its
+official CLI. R5 supplies the policy, the topology and the launcher wiring;
+it does not reimplement a proxy, and it patches nothing in Hermes core.
+
+### 18.2 Where reality corrected the design
+
+Two design assumptions did not survive measurement. Both are recorded because
+the reasoning matters more than the outcome.
+
+**TLS interception was ruled out in §16.3 and is in fact used.** Reusing
+upstream's component means accepting how it works: credential substitution
+requires seeing the request, which requires terminating TLS. The predicted
+cost — distributing a CA across Python, Node, Git, apt and uv — turned out to
+be a solved problem in the pinned image, which already honors `SSL_CERT_FILE`,
+`NODE_EXTRA_CA_CERTS`, `GIT_SSL_CAINFO` and friends. The CA certificate
+reaches the sandbox through a read-only Docker volume; the signing key never
+leaves the broker. Content inspection is still not promised: the audit log
+stays metadata-only.
+
+**Upstream's `require` flag on the secrets transform had to be overridden.**
+On iron-proxy 0.39 the transform also evaluates the `CONNECT` request, which
+by construction carries no `Authorization` header, so `require: true` rejected
+every HTTPS model call before the inner request existed. Measured, not
+assumed: `rejected_by=secrets` on `CONNECT api.openai.com:443`. The override
+lives in the broker entrypoint, which is the external wrap this calls for —
+patching Hermes core would have been the wrong fix for a config default. The
+cost is narrow: a provider key obtained some other way could be spent against
+an already-approved provider host, which is quota abuse the architecture never
+claimed to prevent, and the sandbox holds no such key.
+
+### 18.3 Credential mediation
+
+```text
+MODEL_CREDENTIAL_LOCATION              = BROKER_ONLY
+REAL_PROVIDER_KEY_READABLE_BY_DEVELOPER = NO
+```
+
+This is stronger than §1's promise D, which conceded that in-sandbox code can
+always read the model key. It no longer can. The sandbox receives an opaque
+token under the provider's environment-variable name; the broker swaps it for
+the real credential, and only on the hosts of the class that credential
+belongs to. The proven signal is the adversarial suite's positive control: the
+sandbox sends its token to the provider and gets `200`, which is only possible
+if the substitution fired.
+
+The token is worth nothing off-box. It is meaningful to this broker alone, and
+the broker will not forward it anywhere.
+
+### 18.4 Public web research, as implemented
+
+The pinned runtime does **not** have `ddgs` installed, so upstream's
+DuckDuckGo provider reports unavailable and never runs. The real research path
+is upstream's keyless MCP tier (`plugins/web/keyless_mcp.py`), which walks a
+five-vendor ring: `exa`, `parallel`, `tavily`, `firecrawl`, `keenable`.
+
+Two of those five are approved processors. The other three are deliberately
+denied: two named parties already cover free-tier throttling, and every extra
+vendor is another party receiving our queries.
+
+The ring has a trap worth understanding. With no vendor pinned, upstream
+starts at a per-session random cursor, and a connection the broker refuses is
+not a throttle — so upstream's failover *stops* rather than advancing. An
+unpinned sandbox would therefore lose research on most sessions purely by
+where the cursor landed. The launcher pins the entry vendor to an approved
+processor. That pin is routing, not security: pinning a denied vendor would
+simply fail closed, and the broker still decides what may leave.
+
+Measured during the real Hermes smoke, which is the most convincing evidence
+in this document: the agent researched a public question, **tried to fetch
+`docs.python.org` directly, was refused with 403 `rejected_by=allowlist`**,
+and still produced the correct answer with its source URL — because the
+approved processor did the retrieval. Approving a processor does not approve
+the sites it reads.
+
+### 18.5 Convergence
+
+Egress inputs are part of the runtime convergence contract. The contract
+fingerprint covers the policy, the broker contract, the broker Dockerfile, the
+broker entrypoint and the launcher-side egress module — everything that
+materially changes where data may go. Runtime audit logs are excluded on
+purpose: they are evidence, not policy, and including them would change the
+contract on every request.
+
+Proven by editing the policy: adding a single destination flipped the
+launcher's decision from `REUSE / IDENTITIES_MATCH` to
+`RECREATE / EGRESS_CONTRACT_CHANGED`. A policy change cannot apply silently to
+a container already running the old rules.
+
+### 18.6 Failure behaviour, as measured
+
+```text
+BROKER_FAILURE     = FAIL_CLOSED   (sandbox stays on the internal network)
+POLICY_MISSING     = FAIL_CLOSED
+POLICY_INVALID     = FAIL_CLOSED
+UNKNOWN_DESTINATION = FAIL_CLOSED
+NO_AUTOMATIC_UNRESTRICTED_FALLBACK = YES
+```
+
+There is no branch anywhere that reconnects the sandbox to a bridge network
+when something is wrong. A broker that cannot validate its policy, cannot bind
+its internal address, or holds a mediated credential it cannot use, refuses to
+start rather than starting permissively. An empty allowlist is treated as a
+configuration error, not as "nothing is allowed yet".
+
+`OFFLINE` is the same contract with the network removed (`--network none`),
+not a second architecture. Local repositories, Python, Node, Git, tests and
+`HERMES_HOME` keep working; everything external fails.
+
+### 18.7 Adversarial results
+
+`42 / 42 PASS`, covering all 32 required attack classes plus positive controls
+and the research boundary. The suite includes deliberate positive controls —
+approved SCM read, approved package registries, the provider token swap, the
+approved research processor — because a suite that only proves things are
+blocked passes happily on a completely broken sandbox.
+
+Malicious in-sandbox code with full execution authority (a hostile skill, a
+Git `pre-commit` hook, an npm `preinstall` lifecycle script) runs, and fails
+to choose its own recipient. Container recreation does not restore egress.
+
+### 18.8 Adding future providers without weakening the boundary
+
+Model routing is not implemented and is not affected by this slice, but the
+policy shape decides whether it *can* be added safely later. It can, because
+reachability and credentials are separate concerns here.
+
+A credential alone creates no network path. Adding `OPENROUTER_API_KEY` to the
+broker gives the sandbox nothing until a human adds the provider host to the
+`MODEL_PROVIDER` class — which changes the policy hash, changes the contract
+fingerprint, and forces a deliberate rebuild that a reviewer sees. That is the
+gate: human-reviewed policy entry, credential isolation in the broker, a
+security test, and provider-endpoint approval.
+
+```text
+MODEL_ROUTING_FUTURE_COMPATIBILITY = PASS
+OPENROUTER_FUTURE_COMPATIBILITY    = PASS
+LOCAL_MODEL_FUTURE_COMPATIBILITY   = PASS
+```
+
+Local open-weight models are the easy case: they need no external model egress
+at all, so they work in `OFFLINE` as well as in the enforced mode.
+
+### 18.9 What this still does not promise
+
+Unchanged from §1 and worth repeating where an implementer will read it:
+this is not DLP. Content the sandbox may read can reach any *approved*
+destination — that is what approving a processor means. The reduction is that
+the set of possible recipients is short, named, human-approved and reviewable
+in a PR diff, instead of being the Internet.

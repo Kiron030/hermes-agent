@@ -17,6 +17,7 @@
 | Stage 1 soul / runbook | `SOUL.hermes.md`, `RUNBOOK.hermes-trusted-analyst.md` |
 | Repo B allowlist | `config/powerunits_repo_b_read_allowlist.json` |
 | Developer Hermes (R5) | [`hermes_r5_developer_hermes_v1.md`](../architecture/hermes_r5_developer_hermes_v1.md) |
+| Developer Hermes egress boundary | [`hermes_r5_egress_policy_gate_v1.md`](../architecture/hermes_r5_egress_policy_gate_v1.md), policy in `scripts/r5_developer_hermes/container/egress/egress_policy.json` |
 
 ## Task → entry points
 
@@ -29,6 +30,7 @@
 | Timescale bounded read | docs + tool allowlist | Not general SQL |
 | Repo B product changes | **do in Repo B** | Schemas/pipelines/API |
 | Powerful developer Hermes | `scripts/r5_developer_hermes/` | Container DX + two-repo R/W, no production authority |
+| Approving an outbound destination | `scripts/r5_developer_hermes/container/egress/egress_policy.json` | Security decision, not a config fix; changes the contract hash |
 
 ## Labels
 

@@ -41,7 +41,8 @@ DEDICATED_CONTAINER_CLONES       = DO_NOT_EXECUTE_ON_HOST
 GIT_HOOKS                        = CONTAINED_CODE_EXECUTION
 RESET_DEVELOPER_HERMES_HOME      = launch-developer-hermes.ps1 -Mode reset
 LINUX_CAPABILITY_HARDENING       = DEFERRED_WITH_RATIONALE
-R5_F06_STATUS                    = OPEN_POLICY_DECISION
+R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
+EGRESS_MODE                      = PRIVATE_DEVELOPER_EGRESS_ENFORCED (or OFFLINE)
 DESKTOP_CONTAINER_COMPATIBILITY  = NEEDS_REMEDIATION
 BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 ```
@@ -100,31 +101,67 @@ implement the update deterministically. Required conceptual sequence:
 1. Discover a candidate upstream Hermes release.
 2. Verify tag, commit, and image digest. No floating tags. Do not
    `docker pull latest`.
-3. Update the canonical pin (`pin.json`, `contract.py`, Dockerfile
+3. **Review the release for network-behavior changes** (see below).
+4. Update the canonical pin (`pin.json`, `contract.py`, Dockerfile
    `FROM`, and `image_inputs/build_contract.json`) together.
-4. Rebuild the Developer DX image through the canonical launcher.
-5. Prove image-fingerprint convergence
-   (`EXPECTED_IMAGE_FINGERPRINT == RUNNING_IMAGE_FINGERPRINT`).
-6. Run baseline regression suites.
-7. Run R5 container/security suites.
-8. Run real Hermes smoke where required.
-9. Compare upstream behavior / release notes.
-10. Produce a PR.
-11. Human merge gate.
+5. Update the approved egress policy **only where the review justified it**.
+   A new upstream default is a reason to look, never a reason to approve.
+6. Rebuild the Developer DX image *and* the egress broker through the
+   canonical launcher.
+7. Prove image-fingerprint convergence
+   (`EXPECTED_IMAGE_FINGERPRINT == RUNNING_IMAGE_FINGERPRINT`) and egress
+   convergence (`EGRESS_CONTRACT_FINGERPRINT` matches the running labels).
+8. Run baseline regression suites.
+9. Run R5 container/security suites.
+10. Run the egress adversarial suite (`launch.py prove-egress`).
+11. Run real Hermes smoke where required.
+12. Compare upstream behavior / release notes.
+13. Produce a PR.
+14. Human merge gate.
+
+### Network review checklist (step 3)
+
+An upstream update can move the egress boundary without touching a single R5
+file, because the *code that dials out* is upstream's. Before changing the
+pin, check whether the new version introduces:
+
+- new model-provider hosts, or a changed default provider
+- new web/research endpoints, or a changed vendor ring/failover order
+- new package or runtime-artifact hosts, including lazy/at-first-use downloads
+- new raw-network behavior that does not honor proxy configuration
+- new gateway, telemetry, or update-check destinations
+- a new or upgraded egress component (upstream's own `iron-proxy` pin)
+- new proxy-bypass paths, or new DNS assumptions
+
+The research path is the one that bites hardest: it is a *ring* of vendors,
+and upstream may reorder it, add a vendor, or change which one an
+unconfigured install starts on. Re-read
+`plugins/web/keyless_mcp.py` and `tools/web_tools.py::_get_backend` on every
+update, and re-check that `RESEARCH_BACKEND` in
+`scripts/r5_developer_hermes/container/egress/host.py` still names an approved
+processor. If it does not, research fails closed — safe, but broken.
+
+Two rules make this survivable rather than tedious. First, a destination the
+new version wants is not automatically approved; it goes through the same
+human policy decision as any other. Second, when a new upstream version ships
+a *better* egress mechanism than the one we pinned, record it as
+`UPSTREAM_NATIVE_REPLACEMENT_CANDIDATE` and handle it in its own slice — never
+by silently upgrading inside an unrelated change.
 
 ```text
-DEVELOPER_UPDATE_RUNBOOK_FOUNDATION = YES
-NO_FLOATING_TAGS                    = YES
-DOCKER_PULL_LATEST                  = FORBIDDEN
+DEVELOPER_UPDATE_RUNBOOK_FOUNDATION      = YES
+UPSTREAM_UPDATE_RUNBOOK_EGRESS_INTEGRATED = YES
+NO_FLOATING_TAGS                         = YES
+DOCKER_PULL_LATEST                       = FORBIDDEN
+EGRESS_POLICY_WIDENED_BY_UPDATE          = HUMAN_DECISION_ONLY
 ```
 
 Dedicated clones under `W:\hermes-dev` are container workspaces. Do not
 execute them on the host. Reset the named volume
 `r5-developer-hermes-home` after suspected prompt injection or poisoned
-persistent state. Egress policy is decided in
-[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md)
-(`R5_EGRESS_POLICY_GATE = PASS`) and enforced by a later slice; the running
-container is still unrestricted.
+persistent state. Egress policy is decided **and enforced** — see
+[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md).
+The container reaches only approved destinations, through the broker.
 
 ## Launch
 

@@ -66,13 +66,25 @@ def test_persistent_hermes_home_is_a_named_volume() -> None:
 
 
 def test_launcher_mount_policy_is_exactly_two_repo_binds() -> None:
+    """The host-filesystem boundary is the bind list, not the mount count.
+
+    Egress added a mount (the broker's CA certificate), so counting mounts
+    would only prove that nothing changed. What must stay true is that the
+    host filesystem is reachable through exactly these two repositories and
+    that every other mount is a Docker-managed volume.
+    """
     argv = docker_run_argv()
     bind_mounts = [item for item in argv if item.startswith("type=bind,")]
     assert bind_mounts == [
         f"type=bind,src={BIND_MOUNTS[0][0]},dst={REPO_A_CONTAINER}",
         f"type=bind,src={BIND_MOUNTS[1][0]},dst={REPO_B_CONTAINER}",
     ]
-    assert argv.count("--mount") == 3
+    mount_values = [
+        argv[index + 1] for index, item in enumerate(argv) if item == "--mount"
+    ]
+    assert len(mount_values) == argv.count("--mount")
+    non_bind = [item for item in mount_values if not item.startswith("type=bind,")]
+    assert non_bind and all(item.startswith("type=volume,") for item in non_bind)
 
 
 def test_forbidden_bind_mounts_and_host_roots_are_rejected() -> None:

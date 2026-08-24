@@ -30,6 +30,16 @@ authenticated no matter what `HOME`, `USERPROFILE` or `APPDATA` say.
 
 Isolation therefore comes from a **Linux container** with an explicit
 two-repository bind-mount allowlist. See [`container/`](./container).
+
+That mount allowlist is the **host/filesystem** boundary. It is not the only
+one: the network topology in [`container/egress/`](./container/egress) is the
+**outbound confidentiality** boundary, deciding where what the sandbox reads
+may go. The Developer container sits on an internal-only Docker network and
+reaches approved destinations through the egress broker; arbitrary direct
+egress is denied by topology, not by proxy environment variables. Approving a
+new destination means editing
+[`egress_policy.json`](./container/egress/egress_policy.json), which is a
+security decision reviewable in a PR diff.
 The dedicated `hermes-dev` account remains defense in depth; see
 [`principal/`](./principal). `scope-workspace-authority.ps1` is
 `FALLBACK_ONLY` and must not be executed against `C:\`, `D:\`, or `W:\`.
@@ -80,6 +90,21 @@ python scripts/r5_developer_hermes/container/launch.py prove-dx
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
 ```
+
+Egress:
+
+```bash
+python scripts/r5_developer_hermes/container/launch.py egress-status
+python scripts/r5_developer_hermes/container/launch.py prove-egress
+python scripts/r5_developer_hermes/container/launch.py prove-failure-modes
+python scripts/r5_developer_hermes/container/launch.py prove-offline
+python scripts/r5_developer_hermes/container/launch.py up --egress-mode OFFLINE
+```
+
+`up` is the single canonical path: it creates and verifies the networks,
+brings the broker up healthy first, and only then starts the sandbox. There is
+no branch that starts the sandbox on a routable network when the broker is
+unavailable.
 
 `prepare-runtime` reuses a matching R1 upstream worktree/venv when present.
 
