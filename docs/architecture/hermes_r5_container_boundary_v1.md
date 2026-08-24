@@ -19,6 +19,23 @@ The container may read and write only the two dedicated development
 repositories. Host credentials, production authority, and unrelated host
 filesystems stay outside the mount set.
 
+```text
+CONTAINER_MOUNT_BOUNDARY         = PRIMARY SECURITY BOUNDARY
+HERMES_WRITE_SAFE_ROOT           = DEFENSE IN DEPTH
+DEVELOPER_HERMES_CONTROLLER      = PINNED_PURE_UPSTREAM
+DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
+GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
+REPO_A_REPO_B_SAME_TRUST_DOMAIN  = YES
+POSITIVE_MOUNT_ALLOWLIST         = YES
+```
+
+Mount verification is a positive allowlist after Docker Desktop / WSL path
+normalization. The only approved host bind sources are exactly
+`W:\hermes-dev\workspace\hermes-agent` and
+`W:\hermes-dev\workspace\EU-PP-Database`. Repo A and Repo B are one trust
+domain: both RW, cross-repo mutation expected. The binds are the outer host
+boundary, not isolation between the two repos.
+
 ## Runtime workspace
 
 | Tree | Host path | Container path | Mode |
@@ -35,9 +52,14 @@ proof. Developer DX persists it on the named volume
 
 ## Launcher
 
-`scripts/r5_developer_hermes/container/launch.py` starts the pinned image
-with `--privileged=false`, bridge networking, no host PID namespace, no
-Docker socket, and an explicit environment allowlist.
+`scripts/r5_developer_hermes/container/launch.py` / `docker_run_argv()` is
+the canonical launch contract. `compose.yaml` is a non-authoritative
+example only. The launcher starts the pinned image with
+`--privileged=false`, bridge networking, no host PID namespace, no
+Docker socket, and an explicit environment allowlist. Inspect diagnostics
+emit environment **names** only, never values. A host user with Docker
+daemon authority can still read `Config.Env`; that does not enlarge the
+container trust boundary.
 
 Pinned image:
 

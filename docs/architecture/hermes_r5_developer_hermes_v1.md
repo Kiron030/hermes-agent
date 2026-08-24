@@ -32,6 +32,34 @@ Developer DX (persistent home, fullstack tooling, one-command launch):
 The dedicated `hermes-dev` account and `scope-workspace-authority.ps1` remain
 defense in depth. Do not run the ACL script against `C:\`, `D:\`, or `W:\`.
 
+```text
+DEVELOPER_HERMES_CONTROLLER      = PINNED_PURE_UPSTREAM
+DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
+GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
+OPERATOR_HERMES_TARGET           = UPSTREAM_NEAR + GENERIC_FINAL_TOOLSET_CAP
+CONTAINER_MOUNT_BOUNDARY         = PRIMARY SECURITY BOUNDARY
+HERMES_WRITE_SAFE_ROOT           = DEFENSE IN DEPTH
+REPO_A_REPO_B_SAME_TRUST_DOMAIN  = YES
+R5_F06_STATUS                    = OPEN_POLICY_DECISION
+```
+
+Developer Hermes runs the pinned official image (`Hermes Agent v0.20.5`,
+SHA `fcbd1076a93841fa88855acce810e342a5b78101`) from `/opt/hermes`. It does
+**not** execute `/workspace/hermes-agent` as the controller runtime. The
+generic Operator-Hermes final-toolset cap is intentionally absent. A future
+test image that runs a modified checkout is a separate capability and is
+not part of this sandbox.
+
+Repo A and Repo B are **one** Developer-Hermes trust domain. Both binds are
+intentionally RW. Cross-repo mutation is expected. The two host bind mounts
+define the outer host boundary; they do not isolate the repos from each
+other.
+
+`R5_F06_STATUS = OPEN_POLICY_DECISION`: outbound egress remains unrestricted
+until `R5_EGRESS_POLICY_GATE`. Do not claim R5 fully closed while
+repository-confidentiality policy is undefined. Desktop and Bot Mode stay
+`NEEDS_REMEDIATION`.
+
 
 ### Why the first boundary was withdrawn
 
@@ -77,13 +105,36 @@ UPSTREAM_IMAGE_DIGEST  = sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d8
 
 ## Workspace
 
-| Tree | Default mount | Mode |
-|---|---|---|
-| Repo A | this `hermes-agent` checkout | read/write |
-| Repo B | sibling `EU-PP-Database` or `HERMES_R5_REPO_B_ROOT` | read/write |
+| Tree | Host bind (literal allowlist) | Container | Mode |
+|---|---|---|---|
+| Repo A | `W:\hermes-dev\workspace\hermes-agent` | `/workspace/hermes-agent` | RW |
+| Repo B | `W:\hermes-dev\workspace\EU-PP-Database` | `/workspace/EU-PP-Database` | RW |
 
-No per-file allowlist. Dedicated `HERMES_HOME` under `.r5-dev/home`.
-Scratch git for probes: `.r5-dev/scratch/git-probe`.
+No parent, sibling, or credentials-directory substitution. No per-file
+allowlist. Persistent `HERMES_HOME` is the Docker named volume
+`r5-developer-hermes-home` at `/opt/data`.
+
+```text
+DEDICATED_CONTAINER_CLONES = DO_NOT_EXECUTE_ON_HOST
+GIT_HOOKS                  = CONTAINED_CODE_EXECUTION
+RESET_DEVELOPER_HERMES_HOME = launch-developer-hermes.ps1 -Mode reset
+```
+
+Dedicated clones are container execution workspaces. The host must not run
+pytest, Python, PowerShell, Node/npm, Git hooks, launchers, or repo scripts
+from `W:\hermes-dev`. Container output may be malicious or compromised even
+though it cannot autonomously escape the container. The canonical launcher
+runs from `W:\Workbench\hermes-agent` and refuses a resolved path under
+`W:\hermes-dev`.
+
+Git hooks inside the container are contained code execution — part of the
+arbitrary-code authority already granted there. The host-side clone rule is
+the protection that matters.
+
+Use `-Mode reset` after suspected prompt injection, a bad Skill, bad config,
+or poisoned persistent state. Reset stops the container and removes only
+`r5-developer-hermes-home`. It never accepts an arbitrary volume name and
+never touches Repo A/B, host secrets, or production.
 
 ## Developer policy
 
@@ -186,3 +237,7 @@ See `scripts/r5_developer_hermes/README.md`.
 
 No production Railway/Vercel deploy. No production DB. No execute secret.
 No `.env` harvest. No R2 plugin work. No R3 shadow comparison.
+No egress policy in this slice (`R5_F06_STATUS = OPEN_POLICY_DECISION`).
+No Desktop, Bot Mode, or model-routing implementation.
+`DESKTOP_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`
+`BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`

@@ -44,7 +44,9 @@ def test_developer_image_is_built_from_the_pinned_digest() -> None:
 
 def test_fullstack_image_contract_is_container_local() -> None:
     dockerfile = (CONTAINER_DIR / "Dockerfile").read_text(encoding="utf-8")
-    assert "npm install -g typescript" in dockerfile
+    assert "npm install -g typescript@7.0.2" in dockerfile
+    assert "pytest==9.1.1" in dockerfile
+    assert "uvx --from pytest" not in dockerfile
     assert "nvm" not in dockerfile.lower()
     assert r"C:\nvm4w" not in dockerfile
     assert "C:/Users" not in dockerfile
@@ -124,6 +126,14 @@ def test_dedicated_model_file_rejects_production_and_unknown_keys(tmp_path: Path
     with pytest.raises(RuntimeError, match="non-allowlisted"):
         parse_dedicated_model_env(bad_extra)
 
+    duplicate = tmp_path / "dup.env"
+    duplicate.write_text(
+        "OPENAI_API_KEY=first-not-a-real-key\nOPENAI_API_KEY=second-not-a-real-key\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="duplicate allowlisted key"):
+        parse_dedicated_model_env(duplicate)
+
     assert MODEL_KEY_ALLOWLIST == (
         "OPENROUTER_API_KEY",
         "OPENAI_API_KEY",
@@ -151,6 +161,8 @@ def test_one_command_launcher_does_not_accept_raw_host_mounts() -> None:
     assert "Mode" in text
     assert "W:\\hermes-dev\\workspace\\hermes-agent" in text
     assert "W:\\hermes-dev\\workspace\\EU-PP-Database" in text
+    assert "DO_NOT_EXECUTE_ON_HOST" in text
+    assert "RESET_DEVELOPER_HERMES_HOME" in text
     assert "-RepoA" not in text
     assert "-Mount" not in text
     assert "C:\\Users\\User" not in text
@@ -158,22 +170,14 @@ def test_one_command_launcher_does_not_accept_raw_host_mounts() -> None:
     assert "Linux containers required" in text
 
 
-def test_compose_keeps_the_security_boundary() -> None:
+def test_compose_is_explicitly_non_authoritative() -> None:
     text = (CONTAINER_DIR / "compose.yaml").read_text(encoding="utf-8")
-    assert "r5-developer-hermes:dx-v1" in text
+    assert "NON-AUTHORITATIVE EXAMPLE ONLY" in text
+    assert "docker_run_argv()" in text
     assert PINNED_DIGEST in (CONTAINER_DIR / "Dockerfile").read_text(encoding="utf-8")
-    assert "privileged: false" in text
-    assert "network_mode: bridge" in text
-    assert "pid: host" not in text
-    assert "env_file:" not in text
-    assert "/var/run/docker.sock" not in text
-    assert "C:/Users" not in text
-    assert "W:/Workbench" not in text
-    assert "source: r5-developer-hermes-home" in text
-    assert "target: /opt/data" in text
-    assert text.count("type: bind") == 2
-    assert "user: \"0:0\"" in text
-    assert "HERMES_WRITE_SAFE_ROOT: /workspace:/opt/data" in text
+    argv = docker_run_argv()
+    assert argv[:3] == ["docker", "run", "--detach"]
+    assert "--privileged=false" in argv
 
 
 def test_versioned_skill_is_safe_and_not_powerunits() -> None:

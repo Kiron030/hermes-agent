@@ -41,6 +41,19 @@ authority proof may depend on them.
 
 Docker Desktop Linux containers are the canonical R5 primary boundary.
 
+```text
+DEVELOPER_HERMES_CONTROLLER      = PINNED_PURE_UPSTREAM
+DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
+GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
+REPO_A_REPO_B_SAME_TRUST_DOMAIN  = YES
+DEDICATED_CONTAINER_CLONES       = DO_NOT_EXECUTE_ON_HOST
+R5_F06_STATUS                    = OPEN_POLICY_DECISION
+```
+
+The container executes pinned `/opt/hermes`, not the mounted checkout.
+Repo A and Repo B are one RW trust domain. Do not execute dedicated
+clones under `W:\hermes-dev` on the host.
+
 Pinned modern runtime (from R1):
 
 ```text
@@ -64,6 +77,7 @@ python scripts/r5_developer_hermes/harness.py all
 python scripts/r5_developer_hermes/container/launch.py prove
 python scripts/r5_developer_hermes/container/launch.py prove-dx
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
 ```
 
 `prepare-runtime` reuses a matching R1 upstream worktree/venv when present.

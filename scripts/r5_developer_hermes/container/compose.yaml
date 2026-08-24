@@ -1,4 +1,6 @@
-# Developer-Hermes container contract.
+# NON-AUTHORITATIVE EXAMPLE ONLY.
+# Canonical launch contract: docker_run_argv() in contract.py, executed by launch.py.
+# Do not `docker compose up` this file. Tests exercise docker_run_argv, not compose.
 # Sandbox infrastructure around pinned upstream Hermes. Not Hermes-core.
 name: r5-developer-hermes
 

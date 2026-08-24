@@ -5,9 +5,11 @@ FROM nousresearch/hermes-agent@sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dc
 USER root
 
 # The pinned image already ships Node/npm, Python, uv, Git, and Hermes.
-# Add TypeScript (tsc) and a pytest wrapper so fullstack DX is container-local.
-RUN npm install -g typescript \
-    && printf '%s\n' '#!/bin/sh' 'exec uvx --from pytest pytest "$@"' > /usr/local/bin/pytest \
+# Pin TypeScript and pytest at image build. Do not resolve pytest from
+# the network on every test execution.
+RUN npm install -g typescript@7.0.2 \
+    && uv pip install --python /opt/hermes/.venv/bin/python pytest==9.1.1 \
+    && printf '%s\n' '#!/bin/sh' 'exec /opt/hermes/.venv/bin/python -m pytest "$@"' > /usr/local/bin/pytest \
     && chmod 0755 /usr/local/bin/pytest \
     && mkdir -p /opt/r5-developer /opt/data \
     && chown hermes:hermes /opt/data \

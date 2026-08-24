@@ -89,30 +89,25 @@ def test_docker_run_argv_is_narrow_and_unprivileged() -> None:
     assert "W:\\dataset" not in joined
 
 
-def test_compose_contract_matches_the_launcher() -> None:
+def test_canonical_launch_contract_is_docker_run_argv() -> None:
     text = (CONTAINER_DIR / "compose.yaml").read_text(encoding="utf-8")
     dockerfile = (CONTAINER_DIR / "Dockerfile").read_text(encoding="utf-8")
-    assert DEVELOPER_IMAGE in text
+    assert "NON-AUTHORITATIVE EXAMPLE ONLY" in text
+    assert "docker_run_argv()" in text
     assert PINNED_IMAGE in dockerfile
     assert PINNED_DIGEST in dockerfile
-    assert "privileged: false" in text
-    assert "network_mode: bridge" in text
+    argv = docker_run_argv()
+    assert argv[:3] == ["docker", "run", "--detach"]
+    assert DEVELOPER_IMAGE in argv
+    assert "--privileged=false" in argv
     assert "pid: host" not in text
-    assert "env_file:" not in text
-    assert "/var/run/docker.sock" not in text
-    assert "docker_engine" not in text
-    assert "C:/Users" not in text
-    assert "W:/Workbench" not in text
-    assert "W:/dataset" not in text
-    assert "source: W:/hermes-dev/workspace/hermes-agent" in text
-    assert "target: /workspace/hermes-agent" in text
-    assert "source: W:/hermes-dev/workspace/EU-PP-Database" in text
-    assert "target: /workspace/EU-PP-Database" in text
-    assert text.count("type: bind") == 2
-    assert "type: volume" in text
-    assert "HERMES_HOME: /opt/data" in text
-    assert "/opt/data" in text
     assert "/init" not in text
+    joined = " ".join(argv)
+    assert "/var/run/docker.sock" not in joined
+    assert "docker_engine" not in joined
+    assert "C:\\Users" not in joined
+    assert "W:\\Workbench" not in joined
+    assert "W:\\dataset" not in joined
 
 
 def test_container_files_add_no_hermes_core() -> None:

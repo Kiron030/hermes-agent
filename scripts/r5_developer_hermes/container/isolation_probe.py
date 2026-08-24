@@ -235,17 +235,15 @@ def _pytest_subset() -> dict[str, str]:
     if not target.is_file():
         return {"TEST_LOOP": "NO", "PYTEST": "NO", "reason": "target-missing"}
     pytest_bin = shutil.which("pytest") or ""
-    if pytest_bin:
-        completed = _run([pytest_bin, str(target), "-q", "--tb=no"], cwd=REPO_A, timeout=180)
-        runner = "pytest"
-    else:
-        uvx = shutil.which("uvx") or "uvx"
-        completed = _run(
-            [uvx, "--from", "pytest", "pytest", str(target), "-q", "--tb=no"],
-            cwd=REPO_A,
-            timeout=180,
-        )
-        runner = "uvx-pytest"
+    if not pytest_bin:
+        return {
+            "TEST_LOOP": "NO",
+            "PYTEST": "NO",
+            "reason": "pytest-not-installed",
+            "runner": "none",
+        }
+    completed = _run([pytest_bin, str(target), "-q", "--tb=no"], cwd=REPO_A, timeout=180)
+    runner = "pytest"
     return {
         "TEST_LOOP": "YES" if completed.returncode == 0 else "NO",
         "PYTEST": "YES" if completed.returncode == 0 else "NO",

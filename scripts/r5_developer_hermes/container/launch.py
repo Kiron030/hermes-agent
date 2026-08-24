@@ -24,29 +24,30 @@ if str(SCRIPTS) not in sys.path:
 
 from r5_developer_hermes.container.contract import (  # noqa: E402
     AUTHORITY_ENV_NAMES,
-    BIND_MOUNTS,
+    BOT_MODE_CONTAINER_COMPATIBILITY,
     CONTAINER_HERMES_HOME,
     CONTAINER_NAME,
     CONTAINER_WORKDIR,
+    DESKTOP_CONTAINER_COMPATIBILITY,
     DEVELOPER_IMAGE,
     DEDICATED_MODEL_ENV_FILE,
     HERMES_HOME_MECHANISM,
     HERMES_HOME_VOLUME,
+    HERMES_HOME_VOLUME_LITERAL,
     HOST_REPO_A,
     HOST_REPO_B,
     PINNED_DIGEST,
     PINNED_IMAGE,
-    REPO_A_CONTAINER,
-    REPO_B_CONTAINER,
     RUNTIME_GID,
     RUNTIME_UID,
     RUNTIME_USER,
     WINDOWS_DOCKER_EXE,
+    assert_trusted_host_launcher,
+    classify_inspect_mounts,
     docker_run_argv,
-    is_forbidden_host_source,
     model_credential_status,
-    normalize_host_path,
     parse_dedicated_model_env,
+    sanitize_container_inspect,
 )
 from r5_developer_hermes.harness import artifacts_dir, write_json  # noqa: E402
 
@@ -55,6 +56,10 @@ CONTAINER_ARTIFACT = "container_boundary.json"
 DX_ARTIFACT = "developer_dx.json"
 PROBE_CONTAINER_PATH = "/tmp/r5_isolation_probe.py"
 DX_PROBE_CONTAINER_PATH = "/tmp/r5_dx_probe.py"
+
+
+def _assert_host_execution_trust() -> None:
+    assert_trusted_host_launcher(Path(__file__), HERE.parents[2])
 
 
 def docker_exe() -> str:
@@ -99,6 +104,7 @@ def container_exists(name: str = CONTAINER_NAME) -> bool:
 
 
 def ensure_volume() -> dict[str, Any]:
+    _assert_host_execution_trust()
     docker(["volume", "create", HERMES_HOME_VOLUME], check=False)
     docker(
         [
@@ -121,6 +127,7 @@ def ensure_volume() -> dict[str, Any]:
 
 
 def build_image() -> dict[str, Any]:
+    _assert_host_execution_trust()
     dockerfile = HERE / "Dockerfile"
     text = dockerfile.read_text(encoding="utf-8")
     if PINNED_IMAGE not in text or PINNED_DIGEST not in text:
@@ -151,6 +158,7 @@ def _model_env() -> dict[str, str]:
 
 
 def up() -> dict[str, Any]:
+    _assert_host_execution_trust()
     assert_linux_engine()
     if not HOST_REPO_A.is_dir() or not HOST_REPO_B.is_dir():
         raise RuntimeError("dedicated workspace clones are missing")
@@ -158,7 +166,7 @@ def up() -> dict[str, Any]:
         existing = _inspect()
         image = existing.get("image") or ""
         user = existing.get("user") or ""
-        env_names = {item.split("=", 1)[0] for item in existing.get("env") or [] if "=" in item}
+        env_names = set(existing.get("env_names") or [])
         dx_ready = (
             DEVELOPER_IMAGE in image
             and user in {
@@ -204,16 +212,38 @@ def up() -> dict[str, Any]:
 
 
 def down(*, remove_volume: bool = False) -> dict[str, Any]:
+    _assert_host_execution_trust()
     completed = docker(["rm", "-f", CONTAINER_NAME], check=False)
     volume_removed = False
     if remove_volume:
-        docker(["volume", "rm", HERMES_HOME_VOLUME], check=False)
+        if HERMES_HOME_VOLUME != HERMES_HOME_VOLUME_LITERAL:
+            raise RuntimeError("refusing to remove a non-canonical Hermes home volume")
+        docker(["volume", "rm", HERMES_HOME_VOLUME_LITERAL], check=False)
         volume_removed = True
     return {
         "action": "removed",
         "name": CONTAINER_NAME,
         "exit_code": completed.returncode,
         "volume_removed": volume_removed,
+    }
+
+
+def reset_home() -> dict[str, Any]:
+    """Stop the container and delete only the fixed Developer-Hermes home volume."""
+    _assert_host_execution_trust()
+    if HERMES_HOME_VOLUME != HERMES_HOME_VOLUME_LITERAL:
+        raise RuntimeError("refusing to reset a non-canonical Hermes home volume")
+    stopped = down(remove_volume=False)
+    removed = docker(["volume", "rm", HERMES_HOME_VOLUME_LITERAL], check=False)
+    return {
+        "action": "RESET_DEVELOPER_HERMES_HOME",
+        "name": CONTAINER_NAME,
+        "volume": HERMES_HOME_VOLUME_LITERAL,
+        "container": stopped,
+        "volume_removed": removed.returncode == 0,
+        "repos_touched": "NO",
+        "host_secrets_touched": "NO",
+        "production_touched": "NO",
     }
 
 
@@ -250,85 +280,14 @@ def exec_in(
 
 
 def _inspect() -> dict[str, Any]:
-    raw = docker(["inspect", CONTAINER_NAME]).stdout
-    payload = json.loads(raw)[0]
-    mounts = payload.get("Mounts") or []
-    host_config = payload.get("HostConfig") or {}
-    config = payload.get("Config") or {}
-    bind_mounts = [
-        {
-            "source": item.get("Source"),
-            "destination": item.get("Destination"),
-            "mode": item.get("Mode") or item.get("RW"),
-            "rw": bool(item.get("RW")),
-            "type": item.get("Type"),
-            "name": item.get("Name"),
-        }
-        for item in mounts
-    ]
-    return {
-        "id": payload.get("Id"),
-        "image": config.get("Image") or payload.get("Image"),
-        "image_id": payload.get("Image"),
-        "user": config.get("User") or "",
-        "privileged": bool(host_config.get("Privileged")),
-        "pid_mode": host_config.get("PidMode") or "",
-        "network_mode": host_config.get("NetworkMode") or "",
-        "runtime": host_config.get("Runtime") or "",
-        "env": list(config.get("Env") or []),
-        "working_dir": config.get("WorkingDir"),
-        "mounts": bind_mounts,
-    }
+    # Parse inspect in memory and immediately drop Config.Env values.
+    # Do not persist or log the raw payload.
+    payload = json.loads(docker(["inspect", CONTAINER_NAME]).stdout)[0]
+    return sanitize_container_inspect(payload)
 
 
 def _classify_mounts(inspect_data: dict[str, Any]) -> dict[str, Any]:
-    mounts = inspect_data["mounts"]
-    binds = [item for item in mounts if str(item.get("type") or "").lower() == "bind"]
-    volumes = [item for item in mounts if str(item.get("type") or "").lower() == "volume"]
-    dests = {item["destination"] for item in binds}
-    sources = [str(item["source"] or "") for item in binds]
-    approved_dests = {REPO_A_CONTAINER, REPO_B_CONTAINER}
-    extra_dests = sorted(dests - approved_dests)
-    missing_dests = sorted(approved_dests - dests)
-    forbidden_sources = [source for source in sources if is_forbidden_host_source(source)]
-    whole_w = any(normalize_host_path(source) in {"w:", r"w:"} for source in sources)
-    rw_ok = all(item.get("rw") for item in binds if item["destination"] in approved_dests)
-    hermes_home_volume = any(
-        item.get("destination") == CONTAINER_HERMES_HOME
-        and str(item.get("type") or "").lower() == "volume"
-        and (item.get("name") == HERMES_HOME_VOLUME or HERMES_HOME_VOLUME in str(item.get("source") or ""))
-        for item in volumes
-    )
-    non_bind = [
-        {
-            "destination": item.get("destination"),
-            "type": item.get("type"),
-            "source": item.get("source"),
-            "name": item.get("name"),
-        }
-        for item in mounts
-        if str(item.get("type") or "").lower() != "bind"
-    ]
-    return {
-        "MOUNTS_RW": sorted(dests),
-        "exact_two_approved_rw": dests == approved_dests and rw_ok and not extra_dests and not missing_dests,
-        "extra_host_bind_destinations": extra_dests,
-        "missing_destinations": missing_dests,
-        "forbidden_sources": forbidden_sources,
-        "non_host_mounts": non_bind,
-        "HERMES_HOME_VOLUME_PRESENT": "YES" if hermes_home_volume else "NO",
-        "HOST_W_WHOLE_MOUNTED": "YES" if whole_w else "NO",
-        "HOST_C_MOUNTED": "YES" if any(normalize_host_path(src).startswith("c:") for src in sources) else "NO",
-        "HOST_D_MOUNTED": "YES" if any(normalize_host_path(src).startswith("d:") for src in sources) else "NO",
-        "HOST_W_MOUNTED": "YES"
-        if any(
-            normalize_host_path(src).startswith("w:")
-            and normalize_host_path(src)
-            not in {normalize_host_path(str(HOST_REPO_A)), normalize_host_path(str(HOST_REPO_B))}
-            for src in sources
-        )
-        else "NO",
-    }
+    return classify_inspect_mounts(list(inspect_data.get("mounts") or []))
 
 
 def _copy_probe() -> None:
@@ -347,7 +306,7 @@ def _exec_json(script: str) -> dict[str, Any]:
 
 
 def _env_names(inspect_data: dict[str, Any]) -> list[str]:
-    return sorted(item.split("=", 1)[0] for item in inspect_data["env"] if "=" in item)
+    return list(inspect_data.get("env_names") or [])
 
 
 def _verdict(inspect_data: dict[str, Any], mounts: dict[str, Any], probe: dict[str, Any]) -> str:
@@ -356,6 +315,7 @@ def _verdict(inspect_data: dict[str, Any], mounts: dict[str, Any], probe: dict[s
     leaked_authority = sorted(name for name in AUTHORITY_ENV_NAMES if name in env_names)
     required = [
         mounts["exact_two_approved_rw"],
+        mounts.get("exact_allowlist_match", False),
         not mounts["forbidden_sources"],
         mounts["HOST_C_MOUNTED"] == "NO",
         mounts["HOST_D_MOUNTED"] == "NO",
@@ -433,6 +393,7 @@ def prove_persistence() -> dict[str, Any]:
 
 
 def prove() -> dict[str, Any]:
+    _assert_host_execution_trust()
     if not HOST_REPO_A.is_dir() or not HOST_REPO_B.is_dir():
         raise RuntimeError("dedicated workspace clones are missing")
     started = up()
@@ -468,6 +429,7 @@ def prove() -> dict[str, Any]:
         "probe": probe,
         "launch": started,
         "model_credential": {k: v for k, v in model.items() if k != "key_names" or True},
+        "DIAGNOSTIC_ENV_VALUES": "OMITTED",
         "HOST_PROFILE_REACHABLE": probe["negative_paths"]["HOST_PROFILE_REACHABLE"],
         "HOST_SECRET_ROOT_REACHABLE": probe["negative_paths"]["HOST_SECRET_ROOT_REACHABLE"],
         "OTHER_HOST_WRITE": "NO",
@@ -526,8 +488,8 @@ def prove_dx() -> dict[str, Any]:
         ),
         "HERMES_CORE_FILES_ADDED_BY_DX": 0,
         "HERMES_CORE_STRATEGY_CHANGED": "NO",
-        "DESKTOP_CONTAINER_COMPATIBILITY": "PROMISING",
-        "BOT_MODE_CONTAINER_COMPATIBILITY": "PROMISING",
+        "DESKTOP_CONTAINER_COMPATIBILITY": DESKTOP_CONTAINER_COMPATIBILITY,
+        "BOT_MODE_CONTAINER_COMPATIBILITY": BOT_MODE_CONTAINER_COMPATIBILITY,
         "RAILWAY_AUTH": "ABSENT",
         "VERCEL_AUTH": "ABSENT",
         "GH_HOST_AUTH": "ABSENT",
@@ -539,10 +501,11 @@ def prove_dx() -> dict[str, Any]:
 
 
 def main() -> int:
+    _assert_host_execution_trust()
     parser = argparse.ArgumentParser(description="R5 Developer-Hermes container launcher")
     parser.add_argument(
         "command",
-        choices=("argv", "build", "up", "down", "prove", "prove-dx", "inspect", "preflight"),
+        choices=("argv", "build", "up", "down", "reset", "prove", "prove-dx", "inspect", "preflight"),
     )
     args = parser.parse_args()
     if args.command == "argv":
@@ -569,6 +532,9 @@ def main() -> int:
         return 0
     if args.command == "down":
         write_json(artifacts_dir() / "container_down.json", down())
+        return 0
+    if args.command == "reset":
+        write_json(artifacts_dir() / "container_reset.json", reset_home())
         return 0
     if args.command == "inspect":
         write_json(artifacts_dir() / "container_inspect.json", _inspect())
