@@ -121,8 +121,10 @@ DOCKER_PULL_LATEST                  = FORBIDDEN
 Dedicated clones under `W:\hermes-dev` are container workspaces. Do not
 execute them on the host. Reset the named volume
 `r5-developer-hermes-home` after suspected prompt injection or poisoned
-persistent state. Egress policy is an open decision
-(`R5_EGRESS_POLICY_GATE`).
+persistent state. Egress policy is decided in
+[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md)
+(`R5_EGRESS_POLICY_GATE = PASS`) and enforced by a later slice; the running
+container is still unrestricted.
 
 ## Launch
 

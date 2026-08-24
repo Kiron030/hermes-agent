@@ -55,10 +55,20 @@ intentionally RW. Cross-repo mutation is expected. The two host bind mounts
 define the outer host boundary; they do not isolate the repos from each
 other.
 
-`R5_F06_STATUS = OPEN_POLICY_DECISION`: outbound egress remains unrestricted
-until `R5_EGRESS_POLICY_GATE`. Do not claim R5 fully closed while
-repository-confidentiality policy is undefined. Desktop and Bot Mode stay
+`R5_F06_STATUS = OPEN_POLICY_DECISION`: outbound egress is still unrestricted
+in the running container. The confidentiality contract itself is no longer
+undefined — `R5_EGRESS_POLICY_GATE = PASS` decided it in
+[`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md).
+The constant flips when `R5_EGRESS_POLICY_SMALL` enforces the policy. Do not
+claim R5 fully closed until then. Desktop and Bot Mode stay
 `NEEDS_REMEDIATION`.
+
+```text
+R5_CONFIDENTIALITY_CONTRACT = HOST_AND_PRODUCTION_ISOLATION
+                              + PRIVATE_REPO_CONFIDENTIALITY_AGAINST_
+                                ARBITRARY_THIRD_PARTIES
+SELECTED_EGRESS_ARCHITECTURE = ENFORCING_BROKER_ON_INTERNAL_DOCKER_NETWORK
+```
 
 Runtime proofs must also show source/image/container identity convergence.
 See [`hermes_r5_developer_dx_v1.md`](./hermes_r5_developer_dx_v1.md)
