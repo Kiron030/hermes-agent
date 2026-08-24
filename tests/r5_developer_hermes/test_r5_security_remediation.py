@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import inspect
 import json
+import ntpath
+import os
+from pathlib import PureWindowsPath
+
 import pytest
 
 from r5_developer_hermes.container.contract import (
@@ -252,9 +256,16 @@ def test_host_launcher_from_dedicated_clone_is_denied() -> None:
     clone_script = r"W:\hermes-dev\workspace\hermes-agent\scripts\r5_developer_hermes\container\launch.py"
     clone_root = r"W:\hermes-dev\workspace\hermes-agent"
     relative_escape = r"W:\Workbench\hermes-agent\..\..\hermes-dev\workspace\hermes-agent\scripts\r5_developer_hermes\container\launch.py"
+    # Linux pathlib does not collapse Windows-backslash "..". Express the
+    # intended host path with deterministic Windows canonicalization so the
+    # same denial holds on Linux CI and native Windows.
+    windows_canonical_escape = str(PureWindowsPath(ntpath.normpath(relative_escape)))
+    assert windows_canonical_escape.replace("/", "\\").casefold() == clone_script.casefold()
     assert is_under_dedicated_clone_root(clone_script) is True
     assert is_under_dedicated_clone_root(clone_root) is True
-    assert is_under_dedicated_clone_root(relative_escape) is True
+    assert is_under_dedicated_clone_root(windows_canonical_escape) is True
+    if os.name == "nt":
+        assert is_under_dedicated_clone_root(relative_escape) is True
     assert is_under_dedicated_clone_root(r"W:\Workbench\hermes-agent") is False
     with pytest.raises(RuntimeError, match="HOST_LAUNCHER_FROM_CONTAINER_CLONE"):
         assert_trusted_host_launcher(clone_script, clone_root)

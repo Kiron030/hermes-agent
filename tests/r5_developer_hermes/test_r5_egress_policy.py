@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
+from pathlib import PureWindowsPath
 
 import pytest
 
@@ -127,7 +129,13 @@ def test_broker_receives_no_repository_socket_or_host_secret() -> None:
     assert "--publish" not in argv and "-p" not in argv
     for source, _dst in BIND_MOUNTS:
         assert source not in joined
-    assert str(egress.EGRESS_TOKEN_FILE.parent) not in joined
+    # Linux pathlib treats a Windows drive path as a single name, so
+    # Path(...).parent becomes ".". Keep the Windows host-secret root
+    # explicit: W:\hermes-dev\credentials must never be a broker mount.
+    credentials_root = str(PureWindowsPath(r"W:\hermes-dev\credentials"))
+    assert str(PureWindowsPath(os.fspath(egress.EGRESS_TOKEN_FILE)).parent) == credentials_root
+    assert credentials_root not in joined
+    assert r"W:\hermes-dev\credentials" not in joined
     # Two networks, and the internal one is where the sandbox reaches it.
     assert egress.INTERNAL_NETWORK in argv
 

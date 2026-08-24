@@ -352,8 +352,8 @@ def os_principal_status() -> dict[str, Any]:
     if os.name != "nt":
         return {
             "platform": os.name,
-            "principal_id": str(os.getuid()),  # type: ignore[attr-defined]
-            "is_administrator": os.getuid() == 0,  # type: ignore[attr-defined]
+            "principal_id": str(os.getuid()),  # type: ignore[attr-defined]  # windows-footgun: ok — POSIX branch behind os.name != "nt"
+            "is_administrator": os.getuid() == 0,  # type: ignore[attr-defined]  # windows-footgun: ok — POSIX branch behind os.name != "nt"
         }
     account = sid = None
     completed = subprocess.run(
