@@ -89,6 +89,10 @@ python scripts/r5_developer_hermes/container/launch.py prove
 python scripts/r5_developer_hermes/container/launch.py prove-dx
 python scripts/r5_developer_hermes/container/launch.py desktop-up
 python scripts/r5_developer_hermes/container/launch.py prove-desktop
+python scripts/r5_developer_hermes/desktop_remote_client.py locate-source
+python scripts/r5_developer_hermes/desktop_remote_client.py seed-connection
+python scripts/r5_developer_hermes/desktop_remote_client.py pack
+python scripts/r5_developer_hermes/desktop_remote_client.py preflight
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
@@ -110,6 +114,18 @@ before a local backend is spawned. `HERMES_DESKTOP_REMOTE_URL` alone
 does not skip first-run bootstrap for a password-gated gateway (the
 boot path also requires `HERMES_DESKTOP_REMOTE_TOKEN` and forces
 legacy token auth).
+
+Build the official unmodified Electron Desktop from the exact pin
+(`v2026.8.19` / `0.20.5`) with `desktop_remote_client.py`. That helper
+locates a workbench worktree at the pin SHA, runs the upstream
+`npm run pack` (`--dir`, unpacked `Hermes.exe`), and writes the official
+`%APPDATA%\\Hermes\\connection.json` remote profile
+(`mode=remote`, `authMode=oauth`, `http://127.0.0.1:19119`) *before*
+first start so `runPrimaryBackendStartup` resolves remote and never
+enters `ensureRuntime` / `runBootstrap` / `install.ps1`. Do not build
+from the current checkout `apps/desktop` if it is newer than the pin.
+Node `>=22.22.0` is required by the pinned Desktop package. Do not
+commit generated binaries.
 
 Egress:
 

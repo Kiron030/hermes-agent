@@ -280,6 +280,13 @@ Hermes. Electron Remote Gateway can skip that local spawn only when
 `connection.json` (or a complete env remote) is already remote *before*
 `startHermes()` falls through to `resolveHermesBackend()`.
 
+Reproduce the official remote-only Windows client from the exact pin
+with `scripts/r5_developer_hermes/desktop_remote_client.py`: locate the
+pinned source, `npm run pack`, and pre-seed
+`%APPDATA%\Hermes\connection.json` before the first Electron start.
+`authMode=oauth` is the official cookie / ws-ticket gate (including
+password-login). Do not switch the gateway to token auth for this path.
+
 Bot Mode remains unimplemented. Future routing intent remains Terra
 default, Luna cheap/auxiliary, Sol explicit escalation.
 
