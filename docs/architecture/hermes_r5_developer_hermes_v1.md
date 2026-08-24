@@ -78,8 +78,10 @@ which performs the external retrieval; the sandbox never connects to the
 researched site. Approving a processor is an explicit human trust decision and
 does not approve the sites it reads. See
 [`hermes_r5_egress_policy_gate_v1.md`](./hermes_r5_egress_policy_gate_v1.md)
-for the decision and the evidence. Desktop and Bot Mode stay
-`NEEDS_REMEDIATION`.
+for the decision and the evidence. Official Desktop talks to Developer
+Hermes through a localhost-only authenticated sidecar
+(`DESKTOP_CONTAINER_COMPATIBILITY = OFFICIAL_REMOTE_GATEWAY`). Bot Mode
+stays `NEEDS_REMEDIATION`.
 
 ```text
 R5_CONFIDENTIALITY_CONTRACT = HOST_AND_PRODUCTION_ISOLATION
@@ -271,6 +273,9 @@ See `scripts/r5_developer_hermes/README.md`.
 
 No production Railway/Vercel deploy. No production DB. No execute secret.
 No `.env` harvest. No R2 plugin work. No R3 shadow comparison.
-No Desktop, Bot Mode, or model-routing implementation.
-`DESKTOP_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`
+No Bot Mode or model-routing implementation. Official Desktop uses the
+unchanged upstream app against the existing Developer container via a
+loopback sidecar; the Developer container is not attached to a routable
+network.
+`DESKTOP_CONTAINER_COMPATIBILITY = OFFICIAL_REMOTE_GATEWAY`
 `BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION`

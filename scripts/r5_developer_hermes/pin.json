@@ -23,7 +23,7 @@
   "repo_a_repo_b_same_trust_domain": "YES",
   "canonical_launch_contract": "docker_run_argv",
   "r5_f06_status": "ENFORCED_EGRESS_POLICY",
-  "desktop_container_compatibility": "NEEDS_REMEDIATION",
+  "desktop_container_compatibility": "OFFICIAL_REMOTE_GATEWAY",
   "bot_mode_container_compatibility": "NEEDS_REMEDIATION",
   "hermes_home_mechanism": "DOCKER_NAMED_VOLUME",
   "dedicated_principal_account": "hermes-dev",

@@ -133,7 +133,9 @@ The official image write sandbox is overridden to
 file tool can edit the two approved repo mounts. Host paths stay unmounted.
 The primary boundary is the bind-source allowlist.
 
-Desktop and Bot Mode isolation are not claimed by this sandbox
-(`NEEDS_REMEDIATION`). Outbound egress is enforced
+Official Desktop is inbound UI transport only
+(`DESKTOP_CONTAINER_COMPATIBILITY = OFFICIAL_REMOTE_GATEWAY`):
+`127.0.0.1:19119` via an authenticated sidecar. Bot Mode isolation is
+not claimed (`NEEDS_REMEDIATION`). Outbound egress is enforced
 (`R5_F06_STATUS = ENFORCED_EGRESS_POLICY`). Closeout:
 [`hermes_r5_closeout_v1.md`](../../../docs/architecture/hermes_r5_closeout_v1.md).

@@ -43,7 +43,7 @@ RESET_DEVELOPER_HERMES_HOME      = launch-developer-hermes.ps1 -Mode reset
 LINUX_CAPABILITY_HARDENING       = DEFERRED_WITH_RATIONALE
 R5_F06_STATUS                    = ENFORCED_EGRESS_POLICY
 EGRESS_MODE                      = PRIVATE_DEVELOPER_EGRESS_ENFORCED (or OFFLINE)
-DESKTOP_CONTAINER_COMPATIBILITY  = NEEDS_REMEDIATION
+DESKTOP_CONTAINER_COMPATIBILITY  = OFFICIAL_REMOTE_GATEWAY
 BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 ```
 
@@ -259,13 +259,50 @@ reach the two approved repo mounts without widening host paths.
 ## Desktop / Bot Mode
 
 ```text
-DESKTOP_CONTAINER_COMPATIBILITY  = NEEDS_REMEDIATION
+DESKTOP_CONTAINER_COMPATIBILITY  = OFFICIAL_REMOTE_GATEWAY
 BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 MODEL_ROUTING_CONFIGURABLE_WITHOUT_CORE_FORK = YES
+WINDOWS_COMPUTER_USE_ENABLED     = NO
 ```
 
-Not implemented in this slice. Inventory only: Desktop can later act as a
-remote-gateway control surface; Bot Mode can later run headlessly via
-outbound platform polling. Do not widen mounts or publish ports for those
-features here. Future routing intent remains Terra default, Luna
-cheap/auxiliary, Sol explicit escalation.
+Official Hermes Desktop (unchanged) connects as a Remote Gateway client to
+`http://127.0.0.1:19119`. The Developer container stays on the internal
+Docker network. A localhost-only authenticated sidecar is the dual-homed
+party. Credentials live in
+`W:\hermes-dev\credentials\developer-hermes-desktop.env` and are never
+mounted. Do not install a second Hermes runtime on Windows and do not
+enable Computer Use.
+
+The official website Windows download is Hermes Setup
+(`apps/bootstrap-installer`), not a thin client. It always bootstraps a
+local agent under `%LOCALAPPDATA%\hermes`. Do not run it for Developer
+Hermes. Electron Remote Gateway can skip that local spawn only when
+`connection.json` (or a complete env remote) is already remote *before*
+`startHermes()` falls through to `resolveHermesBackend()`.
+
+Reproduce the official remote-only Windows client from the exact pin
+with `scripts/r5_developer_hermes/desktop_remote_client.py`: locate the
+pinned source, `npm run pack`, and pre-seed
+`%APPDATA%\Hermes\connection.json` before the first Electron start.
+`authMode=oauth` is the official cookie / ws-ticket gate (including
+password-login). Do not switch the gateway to token auth for this path.
+
+Post-merge host residue is not a merge blocker. Distinguish three
+classes and clean them only after merge, never from the PR:
+
+- Pre-existing Hermes HOME (`%APPDATA%\Hermes` and any older
+  `%LOCALAPPDATA%\hermes` profile) predates this slice. Leave it unless
+  a human confirms it is unused.
+- Aborted website-installer / bootstrap residue under
+  `%LOCALAPPDATA%\hermes` is leftover from the rejected Setup /
+  `install.ps1` path. Do not delete it as part of this merge.
+- Official source-built Desktop pack artifacts live under
+  `W:\cache\hermes-desktop-official-v2026.8.19`. Those are generated
+  host outputs, not repo truth, and stay untracked.
+
+Bot Mode remains unimplemented. Future routing intent remains Terra
+default, Luna cheap/auxiliary, Sol explicit escalation.
+
+```powershell
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop
+```

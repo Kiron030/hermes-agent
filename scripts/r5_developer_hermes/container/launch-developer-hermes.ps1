@@ -27,10 +27,11 @@
     .\launch-developer-hermes.ps1 -Mode down
     .\launch-developer-hermes.ps1 -Mode reset -WhatIf
     .\launch-developer-hermes.ps1 -Mode reset
+    .\launch-developer-hermes.ps1 -Mode desktop
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset')]
+    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset', 'desktop', 'desktop-down')]
     [string] $Mode = 'shell'
 )
 
@@ -117,6 +118,14 @@ function Invoke-Launch {
 switch ($Mode) {
     'build' { Invoke-Launch 'build'; break }
     'up'    { Invoke-Launch 'up'; break }
+    'desktop' {
+        Invoke-Launch 'desktop-up'
+        Write-Host 'Official Desktop Remote Gateway: http://127.0.0.1:19119'
+        Write-Host 'Credentials: W:\hermes-dev\credentials\developer-hermes-desktop.env'
+        Write-Host 'Do not run the official website Windows installer / Hermes Setup; it installs a local Hermes runtime.'
+        break
+    }
+    'desktop-down' { Invoke-Launch 'desktop-down'; break }
     'down'  { Invoke-Launch 'down'; break }
     'prove' { Invoke-Launch 'prove-dx'; break }
     'reset' {

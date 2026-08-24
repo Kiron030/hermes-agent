@@ -69,6 +69,7 @@ from r5_developer_hermes.container.image_identity import (  # noqa: E402
     parse_typescript_version,
     required_labels_present,
 )
+from r5_developer_hermes.container import desktop as desktop_gw  # noqa: E402
 from r5_developer_hermes.container.egress import host as egress  # noqa: E402
 from r5_developer_hermes.harness import artifacts_dir, write_json  # noqa: E402
 
@@ -76,6 +77,7 @@ from r5_developer_hermes.harness import artifacts_dir, write_json  # noqa: E402
 CONTAINER_ARTIFACT = "container_boundary.json"
 DX_ARTIFACT = "developer_dx.json"
 EGRESS_ARTIFACT = "egress_boundary.json"
+DESKTOP_ARTIFACT = "desktop_gateway.json"
 PROBE_CONTAINER_PATH = "/tmp/r5_isolation_probe.py"
 DX_PROBE_CONTAINER_PATH = "/tmp/r5_dx_probe.py"
 
@@ -667,6 +669,7 @@ def _up_developer() -> dict[str, Any]:
 
 def down(*, remove_volume: bool = False) -> dict[str, Any]:
     _assert_host_execution_trust()
+    desktop_stopped = stop_desktop()
     completed = docker(["rm", "-f", CONTAINER_NAME], check=False)
     teardown_egress(remove_networks=False)
     volume_removed = False
@@ -680,6 +683,7 @@ def down(*, remove_volume: bool = False) -> dict[str, Any]:
         "name": CONTAINER_NAME,
         "exit_code": completed.returncode,
         "volume_removed": volume_removed,
+        "desktop": desktop_stopped,
     }
 
 
@@ -699,6 +703,195 @@ def reset_home() -> dict[str, Any]:
         "repos_touched": "NO",
         "host_secrets_touched": "NO",
         "production_touched": "NO",
+    }
+
+
+def sidecar_running() -> bool:
+    completed = docker(
+        ["inspect", "-f", "{{.State.Running}}", desktop_gw.SIDECAR_CONTAINER_NAME],
+        check=False,
+    )
+    return completed.returncode == 0 and completed.stdout.strip() == "true"
+
+
+def _developer_serve_listening() -> bool:
+    if not container_running():
+        return False
+    probe = (
+        "import socket,sys;"
+        f"s=socket.socket();s.settimeout(2);"
+        f"sys.exit(s.connect_ex(('127.0.0.1',{desktop_gw.CONTAINER_SERVE_PORT})))"
+    )
+    completed = exec_in(
+        ["/opt/hermes/.venv/bin/python", "-c", probe],
+        check=False,
+    )
+    return completed.returncode == 0
+
+
+def ensure_ingress_network() -> dict[str, Any]:
+    """Create the desktop ingress network. Fail closed if it is unexpectedly internal."""
+    _assert_host_execution_trust()
+    if not _network_exists(desktop_gw.INGRESS_NETWORK):
+        created = docker(desktop_gw.ingress_create_argv()[1:], check=False)
+        if created.returncode != 0:
+            docker(
+                [
+                    "network",
+                    "create",
+                    "--driver",
+                    "bridge",
+                    desktop_gw.INGRESS_NETWORK,
+                ]
+            )
+    if _network_is_internal(desktop_gw.INGRESS_NETWORK):
+        raise RuntimeError(
+            "DESKTOP_INGRESS_FAIL_CLOSED: ingress network is internal, so "
+            "host port publish cannot work"
+        )
+    return {"INGRESS_NETWORK": desktop_gw.INGRESS_NETWORK}
+
+
+def start_hermes_serve() -> dict[str, Any]:
+    """Start authenticated hermes serve inside the existing Developer container."""
+    _assert_host_execution_trust()
+    if not container_running():
+        raise RuntimeError("Developer Hermes is not running; start it before desktop mode")
+    if _developer_serve_listening():
+        return {"HERMES_SERVE": "already-running", "CONTAINER_BIND": desktop_gw.HERMES_SERVE_HOST}
+    creds = desktop_gw.ensure_desktop_auth()
+    cmd = [
+        docker_exe(),
+        "exec",
+        "-d",
+        "-u",
+        f"{RUNTIME_UID}:{RUNTIME_GID}",
+        "-w",
+        CONTAINER_WORKDIR,
+        "-e",
+        f"HERMES_DASHBOARD_BASIC_AUTH_USERNAME={creds['HERMES_DASHBOARD_BASIC_AUTH_USERNAME']}",
+        "-e",
+        f"HERMES_DASHBOARD_BASIC_AUTH_PASSWORD={creds['HERMES_DASHBOARD_BASIC_AUTH_PASSWORD']}",
+        "-e",
+        f"HERMES_DASHBOARD_BASIC_AUTH_SECRET={creds['HERMES_DASHBOARD_BASIC_AUTH_SECRET']}",
+        "-e",
+        f"HERMES_DASHBOARD_FILES_ROOT={desktop_gw.FILES_ROOT}",
+        "-e",
+        f"HERMES_HOME={CONTAINER_HERMES_HOME}",
+        "-e",
+        f"HOME={CONTAINER_HERMES_HOME}",
+        CONTAINER_NAME,
+        desktop_gw.HERMES_SERVE_BIN,
+        "serve",
+        "--host",
+        desktop_gw.HERMES_SERVE_HOST,
+        "--port",
+        str(desktop_gw.CONTAINER_SERVE_PORT),
+        "--skip-build",
+    ]
+    completed = subprocess.run(cmd, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "hermes serve failed to start: "
+            f"{(completed.stderr or completed.stdout).strip()[:500]}"
+        )
+    deadline = time.time() + 45
+    while time.time() < deadline:
+        if _developer_serve_listening():
+            return {
+                "HERMES_SERVE": "started",
+                "CONTAINER_BIND": desktop_gw.HERMES_SERVE_HOST,
+                "CONTAINER_PORT": desktop_gw.CONTAINER_SERVE_PORT,
+            }
+        time.sleep(1)
+    logs = exec_in(["sh", "-c", "ps -ef | grep '[h]ermes serve' || true"], check=False)
+    raise RuntimeError(
+        "hermes serve did not become reachable on the container loopback. "
+        f"{(logs.stdout or logs.stderr).strip()[:400]}"
+    )
+
+
+def start_sidecar() -> dict[str, Any]:
+    """Publish 127.0.0.1:HOST_PORT via the inbound sidecar."""
+    _assert_host_execution_trust()
+    ensure_ingress_network()
+    if sidecar_running():
+        return {
+            "SIDECAR": "already-running",
+            "HOST_BIND": desktop_gw.HOST_BIND,
+            "HOST_PORT": desktop_gw.HOST_PORT,
+        }
+    docker(["rm", "-f", desktop_gw.SIDECAR_CONTAINER_NAME], check=False)
+    argv = desktop_gw.sidecar_run_argv(image=DEVELOPER_IMAGE)
+    created = subprocess.run(
+        [docker_exe(), "create", *argv[3:]],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if created.returncode != 0:
+        raise RuntimeError(
+            "desktop sidecar create failed: "
+            f"{(created.stderr or created.stdout).strip()[:500]}"
+        )
+    docker(
+        [
+            "cp",
+            str(desktop_gw.SIDECAR_SCRIPT_HOST_PATH),
+            f"{desktop_gw.SIDECAR_CONTAINER_NAME}:{desktop_gw.SIDECAR_SCRIPT_CONTAINER_PATH}",
+        ]
+    )
+    docker(["start", desktop_gw.SIDECAR_CONTAINER_NAME])
+    docker(["network", "connect", egress.INTERNAL_NETWORK, desktop_gw.SIDECAR_CONTAINER_NAME])
+    if not sidecar_running():
+        logs = docker(["logs", "--tail", "20", desktop_gw.SIDECAR_CONTAINER_NAME], check=False)
+        raise RuntimeError(
+            "desktop sidecar failed to start. "
+            f"{(logs.stdout or logs.stderr).strip()[:400]}"
+        )
+    return {
+        "SIDECAR": "started",
+        "HOST_BIND": desktop_gw.HOST_BIND,
+        "HOST_PORT": desktop_gw.HOST_PORT,
+        "argv_without_secrets": argv,
+    }
+
+
+def stop_desktop() -> dict[str, Any]:
+    """Stop the inbound sidecar. Developer Hermes itself stays unless down() runs."""
+    _assert_host_execution_trust()
+    removed = docker(["rm", "-f", desktop_gw.SIDECAR_CONTAINER_NAME], check=False)
+    if container_running():
+        exec_in(
+            ["sh", "-c", "pkill -f '[h]ermes serve' || true"],
+            check=False,
+        )
+    return {
+        "sidecar_removed": removed.returncode == 0,
+        "serve_stopped": "YES",
+    }
+
+
+def desktop_up() -> dict[str, Any]:
+    """Bring up Developer Hermes, then the opt-in Desktop remote-gateway path."""
+    _assert_host_execution_trust()
+    started = up()
+    serve = start_hermes_serve()
+    sidecar = start_sidecar()
+    return {
+        **started,
+        "desktop": {
+            "TRANSPORT": desktop_gw.DESKTOP_TRANSPORT,
+            "BASE_URL": desktop_gw.desktop_base_url(),
+            "HOST_BIND": desktop_gw.HOST_BIND,
+            "HOST_PORT": desktop_gw.HOST_PORT,
+            "CONTAINER_BIND": desktop_gw.HERMES_SERVE_HOST,
+            "CONTAINER_PORT": desktop_gw.CONTAINER_SERVE_PORT,
+            "AUTH_MECHANISM": "dashboard.basic_auth",
+            "serve": serve,
+            "sidecar": sidecar,
+            "auth": desktop_gw.desktop_auth_status(),
+        },
     }
 
 
@@ -1337,6 +1530,358 @@ def prove_dx() -> dict[str, Any]:
     return result
 
 
+def _host_loopback_listeners(port: int) -> dict[str, Any]:
+    """Prove the Desktop port is published on 127.0.0.1 only."""
+    import socket
+
+    loopback = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    loopback.settimeout(2)
+    loopback_ok = loopback.connect_ex((desktop_gw.HOST_BIND, port)) == 0
+    loopback.close()
+    lan_ok = False
+    lan_addr = ""
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("192.0.2.1", 80))
+        lan_addr = probe.getsockname()[0]
+        probe.close()
+        if lan_addr and not lan_addr.startswith("127."):
+            lan = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            lan.settimeout(1)
+            lan_ok = lan.connect_ex((lan_addr, port)) == 0
+            lan.close()
+    except OSError:
+        lan_addr = ""
+    wildcard = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    wildcard.settimeout(1)
+    try:
+        wildcard.bind(("0.0.0.0", port))
+        wildcard_free = True
+    except OSError:
+        wildcard_free = False
+    finally:
+        wildcard.close()
+    return {
+        "LOOPBACK_REACHABLE": "YES" if loopback_ok else "NO",
+        "LAN_ADDRESS": lan_addr,
+        "LAN_REACHABLE": "YES" if lan_ok else "NO",
+        "WILDCARD_BIND_FREE": "YES" if wildcard_free else "NO",
+        "HOST_BIND": desktop_gw.HOST_BIND,
+        "HOST_PORT": port,
+    }
+
+
+def _http_json(
+    method: str,
+    path: str,
+    *,
+    body: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    cookies: str = "",
+    timeout: int = 8,
+) -> tuple[int, dict[str, str], Any]:
+    import json as json_lib
+    import urllib.error
+    import urllib.request
+
+    url = desktop_gw.desktop_base_url() + path
+    data = None if body is None else json_lib.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Accept", "application/json")
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+    if cookies:
+        req.add_header("Cookie", cookies)
+    for key, value in (headers or {}).items():
+        req.add_header(key, value)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+            payload: Any
+            try:
+                payload = json_lib.loads(raw.decode("utf-8") or "null")
+            except ValueError:
+                payload = {"text": raw[:200].decode("utf-8", errors="replace")}
+            cookie = resp.headers.get("Set-Cookie") or ""
+            return resp.status, {"set-cookie": cookie}, payload
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        try:
+            payload = json_lib.loads(raw.decode("utf-8") or "null")
+        except ValueError:
+            payload = {"text": raw[:200].decode("utf-8", errors="replace")}
+        return exc.code, {"set-cookie": exc.headers.get("Set-Cookie") or ""}, payload
+
+
+def _cookie_header(set_cookie: str, previous: str = "") -> str:
+    parts = [item.strip() for item in previous.split(";") if item.strip()]
+    if set_cookie:
+        name_value = set_cookie.split(";", 1)[0].strip()
+        if name_value:
+            key = name_value.split("=", 1)[0]
+            parts = [item for item in parts if not item.startswith(key + "=")]
+            parts.append(name_value)
+    return "; ".join(parts)
+
+
+def _ws_probe(*, ticket: str | None, expect_accept: bool) -> dict[str, Any]:
+    """Minimal WebSocket upgrade against /api/ws. Does not log credentials."""
+    import base64
+    import hashlib
+    import socket
+
+    key = base64.b64encode(secrets_token()).decode("ascii")
+    query = f"ticket={ticket}" if ticket else ""
+    path = "/api/ws" + (f"?{query}" if query else "")
+    req = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {desktop_gw.HOST_BIND}:{desktop_gw.HOST_PORT}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {key}\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n"
+    )
+    sock = socket.create_connection((desktop_gw.HOST_BIND, desktop_gw.HOST_PORT), timeout=5)
+    try:
+        sock.sendall(req.encode("ascii"))
+        raw = sock.recv(1024).decode("iso-8859-1", errors="replace")
+        status_line = raw.split("\r\n", 1)[0]
+        accepted = " 101 " in f" {status_line} " or status_line.endswith("101")
+        if expect_accept and accepted:
+            expected = base64.b64encode(
+                hashlib.sha1(
+                    (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")
+                ).digest()
+            ).decode("ascii")
+            if expected not in raw:
+                accepted = False
+        return {
+            "status_line": status_line[:80],
+            "ACCEPTED": "YES" if accepted else "NO",
+            "EXPECTED": "YES" if expect_accept == accepted else "NO",
+        }
+    finally:
+        sock.close()
+
+
+def secrets_token() -> bytes:
+    import os as os_mod
+
+    return os_mod.urandom(16)
+
+
+def _sidecar_inspect() -> dict[str, Any]:
+    completed = docker(["inspect", desktop_gw.SIDECAR_CONTAINER_NAME], check=False)
+    if completed.returncode != 0:
+        return {"SIDECAR_PRESENT": "NO"}
+    payload = json.loads(completed.stdout)[0]
+    classified = desktop_gw.classify_sidecar_inspect(payload)
+    classified["SIDECAR_PRESENT"] = "YES"
+    return classified
+
+
+def _desktop_developer_still_internal() -> dict[str, str]:
+    inspect_data = _inspect()
+    networks = set(inspect_data.get("networks") or [])
+    return {
+        "DEVELOPER_NETWORKS": ",".join(sorted(networks)),
+        "DEVELOPER_ONLY_INTERNAL": (
+            "YES" if networks == {egress.INTERNAL_NETWORK} else "NO"
+        ),
+        "HOST_NETWORK": "YES" if inspect_data.get("network_mode") == "host" else "NO",
+        "PRIVILEGED": "YES" if inspect_data.get("privileged") else "NO",
+    }
+
+
+def prove_desktop() -> dict[str, Any]:
+    """Focused Desktop 0A proof: loopback, auth, same container, repo read."""
+    import base64
+
+    _assert_host_execution_trust()
+    started = desktop_up()
+    identity = _runtime_identity()
+    listeners = _host_loopback_listeners(desktop_gw.HOST_PORT)
+    sidecar = _sidecar_inspect()
+    developer_net = _desktop_developer_still_internal()
+    status_code, _headers, status_body = _http_json("GET", "/api/status")
+    unauth_code, _, _unauth_body = _http_json("GET", "/api/files")
+    creds = desktop_gw.ensure_desktop_auth()
+    bad_code, _, _bad = _http_json(
+        "POST",
+        "/auth/password-login",
+        body={
+            "provider": desktop_gw.AUTH_PROVIDER,
+            "username": creds["HERMES_DASHBOARD_BASIC_AUTH_USERNAME"],
+            "password": "definitely-not-the-password",
+        },
+    )
+    good_code, good_headers, good_body = _http_json(
+        "POST",
+        "/auth/password-login",
+        body={
+            "provider": desktop_gw.AUTH_PROVIDER,
+            "username": creds["HERMES_DASHBOARD_BASIC_AUTH_USERNAME"],
+            "password": creds["HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"],
+        },
+    )
+    cookies = _cookie_header(good_headers.get("set-cookie") or "")
+    # Password login may set more than one cookie via multiple Set-Cookie
+    # headers; urllib exposes only one. Retry login through a cookie jar.
+    if good_code == 200 and not cookies:
+        import http.cookiejar
+        import urllib.request
+
+        jar = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+        import json as json_lib
+
+        req = urllib.request.Request(
+            desktop_gw.desktop_base_url() + "/auth/password-login",
+            data=json_lib.dumps(
+                {
+                    "provider": desktop_gw.AUTH_PROVIDER,
+                    "username": creds["HERMES_DASHBOARD_BASIC_AUTH_USERNAME"],
+                    "password": creds["HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"],
+                }
+            ).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+        with opener.open(req, timeout=8) as resp:
+            good_code = resp.status
+        cookies = "; ".join(f"{item.name}={item.value}" for item in jar)
+    ticket_code, _, ticket_body = _http_json(
+        "POST",
+        "/api/auth/ws-ticket",
+        cookies=cookies,
+    )
+    ticket = ""
+    if isinstance(ticket_body, dict):
+        ticket = str(ticket_body.get("ticket") or "")
+    ws_unauth = _ws_probe(ticket=None, expect_accept=False)
+    ws_auth = (
+        _ws_probe(ticket=ticket, expect_accept=True)
+        if ticket
+        else {"ACCEPTED": "NO", "EXPECTED": "NO", "status_line": "no-ticket"}
+    )
+    files_code, _, files_body = _http_json("GET", "/api/files?path=/workspace", cookies=cookies)
+    repo_code, _, repo_body = _http_json(
+        "GET",
+        f"/api/files/read?path=/workspace/{desktop_gw.PROOF_DOC_RELATIVE}",
+        cookies=cookies,
+    )
+    repo_text = ""
+    if isinstance(repo_body, dict) and repo_body.get("data_url"):
+        encoded = str(repo_body["data_url"]).split(",", 1)[-1]
+        try:
+            repo_text = base64.b64decode(encoded).decode("utf-8", errors="replace")
+        except (ValueError, TypeError):
+            repo_text = ""
+    names = []
+    if isinstance(files_body, dict):
+        names = [str(item.get("name") or "") for item in (files_body.get("entries") or [])]
+    process = exec_in(
+        ["sh", "-c", "ps -ef | grep '[h]ermes serve' | head -n 1"],
+        check=False,
+    )
+    uname = exec_in(["uname", "-a"], check=False)
+    branch = exec_in(
+        ["git", "-C", "/workspace/hermes-agent", "rev-parse", "--abbrev-ref", "HEAD"],
+        check=False,
+    )
+    result = {
+        "DESKTOP_PROOF": "PASS",
+        "TRANSPORT": desktop_gw.DESKTOP_TRANSPORT,
+        "BASE_URL": desktop_gw.desktop_base_url(),
+        "HOST_BIND": desktop_gw.HOST_BIND,
+        "HOST_PORT": desktop_gw.HOST_PORT,
+        "CONTAINER_BIND": desktop_gw.HERMES_SERVE_HOST,
+        "AUTH_MECHANISM": "dashboard.basic_auth",
+        "listeners": listeners,
+        "sidecar": sidecar,
+        "developer_network": developer_net,
+        "status": {
+            "http": status_code,
+            "auth_required": (
+                (status_body or {}).get("auth_required")
+                if isinstance(status_body, dict)
+                else None
+            ),
+            "version": (
+                (status_body or {}).get("version")
+                if isinstance(status_body, dict)
+                else None
+            ),
+        },
+        "UNAUTHENTICATED_ACCESS": "DENIED" if unauth_code in {401, 403} else "FAIL",
+        "WRONG_PASSWORD": "DENIED" if bad_code in {401, 403, 404} else "FAIL",
+        "AUTHENTICATED_GATEWAY": "PASS" if good_code == 200 and ticket_code == 200 and ticket else "FAIL",
+        "WS_UNAUTHENTICATED": "DENIED" if ws_unauth.get("ACCEPTED") == "NO" else "FAIL",
+        "WS_AUTHENTICATED": "PASS" if ws_auth.get("ACCEPTED") == "YES" else "FAIL",
+        "DESKTOP_TO_CONTAINER_EXECUTION": (
+            "PASS"
+            if "hermes-agent" in names and "EU-PP-Database" in names
+            else "FAIL"
+        ),
+        "REPO_READ_PROOF": (
+            "PASS"
+            if repo_code == 200 and desktop_gw.PROOF_DOC_MARKER in repo_text
+            else "FAIL"
+        ),
+        "repo_read_http": repo_code,
+        "repo_read_path": f"/workspace/{desktop_gw.PROOF_DOC_RELATIVE}",
+        "workspace_names": names,
+        "serve_process_present": "YES" if "hermes serve" in (process.stdout or "") else "NO",
+        "uname": (uname.stdout or "").strip()[:160],
+        "repo_branch": (branch.stdout or "").strip(),
+        "RUNTIME_CONVERGED": identity.get("RUNTIME_CONVERGED"),
+        "HOST_FILESYSTEM_AUTHORITY_ADDED": "NO",
+        "WINDOWS_PROFILE_MOUNT_ADDED": "NO",
+        "DOCKER_SOCKET_ACCESS": sidecar.get("DOCKER_SOCKET", "NO"),
+        "PRIVILEGED_CONTAINER": developer_net.get("PRIVILEGED", "NO"),
+        "HOST_NETWORK": developer_net.get("HOST_NETWORK", "NO"),
+        "SIDECAR_ON_EGRESS": (
+            "YES" if egress.EGRESS_NETWORK in set(sidecar.get("networks") or []) else "NO"
+        ),
+        "WINDOWS_COMPUTER_USE_ENABLED": desktop_gw.WINDOWS_COMPUTER_USE_ENABLED,
+        "launch": {
+            "action": started.get("action"),
+            "convergence": started.get("convergence"),
+        },
+        "CREDENTIAL_VALUES_RECORDED": "NO",
+    }
+    failed = [
+        key
+        for key, value in result.items()
+        if key
+        in {
+            "UNAUTHENTICATED_ACCESS",
+            "WRONG_PASSWORD",
+            "AUTHENTICATED_GATEWAY",
+            "WS_UNAUTHENTICATED",
+            "WS_AUTHENTICATED",
+            "DESKTOP_TO_CONTAINER_EXECUTION",
+            "REPO_READ_PROOF",
+        }
+        and value == "FAIL"
+    ]
+    if listeners.get("LOOPBACK_REACHABLE") != "YES" or listeners.get("LAN_REACHABLE") == "YES":
+        failed.append("listeners")
+    if developer_net.get("DEVELOPER_ONLY_INTERNAL") != "YES":
+        failed.append("developer_network")
+    if sidecar.get("HOST_BIND_LOOPBACK_ONLY") != "YES":
+        failed.append("sidecar_bind")
+    if egress.EGRESS_NETWORK in set(sidecar.get("networks") or []):
+        failed.append("sidecar_on_egress")
+    if identity.get("RUNTIME_CONVERGED") not in {True, "YES", "PASS"}:
+        failed.append("convergence")
+    result["DESKTOP_PROOF"] = "FAIL" if failed else "PASS"
+    result["FAILED_CHECKS"] = failed
+    write_json(artifacts_dir() / DESKTOP_ARTIFACT, result)
+    return result
+
+
 def main() -> int:
     _assert_host_execution_trust()
     parser = argparse.ArgumentParser(description="R5 Developer-Hermes container launcher")
@@ -1353,6 +1898,9 @@ def main() -> int:
             "prove-egress",
             "prove-offline",
             "prove-failure-modes",
+            "prove-desktop",
+            "desktop-up",
+            "desktop-down",
             "inspect",
             "preflight",
             "plan",
@@ -1364,6 +1912,11 @@ def main() -> int:
         choices=egress.EGRESS_MODES,
         default=None,
         help="PRIVATE_DEVELOPER_EGRESS_ENFORCED (default) or OFFLINE",
+    )
+    parser.add_argument(
+        "--desktop",
+        action="store_true",
+        help="Also start authenticated hermes serve plus the localhost Desktop sidecar",
     )
     args = parser.parse_args()
     set_egress_mode(args.egress_mode)
@@ -1413,8 +1966,31 @@ def main() -> int:
         write_json(artifacts_dir() / "container_build.json", build_image())
         return 0
     if args.command == "up":
-        write_json(artifacts_dir() / "container_up.json", up())
+        payload = desktop_up() if args.desktop else up()
+        write_json(artifacts_dir() / "container_up.json", payload)
         return 0
+    if args.command == "desktop-up":
+        payload = desktop_up()
+        write_json(artifacts_dir() / "container_desktop_up.json", payload)
+        print(f"DESKTOP_BASE_URL = {desktop_gw.desktop_base_url()}")
+        print("DESKTOP_AUTH_FILE = W:\\hermes-dev\\credentials\\developer-hermes-desktop.env")
+        print(
+            "Do not run the official website Windows installer / Hermes Setup: "
+            "it always bootstraps a local Hermes runtime."
+        )
+        return 0
+    if args.command == "desktop-down":
+        payload = stop_desktop()
+        write_json(artifacts_dir() / "container_desktop_down.json", payload)
+        return 0
+    if args.command == "prove-desktop":
+        result = prove_desktop()
+        print(f"DESKTOP_PROOF = {result['DESKTOP_PROOF']}")
+        print(f"UNAUTHENTICATED_ACCESS = {result['UNAUTHENTICATED_ACCESS']}")
+        print(f"AUTHENTICATED_GATEWAY = {result['AUTHENTICATED_GATEWAY']}")
+        print(f"DESKTOP_TO_CONTAINER_EXECUTION = {result['DESKTOP_TO_CONTAINER_EXECUTION']}")
+        print(f"REPO_READ_PROOF = {result['REPO_READ_PROOF']}")
+        return 0 if result["DESKTOP_PROOF"] == "PASS" else 1
     if args.command == "down":
         write_json(artifacts_dir() / "container_down.json", down())
         return 0

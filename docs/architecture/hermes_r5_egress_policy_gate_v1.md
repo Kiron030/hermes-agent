@@ -599,17 +599,19 @@ sidecar. That is a solvable design task, which is why this is `MANAGEABLE`
 rather than `GOOD`, and it is better discovered now than during Desktop
 remediation.
 
-The future shape is therefore fixed even though Desktop is not implemented:
+That shape is now implemented as inbound UI transport only. The Developer
+container still has no published host port.
 
 ```text
-DESKTOP_TRANSPORT_FUTURE_REQUIREMENT =
+DESKTOP_TRANSPORT =
   Desktop -> localhost-only authenticated transport sidecar
           -> internal Docker network -> Developer Hermes gateway
-  host exposure bound to 127.0.0.1 only
+  host exposure bound to 127.0.0.1:19119 only
   authentication / pairing mandatory
   no local-host tool-execution fallback
   workspace resolver stays /workspace/*
-PORT_9119_OPENED_IN_THIS_SLICE = NO
+PORT_9119_OPENED_ON_DEVELOPER_CONTAINER = NO
+HOST_SIDECAR_PUBLISH = 127.0.0.1:19119
 ```
 
 The sidecar is the dual-homed party, exactly as the broker is. Desktop must
