@@ -1974,6 +1974,10 @@ def main() -> int:
         write_json(artifacts_dir() / "container_desktop_up.json", payload)
         print(f"DESKTOP_BASE_URL = {desktop_gw.desktop_base_url()}")
         print("DESKTOP_AUTH_FILE = W:\\hermes-dev\\credentials\\developer-hermes-desktop.env")
+        print(
+            "Do not run the official website Windows installer / Hermes Setup: "
+            "it always bootstraps a local Hermes runtime."
+        )
         return 0
     if args.command == "desktop-down":
         payload = stop_desktop()

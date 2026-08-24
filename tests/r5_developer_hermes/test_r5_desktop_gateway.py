@@ -122,6 +122,12 @@ def test_launcher_exposes_opt_in_desktop_mode() -> None:
     assert "prove-desktop" in launch_py
     assert "--desktop" in launch_py
     assert "desktop_up" in launch_py
+    assert "website Windows installer" in launch_py
+    readme = (REPO_ROOT / "scripts" / "r5_developer_hermes" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "bootstrap-installer" in readme
+    assert "HERMES_DESKTOP_REMOTE_URL" in readme
     sidecar = (CONTAINER_DIR / "desktop_sidecar.py").read_text(encoding="utf-8")
     assert "create_connection" in sidecar
     assert "HTTP CONNECT" in sidecar or "not an HTTP CONNECT" in sidecar.lower() or "not an HTTP" in sidecar

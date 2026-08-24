@@ -271,9 +271,17 @@ Docker network. A localhost-only authenticated sidecar is the dual-homed
 party. Credentials live in
 `W:\hermes-dev\credentials\developer-hermes-desktop.env` and are never
 mounted. Do not install a second Hermes runtime on Windows and do not
-enable Computer Use. Bot Mode remains unimplemented. Future routing
-intent remains Terra default, Luna cheap/auxiliary, Sol explicit
-escalation.
+enable Computer Use.
+
+The official website Windows download is Hermes Setup
+(`apps/bootstrap-installer`), not a thin client. It always bootstraps a
+local agent under `%LOCALAPPDATA%\hermes`. Do not run it for Developer
+Hermes. Electron Remote Gateway can skip that local spawn only when
+`connection.json` (or a complete env remote) is already remote *before*
+`startHermes()` falls through to `resolveHermesBackend()`.
+
+Bot Mode remains unimplemented. Future routing intent remains Terra
+default, Luna cheap/auxiliary, Sol explicit escalation.
 
 ```powershell
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop

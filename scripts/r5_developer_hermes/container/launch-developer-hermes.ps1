@@ -122,6 +122,7 @@ switch ($Mode) {
         Invoke-Launch 'desktop-up'
         Write-Host 'Official Desktop Remote Gateway: http://127.0.0.1:19119'
         Write-Host 'Credentials: W:\hermes-dev\credentials\developer-hermes-desktop.env'
+        Write-Host 'Do not run the official website Windows installer / Hermes Setup; it installs a local Hermes runtime.'
         break
     }
     'desktop-down' { Invoke-Launch 'desktop-down'; break }

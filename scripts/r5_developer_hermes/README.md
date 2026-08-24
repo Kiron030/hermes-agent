@@ -100,6 +100,17 @@ Official Desktop (unchanged) uses Remote Gateway
 mounted. The Developer container stays on the internal network; a
 localhost sidecar publishes the loopback port.
 
+Do **not** run the official website Windows installer / Hermes Setup to
+get that UI. That package is `apps/bootstrap-installer` (Tauri). It
+always drives `install.ps1` (clone, venv, Node, `hermes` on PATH) and
+is not a remote-only client. The Electron app can talk to an already
+running `hermes serve` via Settings → Gateway or a pre-seeded
+`connection.json`, but only after the Desktop *binary* exists and
+before a local backend is spawned. `HERMES_DESKTOP_REMOTE_URL` alone
+does not skip first-run bootstrap for a password-gated gateway (the
+boot path also requires `HERMES_DESKTOP_REMOTE_TOKEN` and forces
+legacy token auth).
+
 Egress:
 
 ```bash
