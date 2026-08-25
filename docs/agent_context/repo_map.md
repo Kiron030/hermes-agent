@@ -20,7 +20,8 @@
 | Developer Hermes (R5) architecture | [`hermes_r5_developer_hermes_v1.md`](../architecture/hermes_r5_developer_hermes_v1.md) |
 | Developer Hermes upstream update | [`hermes_r5_developer_dx_v1.md`](../architecture/hermes_r5_developer_dx_v1.md) § Upstream update contract — ROUTINE / MATERIAL / TRUST_BOUNDARY_CHANGE |
 | Developer Hermes egress boundary | [`hermes_r5_egress_policy_gate_v1.md`](../architecture/hermes_r5_egress_policy_gate_v1.md), policy in `scripts/r5_developer_hermes/container/egress/egress_policy.json` |
-| Telegram 0B PREP (`telegram-ops`) | [`hermes_r5_telegram_ops_0b_v1.md`](../architecture/hermes_r5_telegram_ops_0b_v1.md) — dedicated profile seed; live token stays on Railway |
+| Telegram 0B PREP (`telegram-ops`) | [`hermes_r5_telegram_ops_0b_v1.md`](../architecture/hermes_r5_telegram_ops_0b_v1.md) — dedicated Developer Remote profile seed; Operator token stays on Railway |
+| Telegram 0C second bot (`telegram-ops` / Developer Remote) | [`hermes_r5_telegram_developer_0c_v1.md`](../architecture/hermes_r5_telegram_developer_0c_v1.md) — TWO_BOT; explicit `telegram-activate`; no Railway change |
 
 ## Task → entry points
 

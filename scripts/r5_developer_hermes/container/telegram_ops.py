@@ -1,8 +1,12 @@
 """Dedicated telegram-ops profile contract for Developer Hermes.
 
-Preparation only. This module does not start a live Telegram poller and
-does not move the Railway token. The profile is a capability/configuration
-boundary, not an OS or container sandbox.
+Internal profile name stays ``telegram-ops``. Display and role are
+Developer Remote: a second BotFather identity for local Developer Hermes.
+The Railway Operator Telegram bot is a different identity and is not
+modified here.
+
+Ordinary ``telegram-up`` stays fail-closed for LIVE_SHAPED tokens.
+Live polling requires an explicit activation intent.
 """
 
 from __future__ import annotations
@@ -15,6 +19,9 @@ from typing import Any
 
 
 PROFILE_NAME = "telegram-ops"
+DISPLAY_NAME = "Developer Remote"
+PROFILE_ROLE = "DEVELOPER_TELEGRAM"
+ARCHITECTURE = "TWO_BOT"
 PROFILE_IS_OS_SANDBOX = False
 TELEGRAM_PROFILE_IS_DEDICATED = True
 APPROVALS_MODE = "manual"
@@ -25,9 +32,13 @@ MEDIA_DOWNLOAD_SCOPE = "OUT_OF_SCOPE"
 TRANSPORT = "LONG_POLLING"
 PUBLIC_INBOUND_PORT = False
 SENTINEL_NAME = ".r5-telegram-ops-seed"
-SEED_VERSION = "telegram-ops-0b-v2"
+SEED_VERSION = "telegram-ops-0c-v1"
 PROFILE_POLICY = "READ_FIRST_WITH_APPROVAL_GATED_WRITES"
 WRITE_APPROVAL_PLUGIN = "telegram-ops-write-approval"
+NUMERIC_USER_RE = re.compile(r"^\d{5,20}$")
+TRUTHY_ENV = frozenset({"1", "true", "yes", "on"})
+ACTIVATION_STDIN_TOKEN_KEY = "telegram_bot_token"
+ACTIVATION_STDIN_USER_KEY = "telegram_allowed_users"
 
 # Upstream `file` is atomic. These schema members arrive with read_file.
 FILE_TOOLSET_ATOMIC_WRITE_TOOLS = frozenset({"write_file", "patch"})
@@ -169,13 +180,41 @@ def classify_telegram_token(value: str | None) -> str:
     return "PLACEHOLDER"
 
 
+def _dotenv_value(value: str) -> str:
+    return str(value).strip().strip('"').strip("'")
+
+
+def _is_truthy_env(value: str) -> bool:
+    return _dotenv_value(value).lower() in TRUTHY_ENV
+
+
+def classify_allowed_users(value: str | None) -> str:
+    """Return PRESENT shape only. Never echoes the identifier."""
+    raw = _dotenv_value("" if value is None else str(value))
+    if not raw:
+        return "MISSING"
+    if "," in raw or not NUMERIC_USER_RE.match(raw):
+        return "INVALID"
+    return "NUMERIC_SINGLE"
+
+
 def read_dotenv_names_and_token_class(path: Path) -> dict[str, str]:
     """Read a dotenv file. Returns names and token class, never the token."""
     names: list[str] = []
     token_class = "MISSING"
     if not path.is_file():
-        return {"env_names": "", "token_class": token_class, "allowed_users_present": "NO"}
+        return {
+            "env_names": "",
+            "token_class": token_class,
+            "allowed_users_present": "NO",
+            "allowed_users_class": "MISSING",
+            "allow_all_set": "NO",
+            "webhook_set": "NO",
+        }
     allowed_users_present = "NO"
+    allowed_users_class = "MISSING"
+    allow_all_set = "NO"
+    webhook_set = "NO"
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -187,12 +226,21 @@ def read_dotenv_names_and_token_class(path: Path) -> dict[str, str]:
         names.append(key)
         if key == "TELEGRAM_BOT_TOKEN":
             token_class = classify_telegram_token(value)
-        if key == "TELEGRAM_ALLOWED_USERS" and value.strip().strip('"').strip("'"):
-            allowed_users_present = "YES"
+        if key == "TELEGRAM_ALLOWED_USERS":
+            allowed_users_class = classify_allowed_users(value)
+            if allowed_users_class == "NUMERIC_SINGLE":
+                allowed_users_present = "YES"
+        if key in {"TELEGRAM_ALLOW_ALL_USERS", "GATEWAY_ALLOW_ALL_USERS"} and _is_truthy_env(value):
+            allow_all_set = "YES"
+        if key == "TELEGRAM_WEBHOOK_URL" and _dotenv_value(value):
+            webhook_set = "YES"
     return {
         "env_names": ",".join(sorted(names)),
         "token_class": token_class,
         "allowed_users_present": allowed_users_present,
+        "allowed_users_class": allowed_users_class,
+        "allow_all_set": allow_all_set,
+        "webhook_set": webhook_set,
     }
 
 
@@ -256,7 +304,7 @@ def gateway_lifecycle_argv(action: str) -> tuple[str, ...]:
 
 
 def may_start_gateway(token_class: str) -> tuple[bool, str]:
-    """PREP may start only when polling cannot steal the live identity."""
+    """Ordinary telegram-up stays fail-closed for live-shaped tokens."""
     if token_class == "LIVE_SHAPED":
         return False, "REFUSE_LIVE_TOKEN"
     if token_class == "SYNTHETIC":
@@ -264,6 +312,130 @@ def may_start_gateway(token_class: str) -> tuple[bool, str]:
     if token_class == "MISSING":
         return True, "NO_TOKEN_NO_POLL"
     return False, "REFUSE_UNKNOWN_TOKEN"
+
+
+def may_start_live_gateway(
+    token_class: str,
+    *,
+    live_activation: bool,
+    allowed_users_present: str = "NO",
+    allow_all_set: str = "NO",
+    webhook_set: str = "NO",
+) -> tuple[bool, str]:
+    """Start live polling only with explicit human intent and a closed allowlist."""
+    if allow_all_set == "YES":
+        return False, "REFUSE_ALLOW_ALL"
+    if webhook_set == "YES":
+        return False, "REFUSE_WEBHOOK"
+    if token_class == "LIVE_SHAPED":
+        if not live_activation:
+            return False, "REFUSE_LIVE_TOKEN"
+        if allowed_users_present != "YES":
+            return False, "REFUSE_MISSING_ALLOWED_USER"
+        return True, "LIVE_ACTIVATION_OK"
+    if live_activation:
+        return False, "REFUSE_NON_LIVE_FOR_ACTIVATION"
+    return may_start_gateway(token_class)
+
+
+def parse_activation_payload(payload: Any) -> dict[str, str]:
+    """Accept only the two secret fields. Never return them in status output."""
+    if not isinstance(payload, dict):
+        raise ValueError("REFUSE_ACTIVATION_PAYLOAD")
+    token = payload.get(ACTIVATION_STDIN_TOKEN_KEY)
+    user = payload.get(ACTIVATION_STDIN_USER_KEY)
+    if token is None or user is None:
+        raise ValueError("REFUSE_ACTIVATION_PAYLOAD")
+    extra = sorted(
+        str(key)
+        for key in payload
+        if key not in {ACTIVATION_STDIN_TOKEN_KEY, ACTIVATION_STDIN_USER_KEY}
+    )
+    if extra:
+        raise ValueError("REFUSE_ACTIVATION_EXTRA_FIELDS")
+    return {
+        ACTIVATION_STDIN_TOKEN_KEY: str(token),
+        ACTIVATION_STDIN_USER_KEY: str(user),
+    }
+
+
+def apply_live_secrets(hermes_home: Path, payload: dict[str, Any]) -> dict[str, str]:
+    """Write the Developer token and one numeric user into the profile .env.
+
+    Values are accepted only from a parsed stdin payload. The return value
+    never includes the token or the user identifier.
+    """
+    dest = profile_home(hermes_home)
+    dest.mkdir(parents=True, exist_ok=True)
+    env_target = dest / ".env"
+    existing = read_dotenv_names_and_token_class(env_target)
+    if (
+        existing["token_class"] == "LIVE_SHAPED"
+        and existing["allowed_users_present"] == "YES"
+    ):
+        return {
+            "APPLIED": "NO",
+            "REASON": "REFUSE_OVERWRITE_EXISTING_LIVE_SECRET",
+            **{key: existing[key] for key in (
+                "token_class",
+                "allowed_users_present",
+                "allowed_users_class",
+                "allow_all_set",
+                "webhook_set",
+            )},
+        }
+    parsed = parse_activation_payload(payload)
+    token_class = classify_telegram_token(parsed[ACTIVATION_STDIN_TOKEN_KEY])
+    users_class = classify_allowed_users(parsed[ACTIVATION_STDIN_USER_KEY])
+    if token_class != "LIVE_SHAPED":
+        return {
+            "APPLIED": "NO",
+            "REASON": "REFUSE_NON_LIVE_TOKEN",
+            "token_class": token_class,
+            "allowed_users_present": "NO",
+            "allowed_users_class": users_class,
+            "allow_all_set": "NO",
+            "webhook_set": "NO",
+        }
+    if users_class != "NUMERIC_SINGLE":
+        return {
+            "APPLIED": "NO",
+            "REASON": "REFUSE_NON_NUMERIC_USER",
+            "token_class": token_class,
+            "allowed_users_present": "NO",
+            "allowed_users_class": users_class,
+            "allow_all_set": "NO",
+            "webhook_set": "NO",
+        }
+    text = (
+        "# Developer Remote Telegram secrets. Never commit this file.\n"
+        "# Operator Railway token is a different identity and is not stored here.\n"
+        f"TELEGRAM_BOT_TOKEN={parsed[ACTIVATION_STDIN_TOKEN_KEY]}\n"
+        f"TELEGRAM_ALLOWED_USERS={_dotenv_value(parsed[ACTIVATION_STDIN_USER_KEY])}\n"
+        "# TELEGRAM_ALLOW_ALL_USERS=\n"
+        "# GATEWAY_ALLOW_ALL_USERS=\n"
+        "# TELEGRAM_WEBHOOK_URL=\n"
+        "# TELEGRAM_GROUP_ALLOWED_USERS=\n"
+        "# TELEGRAM_GROUP_ALLOWED_CHATS=\n"
+    )
+    env_target.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(env_target, 0o600)
+    except OSError:
+        pass
+    state = read_dotenv_names_and_token_class(env_target)
+    return {
+        "APPLIED": "YES",
+        "REASON": "LIVE_SECRET_STORED",
+        "TOKEN_STORAGE": TOKEN_STORAGE_TARGET,
+        **{key: state[key] for key in (
+            "token_class",
+            "allowed_users_present",
+            "allowed_users_class",
+            "allow_all_set",
+            "webhook_set",
+        )},
+    }
 
 
 def profile_invariants(config: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -278,6 +450,9 @@ def profile_invariants(config: dict[str, Any] | None = None) -> dict[str, Any]:
     telegram_tools = list(platform_toolsets.get("telegram") or [])
     return {
         "PROFILE_NAME": PROFILE_NAME,
+        "DISPLAY_NAME": DISPLAY_NAME,
+        "PROFILE_ROLE": PROFILE_ROLE,
+        "ARCHITECTURE": ARCHITECTURE,
         "PROFILE_IS_OS_SANDBOX": PROFILE_IS_OS_SANDBOX,
         "TELEGRAM_PROFILE_IS_DEDICATED": TELEGRAM_PROFILE_IS_DEDICATED,
         "APPROVALS_MODE": approvals.get("mode"),

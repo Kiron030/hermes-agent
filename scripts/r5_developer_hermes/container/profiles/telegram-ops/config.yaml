@@ -1,6 +1,8 @@
-# Dedicated Developer-Hermes Telegram profile.
+# Dedicated Developer-Hermes Telegram profile (Developer Remote).
+# Internal name: telegram-ops. Display: Developer Remote.
 # Capability/configuration boundary only — NOT an OS/container sandbox.
 # Shares the Developer container, uid, mounts, egress broker, and model boundary.
+# This is NOT the Railway Operator Telegram bot.
 #
 # TELEGRAM_PROFILE_IS_DEDICATED = YES
 # This profile is never the Developer default / Desktop profile.

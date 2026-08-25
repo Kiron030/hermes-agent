@@ -873,20 +873,108 @@ def stop_desktop() -> dict[str, Any]:
     }
 
 
-def _telegram_token_class_in_container() -> str:
+def _telegram_secret_state_in_container() -> dict[str, str]:
     probe = (
-        "import sys; sys.path.insert(0, '/opt/r5-developer'); "
+        "import json,sys; sys.path.insert(0, '/opt/r5-developer'); "
         "from pathlib import Path; "
         "from telegram_ops import read_dotenv_names_and_token_class, token_env_path; "
-        "print(read_dotenv_names_and_token_class(token_env_path(Path('/opt/data')))['token_class'])"
+        "print(json.dumps(read_dotenv_names_and_token_class(token_env_path(Path('/opt/data')))))"
     )
     completed = exec_in(
         ["/opt/hermes/.venv/bin/python", "-c", probe],
         check=False,
     )
     if completed.returncode != 0:
-        return "UNKNOWN"
-    return (completed.stdout or "").strip() or "UNKNOWN"
+        return {
+            "token_class": "UNKNOWN",
+            "allowed_users_present": "UNKNOWN",
+            "allowed_users_class": "UNKNOWN",
+            "allow_all_set": "UNKNOWN",
+            "webhook_set": "UNKNOWN",
+        }
+    try:
+        payload = json.loads((completed.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        return {
+            "token_class": "UNKNOWN",
+            "allowed_users_present": "UNKNOWN",
+            "allowed_users_class": "UNKNOWN",
+            "allow_all_set": "UNKNOWN",
+            "webhook_set": "UNKNOWN",
+        }
+    return {
+        "token_class": str(payload.get("token_class") or "UNKNOWN"),
+        "allowed_users_present": str(payload.get("allowed_users_present") or "NO"),
+        "allowed_users_class": str(payload.get("allowed_users_class") or "MISSING"),
+        "allow_all_set": str(payload.get("allow_all_set") or "NO"),
+        "webhook_set": str(payload.get("webhook_set") or "NO"),
+    }
+
+
+def _telegram_token_class_in_container() -> str:
+    return _telegram_secret_state_in_container()["token_class"]
+
+
+def _telegram_conflict_signal(status_text: str) -> str:
+    lowered = status_text.lower()
+    if "409" in status_text or "conflict" in lowered:
+        return "YES"
+    return "NO"
+
+
+def _activation_payload_from_stdin() -> dict[str, Any] | None:
+    if sys.stdin.isatty():
+        return None
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("REFUSE_ACTIVATION_PAYLOAD") from exc
+    return tg_ops.parse_activation_payload(parsed)
+
+
+def _write_live_secrets_via_stdin(payload: dict[str, str]) -> dict[str, Any]:
+    script = (
+        "import json,sys; sys.path.insert(0,'/opt/r5-developer'); "
+        "from pathlib import Path; "
+        "from telegram_ops import apply_live_secrets; "
+        "print(json.dumps(apply_live_secrets(Path('/opt/data'), json.load(sys.stdin))))"
+    )
+    completed = subprocess.run(
+        [
+            docker_exe(),
+            "exec",
+            "-i",
+            "-u",
+            f"{RUNTIME_UID}:{RUNTIME_GID}",
+            "-w",
+            CONTAINER_WORKDIR,
+            CONTAINER_NAME,
+            "/opt/hermes/.venv/bin/python",
+            "-c",
+            script,
+        ],
+        input=json.dumps(
+            {
+                tg_ops.ACTIVATION_STDIN_TOKEN_KEY: payload[tg_ops.ACTIVATION_STDIN_TOKEN_KEY],
+                tg_ops.ACTIVATION_STDIN_USER_KEY: payload[tg_ops.ACTIVATION_STDIN_USER_KEY],
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "telegram secret write failed: "
+            f"{(completed.stderr or completed.stdout).strip()[:200]}"
+        )
+    try:
+        return json.loads((completed.stdout or "").strip().splitlines()[-1])
+    except (json.JSONDecodeError, IndexError) as exc:
+        raise RuntimeError("telegram secret write produced no status") from exc
 
 
 def telegram_status() -> dict[str, Any]:
@@ -895,11 +983,17 @@ def telegram_status() -> dict[str, Any]:
     running = container_running()
     result: dict[str, Any] = {
         "PROFILE": tg_ops.PROFILE_NAME,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "PROFILE_ROLE": tg_ops.PROFILE_ROLE,
+        "ARCHITECTURE": tg_ops.ARCHITECTURE,
         "CONTAINER_RUNNING": "YES" if running else "NO",
         "TRANSPORT": tg_ops.TRANSPORT,
         "PUBLIC_INBOUND_PORT": "NO",
         "TOKEN_STORAGE_TARGET": tg_ops.TOKEN_STORAGE_TARGET,
+        "TOKEN_VALUES_RECORDED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
         "LIVE_POLLING": "NO",
+        "TELEGRAM_POLL_CONFLICT_409": "NO",
     }
     if not running:
         result["GATEWAY"] = "DOWN"
@@ -909,36 +1003,42 @@ def telegram_status() -> dict[str, Any]:
         check=False,
     )
     result["PROFILE_SEEDED"] = "YES" if seeded.returncode == 0 else "NO"
-    result["TOKEN_CLASS"] = _telegram_token_class_in_container()
+    state = _telegram_secret_state_in_container()
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["ALLOWED_USERS_PRESENT"] = state["allowed_users_present"]
+    result["ALLOWED_USERS_CLASS"] = state["allowed_users_class"]
+    result["ALLOW_ALL_SET"] = state["allow_all_set"]
+    result["WEBHOOK_SET"] = state["webhook_set"]
     status = exec_in(list(tg_ops.GATEWAY_STATUS_ARGV), check=False)
+    status_text = f"{status.stdout or ''}\n{status.stderr or ''}"
     result["GATEWAY_STATUS_EXIT"] = status.returncode
     result["GATEWAY"] = "UP" if status.returncode == 0 else "DOWN"
+    result["TELEGRAM_POLL_CONFLICT_409"] = _telegram_conflict_signal(status_text)
     if result["TOKEN_CLASS"] == "LIVE_SHAPED" and result["GATEWAY"] == "UP":
-        result["LIVE_POLLING"] = "POSSIBLE"
+        result["LIVE_POLLING"] = "YES"
+    elif result["TOKEN_CLASS"] == "LIVE_SHAPED":
+        result["LIVE_POLLING"] = "NO"
     return result
 
 
 def telegram_up() -> dict[str, Any]:
-    """Prepare and optionally start the telegram-ops gateway.
-
-    PREP refuses a live-shaped token so Railway keeps the existing poller.
-    A missing token starts the process without enabling Telegram polling.
-    A synthetic token may start for lifecycle proof only.
-    """
+    """Prepare the telegram-ops gateway. Ordinary up still refuses live tokens."""
     _assert_host_execution_trust()
     started = up()
     exec_in(["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"])
-    token_class = _telegram_token_class_in_container()
-    allowed, reason = tg_ops.may_start_gateway(token_class)
+    state = _telegram_secret_state_in_container()
+    allowed, reason = tg_ops.may_start_gateway(state["token_class"])
     result: dict[str, Any] = {
         **started,
         "PROFILE": tg_ops.PROFILE_NAME,
-        "TOKEN_CLASS": token_class,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "TOKEN_CLASS": state["token_class"],
         "TOKEN_VALUES_RECORDED": "NO",
         "LIFECYCLE_ARGV": list(tg_ops.GATEWAY_START_ARGV),
         "START_PERMITTED": "YES" if allowed else "NO",
         "START_REASON": reason,
         "LIVE_TOKEN_MOVED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
     }
     if not allowed:
         result["GATEWAY"] = "NOT_STARTED"
@@ -946,7 +1046,90 @@ def telegram_up() -> dict[str, Any]:
     launched = exec_in(list(tg_ops.GATEWAY_START_ARGV), check=False)
     result["GATEWAY_START_EXIT"] = launched.returncode
     result.update(telegram_status())
-    result["TOKEN_CLASS"] = token_class
+    result["TOKEN_CLASS"] = state["token_class"]
+    return result
+
+
+def telegram_activate(*, confirmed: bool) -> dict[str, Any]:
+    """Explicit live activation for the dedicated Developer Telegram bot."""
+    _assert_host_execution_trust()
+    result: dict[str, Any] = {
+        "PROFILE": tg_ops.PROFILE_NAME,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "PROFILE_ROLE": tg_ops.PROFILE_ROLE,
+        "ARCHITECTURE": tg_ops.ARCHITECTURE,
+        "TOKEN_VALUES_RECORDED": "NO",
+        "LIVE_TOKEN_MOVED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
+        "RAILWAY_CHANGED": "NO",
+    }
+    if not confirmed:
+        result.update(
+            {
+                "GATEWAY": "NOT_STARTED",
+                "START_PERMITTED": "NO",
+                "START_REASON": "REFUSE_MISSING_ACTIVATION_INTENT",
+            }
+        )
+        return result
+    started = up()
+    exec_in(["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"])
+    state = _telegram_secret_state_in_container()
+    result["launch"] = {
+        "action": started.get("action"),
+        "convergence": started.get("convergence"),
+    }
+    if state["token_class"] != "LIVE_SHAPED" or state["allowed_users_present"] != "YES":
+        payload = _activation_payload_from_stdin()
+        if payload is None:
+            result.update(
+                {
+                    **state,
+                    "TOKEN_CLASS": state["token_class"],
+                    "GATEWAY": "NOT_STARTED",
+                    "START_PERMITTED": "NO",
+                    "START_REASON": "WAITING_HUMAN_SECRET",
+                    "HUMAN_ACTION": (
+                        "Run launch-developer-hermes.ps1 -Mode telegram-activate "
+                        "in a local terminal outside Cursor chat, then enter the "
+                        "NEW Developer bot token and one numeric Telegram user id."
+                    ),
+                }
+            )
+            return result
+        written = _write_live_secrets_via_stdin(payload)
+        result["SECRET_WRITE"] = written.get("REASON")
+        if written.get("APPLIED") != "YES":
+            result.update(
+                {
+                    "GATEWAY": "NOT_STARTED",
+                    "START_PERMITTED": "NO",
+                    "START_REASON": written.get("REASON") or "REFUSE_SECRET_WRITE",
+                    "TOKEN_CLASS": written.get("token_class") or state["token_class"],
+                }
+            )
+            return result
+        state = _telegram_secret_state_in_container()
+    allowed, reason = tg_ops.may_start_live_gateway(
+        state["token_class"],
+        live_activation=True,
+        allowed_users_present=state["allowed_users_present"],
+        allow_all_set=state["allow_all_set"],
+        webhook_set=state["webhook_set"],
+    )
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["ALLOWED_USERS_PRESENT"] = state["allowed_users_present"]
+    result["START_PERMITTED"] = "YES" if allowed else "NO"
+    result["START_REASON"] = reason
+    if not allowed:
+        result["GATEWAY"] = "NOT_STARTED"
+        return result
+    launched = exec_in(list(tg_ops.GATEWAY_START_ARGV), check=False)
+    result["GATEWAY_START_EXIT"] = launched.returncode
+    result.update(telegram_status())
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["START_PERMITTED"] = "YES"
+    result["START_REASON"] = reason
     return result
 
 
@@ -1999,6 +2182,7 @@ def main() -> int:
             "telegram-up",
             "telegram-status",
             "telegram-down",
+            "telegram-activate",
             "inspect",
             "preflight",
             "plan",
@@ -2015,6 +2199,15 @@ def main() -> int:
         "--desktop",
         action="store_true",
         help="Also start authenticated hermes serve plus the localhost Desktop sidecar",
+    )
+    parser.add_argument(
+        "--i-understand-this-starts-the-developer-telegram-bot",
+        action="store_true",
+        dest="developer_telegram_live_activation",
+        help=(
+            "Required intent for telegram-activate. Ordinary telegram-up still "
+            "refuses LIVE_SHAPED tokens. Never pass the token on the command line."
+        ),
     )
     args = parser.parse_args()
     set_egress_mode(args.egress_mode)
@@ -2085,19 +2278,24 @@ def main() -> int:
         payload = telegram_up()
         write_json(artifacts_dir() / "container_telegram_up.json", payload)
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME', tg_ops.DISPLAY_NAME)}")
         print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
         print(f"START_PERMITTED = {payload.get('START_PERMITTED')}")
         print(f"START_REASON = {payload.get('START_REASON')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
         print("LIVE_TOKEN_MOVED = NO")
+        print("OPERATOR_TELEGRAM_CHANGED = NO")
         return 0
     if args.command == "telegram-status":
         payload = telegram_status()
         write_json(artifacts_dir() / "container_telegram_status.json", payload)
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
         print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"ALLOWED_USERS_PRESENT = {payload.get('ALLOWED_USERS_PRESENT')}")
         print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
+        print(f"TELEGRAM_POLL_CONFLICT_409 = {payload.get('TELEGRAM_POLL_CONFLICT_409')}")
         return 0
     if args.command == "telegram-down":
         payload = telegram_down()
@@ -2105,6 +2303,23 @@ def main() -> int:
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
         return 0
+    if args.command == "telegram-activate":
+        payload = telegram_activate(confirmed=args.developer_telegram_live_activation)
+        write_json(artifacts_dir() / "container_telegram_activate.json", payload)
+        print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME', tg_ops.DISPLAY_NAME)}")
+        print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"ALLOWED_USERS_PRESENT = {payload.get('ALLOWED_USERS_PRESENT')}")
+        print(f"START_PERMITTED = {payload.get('START_PERMITTED')}")
+        print(f"START_REASON = {payload.get('START_REASON')}")
+        print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
+        print("TOKEN_VALUES_RECORDED = NO")
+        print("OPERATOR_TELEGRAM_CHANGED = NO")
+        print("RAILWAY_CHANGED = NO")
+        if payload.get("HUMAN_ACTION"):
+            print(f"HUMAN_ACTION = {payload['HUMAN_ACTION']}")
+        return 0 if payload.get("START_REASON") != "REFUSE_MISSING_ACTIVATION_INTENT" else 2
     if args.command == "prove-desktop":
         result = prove_desktop()
         print(f"DESKTOP_PROOF = {result['DESKTOP_PROOF']}")
