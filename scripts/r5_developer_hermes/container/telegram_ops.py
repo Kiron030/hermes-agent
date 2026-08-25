@@ -256,6 +256,10 @@ def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
     """Create or refresh the dedicated profile. Never overwrite a live .env."""
     dest = profile_home(hermes_home)
     dest.mkdir(parents=True, exist_ok=True)
+    try:
+        dest.chmod(0o700)
+    except OSError:
+        pass
     for name in ("sessions", "memories", "logs", "skills", "plugins"):
         (dest / name).mkdir(exist_ok=True)
     paths = seed_paths()
@@ -367,6 +371,10 @@ def apply_live_secrets(hermes_home: Path, payload: dict[str, Any]) -> dict[str, 
     """
     dest = profile_home(hermes_home)
     dest.mkdir(parents=True, exist_ok=True)
+    try:
+        dest.chmod(0o700)
+    except OSError:
+        pass
     env_target = dest / ".env"
     existing = read_dotenv_names_and_token_class(env_target)
     if (

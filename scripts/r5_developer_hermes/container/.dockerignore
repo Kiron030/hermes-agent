@@ -2,6 +2,7 @@
 !Dockerfile
 !entrypoint.sh
 !seed_home.py
+!migrate_home.py
 !telegram_ops.py
 !profiles/
 !profiles/**/*

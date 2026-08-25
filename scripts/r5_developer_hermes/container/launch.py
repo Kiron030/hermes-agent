@@ -422,9 +422,9 @@ def _dx_ready(inspect_data: dict[str, Any]) -> bool:
             f"{RUNTIME_UID}:{RUNTIME_GID}",
             RUNTIME_USER,
             str(RUNTIME_UID),
-            "0:0",
         }
-        and "HERMES_DOCKER_EXEC_AS_ROOT" in env_names
+        and "HERMES_DOCKER_EXEC_AS_ROOT" not in env_names
+        and "HERMES_ALLOW_ROOT_GATEWAY" not in env_names
         and "GIT_CONFIG_GLOBAL" in env_names
     )
 
@@ -517,8 +517,68 @@ def build_image() -> dict[str, Any]:
     }
 
 
+def migrate_home_argv(*, apply: bool) -> list[str]:
+    """One-shot volume-only helper. No workspace binds, socket, or egress CA."""
+    return [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        f"{CONTAINER_NAME}-migrate-home",
+        "--user",
+        "0:0",
+        "--privileged=false",
+        "--security-opt",
+        "no-new-privileges:true",
+        "--network",
+        "none",
+        "--mount",
+        f"type=volume,src={HERMES_HOME_VOLUME},dst={CONTAINER_HERMES_HOME}",
+        "--entrypoint",
+        "python3",
+        DEVELOPER_IMAGE,
+        "/opt/r5-developer/migrate_home.py",
+        "--apply" if apply else "--dry-run",
+    ]
+
+
+def migrate_home(*, apply: bool = False) -> dict[str, Any]:
+    """Audit or apply HERMES_HOME ownership. Never prints secret contents."""
+    _assert_host_execution_trust()
+    if apply and container_running():
+        raise RuntimeError("stop Developer Hermes before applying HERMES_HOME migration")
+    if _image_inspect_payload(DEVELOPER_IMAGE) is None:
+        raise RuntimeError("Developer image is missing; build before migrate-home")
+    ensure_volume()
+    completed = subprocess.run(
+        [docker_exe(), *migrate_home_argv(apply=apply)[1:]],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    stdout = (completed.stdout or "").strip()
+    try:
+        payload = json.loads(stdout)
+    except ValueError:
+        payload = {
+            "OK": "NO",
+            "error": (completed.stderr or completed.stdout).strip()[:400],
+            "CONTENTS_PRINTED": "NO",
+        }
+    payload["MODE"] = "APPLY" if apply else "DRY_RUN"
+    payload["exit_code"] = completed.returncode
+    payload["TOKEN_PRINTED"] = "NO"
+    if completed.returncode != 0 and payload.get("OK") != "YES":
+        raise RuntimeError(
+            "HERMES_HOME migration failed closed: "
+            f"{payload.get('error') or payload.get('errors') or completed.returncode}"
+        )
+    return payload
+
+
 def _create_container() -> dict[str, Any]:
     ensure_volume()
+    migration = migrate_home(apply=True)
     mode = egress_mode()
     token = egress.ensure_egress_token() if mode == egress.MODE_ENFORCED else None
     argv = docker_run_argv(model_env=_model_env(), egress_mode=mode, egress_token=token)
@@ -537,6 +597,12 @@ def _create_container() -> dict[str, Any]:
         "id": completed.stdout.strip(),
         "EGRESS_MODE": mode,
         "argv_without_secrets": docker_run_argv(model_env=None, egress_mode=mode, egress_token=None),
+        "hermes_home_migration": {
+            "OK": migration.get("OK"),
+            "MODE": migration.get("MODE"),
+            "CHANGE_COUNT": migration.get("CHANGE_COUNT"),
+            "CONTENTS_PRINTED": "NO",
+        },
     }
 
 
@@ -1306,12 +1372,14 @@ def _verdict(
         not leaked_authority,
         probe["repo_a"]["writable"] == "YES",
         probe["repo_b"]["writable"] == "YES",
+        (inspect_data.get("user") or "")
+        in {f"{RUNTIME_UID}:{RUNTIME_GID}", RUNTIME_USER, str(RUNTIME_UID)},
+        "HERMES_DOCKER_EXEC_AS_ROOT" not in env_names,
+        "HERMES_ALLOW_ROOT_GATEWAY" not in env_names,
         probe["git_a"]["status"] == "YES",
         probe["git_b"]["status"] == "YES",
         probe["git_a"]["diff"] == "YES",
         probe["git_b"]["diff"] == "YES",
-        probe["git_a"]["local_commit"] == "YES",
-        probe["git_b"]["local_commit"] == "YES",
         tooling["PYTHON"] == "YES",
         tooling["UV"] == "YES",
         tooling["GIT"] == "YES",
@@ -1411,6 +1479,18 @@ def prove() -> dict[str, Any]:
         "CONTAINER_ID": inspect_data.get("id"),
         "container_name": CONTAINER_NAME,
         "CONTAINER_RUNTIME_USER": inspect_data.get("user") or f"{RUNTIME_UID}:{RUNTIME_GID}",
+        "HERMES_SERVE_USER_EXPECTED": RUNTIME_USER,
+        "ROOT_GATEWAY_OVERRIDE": (
+            "PRESENT" if "HERMES_ALLOW_ROOT_GATEWAY" in set(_env_names(inspect_data)) else "ABSENT"
+        ),
+        "LOCAL_COMMIT_A": probe["git_a"].get("local_commit"),
+        "LOCAL_COMMIT_B": probe["git_b"].get("local_commit"),
+        "LOCAL_COMMIT_RESIDUAL": (
+            "WINDOWS_BIND_GIT_METADATA"
+            if probe["git_a"].get("local_commit") != "YES"
+            or probe["git_b"].get("local_commit") != "YES"
+            else "NONE"
+        ),
         "privileged": inspect_data["privileged"],
         "pid_mode": inspect_data["pid_mode"],
         "network_mode": inspect_data["network_mode"],
@@ -2183,6 +2263,7 @@ def main() -> int:
             "telegram-status",
             "telegram-down",
             "telegram-activate",
+            "migrate-home",
             "inspect",
             "preflight",
             "plan",
@@ -2208,6 +2289,11 @@ def main() -> int:
             "Required intent for telegram-activate. Ordinary telegram-up still "
             "refuses LIVE_SHAPED tokens. Never pass the token on the command line."
         ),
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply HERMES_HOME ownership migration (migrate-home only)",
     )
     args = parser.parse_args()
     set_egress_mode(args.egress_mode)
@@ -2297,6 +2383,15 @@ def main() -> int:
         print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
         print(f"TELEGRAM_POLL_CONFLICT_409 = {payload.get('TELEGRAM_POLL_CONFLICT_409')}")
         return 0
+    if args.command == "migrate-home":
+        payload = migrate_home(apply=args.apply)
+        write_json(artifacts_dir() / "container_migrate_home.json", payload)
+        print(f"MIGRATION_MODE = {payload.get('MODE')}")
+        print(f"MIGRATION_OK = {payload.get('OK')}")
+        print(f"CHANGE_COUNT = {payload.get('CHANGE_COUNT')}")
+        print("CONTENTS_PRINTED = NO")
+        print("TOKEN_PRINTED = NO")
+        return 0 if payload.get("OK") == "YES" else 1
     if args.command == "telegram-down":
         payload = telegram_down()
         write_json(artifacts_dir() / "container_telegram_down.json", payload)

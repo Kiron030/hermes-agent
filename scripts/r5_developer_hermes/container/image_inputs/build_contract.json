@@ -1,6 +1,6 @@
 {
   "schema": "r5-developer-image-inputs",
-  "contract_version": "r5-dx-image-v1",
+  "contract_version": "r5-dx-image-v2",
   "upstream_image_digest": "sha256:3811ed13da874fba2ac99b6d492db9a203d34cb6dccf90d886948c00d0ccec09",
   "typescript_pin": "7.0.2",
   "pytest_pin": "9.1.1",
