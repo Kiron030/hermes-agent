@@ -17,12 +17,14 @@ RUN npm install -g typescript@7.0.2 \
 
 COPY entrypoint.sh /opt/r5-developer/entrypoint.sh
 COPY seed_home.py /opt/r5-developer/seed_home.py
+COPY migrate_home.py /opt/r5-developer/migrate_home.py
 COPY telegram_ops.py /opt/r5-developer/telegram_ops.py
 COPY profiles/telegram-ops /opt/r5-developer/profiles/telegram-ops
 COPY skills/r5-dev-skill /opt/r5-developer/skills/r5-dev-skill
 COPY image_inputs/build_contract.json /opt/r5-developer/image_inputs/build_contract.json
 RUN sed -i 's/\r$//' /opt/r5-developer/entrypoint.sh \
-    && chmod 0755 /opt/r5-developer/entrypoint.sh \
+    && sed -i 's/\r$//' /opt/r5-developer/migrate_home.py \
+    && chmod 0755 /opt/r5-developer/entrypoint.sh /opt/r5-developer/migrate_home.py \
     && chown -R hermes:hermes /opt/r5-developer
 
 # Identity labels are applied last so a fingerprint-only rebuild does not
@@ -36,9 +38,11 @@ LABEL io.powerunits.r5.input-sha256="${R5_INPUT_SHA256}" \
       io.powerunits.r5.contract-version="${R5_CONTRACT_VERSION}" \
       io.powerunits.r5.source-git-sha="${R5_SOURCE_GIT_SHA}"
 
-# Runtime user is root inside an unprivileged container. Windows bind-mount
-# `.git/objects` is not writable by uid 10000; local Git commits require this.
-USER root
+# Runtime identity is hermes / 10000:10000. Root-only build steps above
+# must restore this user. Do not leave the image as USER root.
+# Windows bind-mount .git metadata created by a previous root runtime may
+# remain root-owned; that does not justify a root Hermes process.
+USER hermes
 WORKDIR /workspace
 ENTRYPOINT ["/opt/r5-developer/entrypoint.sh"]
 CMD ["sleep", "infinity"]

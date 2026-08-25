@@ -15,8 +15,6 @@ BUNDLED_SKILLS = Path("/opt/hermes/skills")
 VERSIONED_SKILL = Path("/opt/r5-developer/skills/r5-dev-skill")
 SKILLS_SYNC = Path("/opt/hermes/tools/skills_sync.py")
 VENV_PYTHON = Path("/opt/hermes/.venv/bin/python")
-SENTINEL = HERMES_HOME / ".r5-dx-sentinel"
-GITCONFIG = HERMES_HOME / ".gitconfig"
 
 _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
@@ -76,17 +74,31 @@ def _write_if_missing(path: Path, text: str) -> None:
 
 
 def main() -> int:
-    HERMES_HOME.mkdir(parents=True, exist_ok=True)
+    geteuid = getattr(os, "geteuid", None)
+    if geteuid is not None and geteuid() == 0:
+        print("seed_home: refusing to seed HERMES_HOME as root", file=sys.stderr)
+        return 78
+    try:
+        HERMES_HOME.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"seed_home: cannot create {HERMES_HOME}: {exc}", file=sys.stderr)
+        return 78
+    if not os.access(HERMES_HOME, os.W_OK | os.X_OK):
+        uid = getattr(os, "getuid", lambda: -1)()
+        print(f"seed_home: {HERMES_HOME} is not writable by uid {uid}", file=sys.stderr)
+        return 78
     try:
         HERMES_HOME.chmod(0o755)
     except OSError:
         pass
     for name in ("sessions", "skills", "memories", "logs", "plans"):
         (HERMES_HOME / name).mkdir(exist_ok=True)
+    sentinel = HERMES_HOME / ".r5-dx-sentinel"
+    gitconfig = HERMES_HOME / ".gitconfig"
     _write_if_missing(HERMES_HOME / "config.yaml", CONFIG)
     _write_if_missing(HERMES_HOME / "SOUL.md", SOUL)
-    if not GITCONFIG.exists():
-        GITCONFIG.write_text(GITCONFIG_TEXT, encoding="utf-8")
+    if not gitconfig.exists():
+        gitconfig.write_text(GITCONFIG_TEXT, encoding="utf-8")
     dest_skill = HERMES_HOME / "skills" / "r5-dev-skill"
     if VERSIONED_SKILL.is_dir() and not (dest_skill / "SKILL.md").is_file():
         shutil.copytree(VERSIONED_SKILL, dest_skill, dirs_exist_ok=True)
@@ -101,7 +113,7 @@ def main() -> int:
             },
         )
     seed_telegram_ops_profile(HERMES_HOME)
-    SENTINEL.write_text("R5_DEVELOPER_DX_PERSISTENCE_SENTINEL\n", encoding="utf-8")
+    sentinel.write_text("R5_DEVELOPER_DX_PERSISTENCE_SENTINEL\n", encoding="utf-8")
     return 0
 
 

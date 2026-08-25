@@ -53,6 +53,12 @@ def test_fullstack_image_contract_is_container_local() -> None:
     text = (CONTAINER_DIR / "entrypoint.sh").read_text(encoding="utf-8")
     assert "HERMES_HOME" in text
     assert "/opt/r5-developer/seed_home.py" in text
+    assert "USER hermes" in dockerfile
+    assert dockerfile.rstrip().endswith('CMD ["sleep", "infinity"]')
+    assert dockerfile.count("USER hermes") >= 1
+    last_user = [line for line in dockerfile.splitlines() if line.startswith("USER ")][-1]
+    assert last_user == "USER hermes"
+    assert "refusing to start Hermes runtime as root" in text
 
 
 def test_persistent_hermes_home_is_a_named_volume() -> None:
@@ -111,7 +117,10 @@ def test_docker_run_argv_forbids_credential_passthrough() -> None:
     assert "--privileged=false" in argv
     assert "--pid" not in argv
     assert f"--user" in argv
-    assert "0:0" in argv
+    assert "10000:10000" in argv
+    assert "0:0" not in argv
+    assert "HERMES_DOCKER_EXEC_AS_ROOT" not in joined
+    assert "HERMES_ALLOW_ROOT_GATEWAY" not in joined
     assert "/var/run/docker.sock" not in joined
     assert r"\\.\pipe\docker_engine" not in joined
     assert "C:\\Users" not in joined

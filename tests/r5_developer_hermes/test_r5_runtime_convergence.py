@@ -51,6 +51,7 @@ def test_image_input_set_is_the_minimum_material_build_context() -> None:
         ".dockerignore",
         "entrypoint.sh",
         "seed_home.py",
+        "migrate_home.py",
         "telegram_ops.py",
         "profiles/telegram-ops/config.yaml",
         "profiles/telegram-ops/SOUL.md",
@@ -67,6 +68,7 @@ def test_image_input_set_is_the_minimum_material_build_context() -> None:
         assert relative.split("/", 1)[0] in dockerignore or relative in dockerignore
     assert "COPY entrypoint.sh" in dockerfile
     assert "COPY seed_home.py" in dockerfile
+    assert "COPY migrate_home.py" in dockerfile
     assert "COPY telegram_ops.py" in dockerfile
     assert "COPY profiles/telegram-ops" in dockerfile
     assert "COPY skills/r5-dev-skill" in dockerfile

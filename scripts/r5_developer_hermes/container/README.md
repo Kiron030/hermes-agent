@@ -6,6 +6,9 @@ Infrastructure around Hermes. Not Hermes-core.
 ISOLATION_BOUNDARY               = CONTAINER
 ISOLATION_BOUNDARY_FALLBACK      = DEDICATED_OS_PRINCIPAL
 HERMES_HOME_MECHANISM            = DOCKER_NAMED_VOLUME
+CONTAINER_RUNTIME_USER           = hermes / 10000:10000
+HERMES_HOME_RUNTIME_OWNER        = hermes:hermes
+ROOT_GATEWAY_ALLOWED             = NO
 DEVELOPER_HERMES_CONTROLLER      = PINNED_PURE_UPSTREAM
 DEVELOPER_RUNTIME_SOURCE         = /opt/hermes
 GENERIC_FINAL_TOOLSET_CAP_ACTIVE = NO
@@ -94,6 +97,8 @@ python scripts/r5_developer_hermes/container/launch.py reset
 python scripts/r5_developer_hermes/container/launch.py telegram-up
 python scripts/r5_developer_hermes/container/launch.py telegram-status
 python scripts/r5_developer_hermes/container/launch.py telegram-down
+python scripts/r5_developer_hermes/container/launch.py migrate-home
+python scripts/r5_developer_hermes/container/launch.py migrate-home --apply
 python scripts/r5_developer_hermes/container/launch.py down
 ```
 
@@ -105,6 +110,19 @@ Inspect/proof output may include environment variable **names** only.
 Values are omitted. A host user with Docker daemon authority can still
 inspect container environment; that does not enlarge the container trust
 boundary.
+
+## Runtime user and HERMES_HOME ownership
+
+The image and container run as `hermes` (uid/gid 10000). `HERMES_HOME` is
+owned by that user. Root gateway remains forbidden.
+
+Existing volumes created under the previous root runtime are repaired by
+`launch.py migrate-home` (dry-run) and `--apply`. `up` applies the same
+controlled migration automatically. The helper mounts only the named
+volume, never workspace binds or the Telegram token value.
+
+See [`hermes_r5_developer_nonroot_runtime_v1.md`](../../../docs/architecture/hermes_r5_developer_nonroot_runtime_v1.md).
+Open Telegram PR #74 stays separate and is not modified here.
 
 ## Reset persistent home
 
