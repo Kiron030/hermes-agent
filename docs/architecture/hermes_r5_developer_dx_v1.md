@@ -8,7 +8,7 @@
 ```text
 ISOLATION_BOUNDARY            = CONTAINER
 HERMES_HOME_MECHANISM         = DOCKER_NAMED_VOLUME
-CONTAINER_RUNTIME_USER        = ROOT_ACCEPTED_WITH_RATIONALE
+CONTAINER_RUNTIME_USER        = hermes / 10000:10000
 HERMES_CORE_FILES_ADDED_BY_DX = 0
 ```
 
@@ -26,7 +26,7 @@ state, skills, a one-command launcher, and isolated Git identity.
 | Repo A | `/workspace/hermes-agent` (RW bind) |
 | Repo B | `/workspace/EU-PP-Database` (RW bind) |
 | Persistent home | named volume `r5-developer-hermes-home` → `/opt/data` |
-| Runtime user | root inside an unprivileged container. uid 10000 cannot write Windows bind-mount `.git/objects`. |
+| Runtime user | `hermes` / uid 10000 inside an unprivileged container. See [`hermes_r5_developer_nonroot_runtime_v1.md`](./hermes_r5_developer_nonroot_runtime_v1.md). |
 
 Host profile, host secrets, Docker socket, Railway/Vercel/GitHub/production
 DB credentials stay unmounted.
@@ -50,8 +50,8 @@ BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 The controller is pinned `/opt/hermes`, not the mounted checkout. TypeScript
 and pytest are pinned at image build; pytest is not fetched unconstrained
 on every test run. `cap_drop ALL` is deferred: the container already runs
-unprivileged as root only so Windows bind-mount Git works, and a guessed
-capability subset would risk the proven DX.
+unprivileged as uid 10000, and a guessed capability subset would risk the
+proven DX.
 
 ## Runtime identity
 

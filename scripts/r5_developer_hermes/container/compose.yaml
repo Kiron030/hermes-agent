@@ -11,7 +11,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: r5-developer-hermes
-    user: "0:0"
+    user: "10000:10000"
     privileged: false
     network_mode: bridge
     working_dir: /workspace
@@ -22,7 +22,6 @@ services:
       LANG: C.UTF-8
       GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
       GIT_CONFIG_NOSYSTEM: "1"
-      HERMES_DOCKER_EXEC_AS_ROOT: "1"
       HERMES_WRITE_SAFE_ROOT: /workspace:/opt/data
     volumes:
       - type: volume

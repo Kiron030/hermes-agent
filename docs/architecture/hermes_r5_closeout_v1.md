@@ -158,7 +158,7 @@ Do not reopen these. They were measured and accepted.
 |---|---|---|
 | TLS interception inside the isolated egress architecture (iron-proxy requires it) | `ACCEPTED_LOW_RISK` | CA trust is sandbox-scoped; host trust store is unaffected; the broker is intentionally trusted for approved HTTPS; audit stores neither request bodies nor credentials |
 | `require_token_on_provider_hosts=false` | `ACCEPTED_LOW_RISK` | Another credential could be used only against an already approved provider host. It does **not** create new arbitrary destinations, host authority, production authority, or Docker authority |
-| Container root | accepted defense-in-depth posture | uid 10000 cannot write Windows bind-mount `.git/objects`; the container is already unprivileged |
+| Windows bind-mount `.git` metadata | accepted residual after non-root repair | working trees stay writable by uid 10000; some root-created `.git/index` / object shards may remain unwritable without host ACL changes. The Hermes runtime itself is no longer root. See [`hermes_r5_developer_nonroot_runtime_v1.md`](./hermes_r5_developer_nonroot_runtime_v1.md). |
 | Git hooks | contained code execution | part of the in-sandbox arbitrary-code authority already granted; host-side clone non-execution is the protection that matters |
 | Linux capability reduction | deferred, not blocking | a guessed `cap_drop` subset would risk the proven DX |
 

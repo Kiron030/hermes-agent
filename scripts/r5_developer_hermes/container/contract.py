@@ -38,15 +38,16 @@ HERMES_HOME_VOLUME = "r5-developer-hermes-home"
 HERMES_HOME_VOLUME_LITERAL = "r5-developer-hermes-home"
 HERMES_HOME_MECHANISM = "DOCKER_NAMED_VOLUME"
 
-# Windows/WSL bind mounts make Repo A/B working trees writable to uid 10000,
-# but `.git/objects` stays root-owned. Non-root therefore breaks local Git
-# commits. The container stays unprivileged; this is not host root.
-RUNTIME_USER = "root"
-RUNTIME_UID = 0
-RUNTIME_GID = 0
+# Developer Hermes runtime is the image hermes user. Historical root was an
+# intentional Git workaround that poisoned HERMES_HOME and broke the upstream
+# non-root gateway. Working trees stay 0777 on Windows binds; root-created
+# `.git` metadata may remain unwritable without host ACL changes.
+RUNTIME_USER = "hermes"
+RUNTIME_UID = 10000
+RUNTIME_GID = 10000
 RUNTIME_USER_RATIONALE = (
-    "ROOT_ACCEPTED_WITH_RATIONALE: Windows bind-mount .git/objects is not "
-    "writable by uid 10000; unprivileged container root keeps local Git."
+    "PURE_NONROOT: image and container run as uid/gid 10000; "
+    "HERMES_HOME is hermes:hermes; root gateway remains forbidden."
 )
 
 # Literal approved host bind sources. Security checks use these strings,
@@ -104,14 +105,14 @@ GIT_HOOKS_POSTURE = "CONTAINED_CODE_EXECUTION"
 LINUX_CAPABILITY_HARDENING = "DEFERRED_WITH_RATIONALE"
 LINUX_CAPABILITY_HARDENING_RATIONALE = (
     "The container already runs unprivileged (--privileged=false, "
-    "no-new-privileges) as root only so Windows bind-mount .git/objects "
-    "stay writable. cap_drop ALL plus a guessed add-back set needs an "
-    "empirical Git/Node/Hermes/pytest/volume matrix and can break proven "
-    "DX. LOW finding; mount allowlist remains the primary boundary."
+    "no-new-privileges) as uid 10000. cap_drop ALL plus a guessed add-back "
+    "set needs an empirical Git/Node/Hermes/pytest/volume matrix and can "
+    "break proven DX. LOW finding; mount allowlist remains the primary "
+    "boundary."
 )
 TYPESCRIPT_PIN = "7.0.2"
 PYTEST_PIN = "9.1.1"
-IMAGE_CONTRACT_VERSION = "r5-dx-image-v1"
+IMAGE_CONTRACT_VERSION = "r5-dx-image-v2"
 IMAGE_LABEL_INPUT_SHA256 = "io.powerunits.r5.input-sha256"
 IMAGE_LABEL_HERMES_BASE_DIGEST = "io.powerunits.r5.hermes-base-digest"
 IMAGE_LABEL_CONTRACT_VERSION = "io.powerunits.r5.contract-version"
@@ -123,9 +124,6 @@ ENV_ALLOWLIST: dict[str, str] = {
     "LANG": "C.UTF-8",
     "GIT_CONFIG_GLOBAL": f"{CONTAINER_HERMES_HOME}/.gitconfig",
     "GIT_CONFIG_NOSYSTEM": "1",
-    # Container runs as root for Windows bind-mount Git. Keep the official
-    # hermes PATH shim from dropping to uid 10000 and then failing on home files.
-    "HERMES_DOCKER_EXEC_AS_ROOT": "1",
     # Official image defaults this to /opt/data, which blocks write_file/patch
     # on the approved repo mounts. Defense in depth only — the bind allowlist
     # is the primary host boundary.
@@ -537,7 +535,7 @@ def docker_run_argv(
         "--name",
         name,
         "--user",
-        "0:0",
+        f"{RUNTIME_UID}:{RUNTIME_GID}",
         "--privileged=false",
         *egress.developer_network_args(mode=mode),
         "--workdir",

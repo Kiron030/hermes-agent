@@ -23,7 +23,7 @@ from typing import Any, Literal
 CONTAINER_DIR = Path(__file__).resolve().parent
 
 IMAGE_INPUT_SCHEMA = "r5-developer-image-inputs-v1"
-IMAGE_CONTRACT_VERSION = "r5-dx-image-v1"
+IMAGE_CONTRACT_VERSION = "r5-dx-image-v2"
 
 LABEL_INPUT_SHA256 = "io.powerunits.r5.input-sha256"
 LABEL_HERMES_BASE_DIGEST = "io.powerunits.r5.hermes-base-digest"
@@ -44,6 +44,7 @@ IMAGE_INPUT_RELATIVE_PATHS: tuple[str, ...] = (
     ".dockerignore",
     "entrypoint.sh",
     "seed_home.py",
+    "migrate_home.py",
     "telegram_ops.py",
     "profiles/telegram-ops/config.yaml",
     "profiles/telegram-ops/SOUL.md",
