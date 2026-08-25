@@ -48,9 +48,11 @@ def test_every_required_destination_class_is_represented() -> None:
         "OS_PACKAGE_REGISTRY",
         "SUPPLY_CHAIN_SAFETY",
         "RUNTIME_ARTIFACT",
+        "MESSAGING_PLATFORM",
     ):
         assert required in classes
     assert classes["OTHER_ARBITRARY_NETWORK"]["decision"] == "DENY"
+    assert classes["MESSAGING_PLATFORM"]["hosts"] == ["api.telegram.org"]
 
 
 def test_policy_carries_no_credential_values() -> None:

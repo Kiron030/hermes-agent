@@ -31,7 +31,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset', 'desktop', 'desktop-down')]
+    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset', 'desktop', 'desktop-down', 'telegram-up', 'telegram-status', 'telegram-down')]
     [string] $Mode = 'shell'
 )
 
@@ -126,6 +126,13 @@ switch ($Mode) {
         break
     }
     'desktop-down' { Invoke-Launch 'desktop-down'; break }
+    'telegram-up' {
+        Invoke-Launch 'telegram-up'
+        Write-Host 'telegram-ops PREP: does not move the live Railway token.'
+        break
+    }
+    'telegram-status' { Invoke-Launch 'telegram-status'; break }
+    'telegram-down' { Invoke-Launch 'telegram-down'; break }
     'down'  { Invoke-Launch 'down'; break }
     'prove' { Invoke-Launch 'prove-dx'; break }
     'reset' {

@@ -33,6 +33,7 @@ APPROVED_SCM = "https://api.github.com/rate_limit"
 APPROVED_HTTP = "http://deb.debian.org/debian/dists/trixie/Release"
 APPROVED_PYPI = "https://pypi.org/pypi/pip/json"
 APPROVED_MODEL_HOST = "api.openai.com"
+APPROVED_TELEGRAM_HOST = "api.telegram.org"
 
 # Research: the approved processor is reachable, the site it researches is not,
 # and the ring vendors nobody approved stay denied even though upstream code
@@ -376,6 +377,16 @@ def main() -> int:  # noqa: PLR0915 — a flat matrix reads better than nested h
         "approved_model_provider_token_swap", "MODEL", "ALLOWED",
         not reached(status),
         f"status={status} (200 means the broker substituted the real credential)",
+    )
+    # Transport reachability only. No bot token and no getUpdates — this must
+    # not take over the live Railway poller.
+    status, detail = curl_status(f"https://{APPROVED_TELEGRAM_HOST}/")
+    record(
+        "approved_messaging_platform",
+        "MESSAGING",
+        "ALLOWED",
+        status == 0 or status == 403,
+        f"status={status} (no bot token; long-poll host only)",
     )
 
     passed = sum(1 for row in rows if row["result"] == "PASS")

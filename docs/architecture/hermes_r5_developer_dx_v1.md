@@ -67,7 +67,7 @@ CHECKED_IN_RUNTIME_CONTRACT
 
 The launcher computes `DEVELOPER_IMAGE_INPUT_FINGERPRINT` from the minimum
 material image-input set (`Dockerfile`, `.dockerignore`, `entrypoint.sh`,
-`seed_home.py`, the bundled skill, and `image_inputs/build_contract.json`).
+`seed_home.py`, `telegram_ops.py`, the `telegram-ops` profile seed, the bundled skill, and `image_inputs/build_contract.json`).
 The built image is stamped with:
 
 ```text
@@ -264,6 +264,13 @@ BOT_MODE_CONTAINER_COMPATIBILITY = NEEDS_REMEDIATION
 MODEL_ROUTING_CONFIGURABLE_WITHOUT_CORE_FORK = YES
 WINDOWS_COMPUTER_USE_ENABLED     = NO
 ```
+
+0B PREP seeds the dedicated `telegram-ops` profile so official Desktop Bot
+Mode can list it after reload (`Bot = profile`). The live Telegram token
+stays on Railway. `BOT_MODE_CONTAINER_COMPATIBILITY` stays
+`NEEDS_REMEDIATION` until a human activates
+`TELEGRAM_EXISTING_PATH_0C_ACTIVATE`. See
+[`hermes_r5_telegram_ops_0b_v1.md`](./hermes_r5_telegram_ops_0b_v1.md).
 
 Official Hermes Desktop (unchanged) connects as a Remote Gateway client to
 `http://127.0.0.1:19119`. The Developer container stays on the internal

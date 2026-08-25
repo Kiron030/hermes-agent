@@ -44,6 +44,10 @@ IMAGE_INPUT_RELATIVE_PATHS: tuple[str, ...] = (
     ".dockerignore",
     "entrypoint.sh",
     "seed_home.py",
+    "telegram_ops.py",
+    "profiles/telegram-ops/config.yaml",
+    "profiles/telegram-ops/SOUL.md",
+    "profiles/telegram-ops/env.template",
     "skills/r5-dev-skill/SKILL.md",
     "image_inputs/build_contract.json",
 )

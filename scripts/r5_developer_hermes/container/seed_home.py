@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -16,6 +17,14 @@ SKILLS_SYNC = Path("/opt/hermes/tools/skills_sync.py")
 VENV_PYTHON = Path("/opt/hermes/.venv/bin/python")
 SENTINEL = HERMES_HOME / ".r5-dx-sentinel"
 GITCONFIG = HERMES_HOME / ".gitconfig"
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+try:
+    from r5_developer_hermes.container.telegram_ops import seed_telegram_ops_profile
+except ImportError:
+    from telegram_ops import seed_telegram_ops_profile  # type: ignore
 
 CONFIG = """model: gpt-5.6-terra
 provider: openai-api
@@ -91,6 +100,7 @@ def main() -> int:
                 "HOME": str(HERMES_HOME),
             },
         )
+    seed_telegram_ops_profile(HERMES_HOME)
     SENTINEL.write_text("R5_DEVELOPER_DX_PERSISTENCE_SENTINEL\n", encoding="utf-8")
     return 0
 

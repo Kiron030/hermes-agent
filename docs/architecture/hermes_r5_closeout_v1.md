@@ -235,7 +235,12 @@ the remainder from this document.
 2. Post-merge upstream update contract — established
 3. Desktop container integration — first functional slice (official
    Remote Gateway + localhost sidecar; Developer container unchanged)
-4. Bot Mode / Telegram integration
+4. Bot Mode / Telegram integration — 0B PREP seeds dedicated
+   profile `telegram-ops` and named Egress `api.telegram.org`. The live
+   token stays on Railway. Activation is a later human slice
+   (`TELEGRAM_EXISTING_PATH_0C_ACTIVATE`). See
+   [`hermes_r5_telegram_ops_0b_v1.md`](./hermes_r5_telegram_ops_0b_v1.md).
+   `R5_GATE` stays `CLOSED`.
 5. Model routing
 6. PowerUnits-specific Developer-Hermes Skills / Memory / operating model
 

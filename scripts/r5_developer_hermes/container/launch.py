@@ -71,6 +71,7 @@ from r5_developer_hermes.container.image_identity import (  # noqa: E402
 )
 from r5_developer_hermes.container import desktop as desktop_gw  # noqa: E402
 from r5_developer_hermes.container.egress import host as egress  # noqa: E402
+from r5_developer_hermes.container import telegram_ops as tg_ops  # noqa: E402
 from r5_developer_hermes.harness import artifacts_dir, write_json  # noqa: E402
 
 
@@ -869,6 +870,100 @@ def stop_desktop() -> dict[str, Any]:
     return {
         "sidecar_removed": removed.returncode == 0,
         "serve_stopped": "YES",
+    }
+
+
+def _telegram_token_class_in_container() -> str:
+    probe = (
+        "import sys; sys.path.insert(0, '/opt/r5-developer'); "
+        "from pathlib import Path; "
+        "from telegram_ops import read_dotenv_names_and_token_class, token_env_path; "
+        "print(read_dotenv_names_and_token_class(token_env_path(Path('/opt/data')))['token_class'])"
+    )
+    completed = exec_in(
+        ["/opt/hermes/.venv/bin/python", "-c", probe],
+        check=False,
+    )
+    if completed.returncode != 0:
+        return "UNKNOWN"
+    return (completed.stdout or "").strip() or "UNKNOWN"
+
+
+def telegram_status() -> dict[str, Any]:
+    """Observe the dedicated Telegram gateway. Never prints a token."""
+    _assert_host_execution_trust()
+    running = container_running()
+    result: dict[str, Any] = {
+        "PROFILE": tg_ops.PROFILE_NAME,
+        "CONTAINER_RUNNING": "YES" if running else "NO",
+        "TRANSPORT": tg_ops.TRANSPORT,
+        "PUBLIC_INBOUND_PORT": "NO",
+        "TOKEN_STORAGE_TARGET": tg_ops.TOKEN_STORAGE_TARGET,
+        "LIVE_POLLING": "NO",
+    }
+    if not running:
+        result["GATEWAY"] = "DOWN"
+        return result
+    seeded = exec_in(
+        ["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"],
+        check=False,
+    )
+    result["PROFILE_SEEDED"] = "YES" if seeded.returncode == 0 else "NO"
+    result["TOKEN_CLASS"] = _telegram_token_class_in_container()
+    status = exec_in(list(tg_ops.GATEWAY_STATUS_ARGV), check=False)
+    result["GATEWAY_STATUS_EXIT"] = status.returncode
+    result["GATEWAY"] = "UP" if status.returncode == 0 else "DOWN"
+    if result["TOKEN_CLASS"] == "LIVE_SHAPED" and result["GATEWAY"] == "UP":
+        result["LIVE_POLLING"] = "POSSIBLE"
+    return result
+
+
+def telegram_up() -> dict[str, Any]:
+    """Prepare and optionally start the telegram-ops gateway.
+
+    PREP refuses a live-shaped token so Railway keeps the existing poller.
+    A missing token starts the process without enabling Telegram polling.
+    A synthetic token may start for lifecycle proof only.
+    """
+    _assert_host_execution_trust()
+    started = up()
+    exec_in(["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"])
+    token_class = _telegram_token_class_in_container()
+    allowed, reason = tg_ops.may_start_gateway(token_class)
+    result: dict[str, Any] = {
+        **started,
+        "PROFILE": tg_ops.PROFILE_NAME,
+        "TOKEN_CLASS": token_class,
+        "TOKEN_VALUES_RECORDED": "NO",
+        "LIFECYCLE_ARGV": list(tg_ops.GATEWAY_START_ARGV),
+        "START_PERMITTED": "YES" if allowed else "NO",
+        "START_REASON": reason,
+        "LIVE_TOKEN_MOVED": "NO",
+    }
+    if not allowed:
+        result["GATEWAY"] = "NOT_STARTED"
+        return result
+    launched = exec_in(list(tg_ops.GATEWAY_START_ARGV), check=False)
+    result["GATEWAY_START_EXIT"] = launched.returncode
+    result.update(telegram_status())
+    result["TOKEN_CLASS"] = token_class
+    return result
+
+
+def telegram_down() -> dict[str, Any]:
+    """Stop only the telegram-ops gateway. Developer Hermes stays up."""
+    _assert_host_execution_trust()
+    if not container_running():
+        return {
+            "PROFILE": tg_ops.PROFILE_NAME,
+            "GATEWAY": "DOWN",
+            "CONTAINER_RUNNING": "NO",
+        }
+    stopped = exec_in(list(tg_ops.GATEWAY_STOP_ARGV), check=False)
+    return {
+        "PROFILE": tg_ops.PROFILE_NAME,
+        "GATEWAY_STOP_EXIT": stopped.returncode,
+        **telegram_status(),
     }
 
 
@@ -1901,6 +1996,9 @@ def main() -> int:
             "prove-desktop",
             "desktop-up",
             "desktop-down",
+            "telegram-up",
+            "telegram-status",
+            "telegram-down",
             "inspect",
             "preflight",
             "plan",
@@ -1982,6 +2080,30 @@ def main() -> int:
     if args.command == "desktop-down":
         payload = stop_desktop()
         write_json(artifacts_dir() / "container_desktop_down.json", payload)
+        return 0
+    if args.command == "telegram-up":
+        payload = telegram_up()
+        write_json(artifacts_dir() / "container_telegram_up.json", payload)
+        print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"START_PERMITTED = {payload.get('START_PERMITTED')}")
+        print(f"START_REASON = {payload.get('START_REASON')}")
+        print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print("LIVE_TOKEN_MOVED = NO")
+        return 0
+    if args.command == "telegram-status":
+        payload = telegram_status()
+        write_json(artifacts_dir() / "container_telegram_status.json", payload)
+        print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
+        return 0
+    if args.command == "telegram-down":
+        payload = telegram_down()
+        write_json(artifacts_dir() / "container_telegram_down.json", payload)
+        print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"GATEWAY = {payload.get('GATEWAY')}")
         return 0
     if args.command == "prove-desktop":
         result = prove_desktop()
