@@ -1460,7 +1460,14 @@ def exec_detached(
         CONTAINER_NAME,
         *args,
     ]
-    return subprocess.run(cmd, text=True, capture_output=True, check=False)
+    return subprocess.run(
+        cmd,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
 
 
 def exec_in(
@@ -1483,6 +1490,8 @@ def exec_in(
     completed = subprocess.run(
         cmd,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
         timeout=timeout,
