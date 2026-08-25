@@ -108,8 +108,9 @@ python scripts/r5_developer_hermes/desktop_remote_client.py preflight
 `telegram-up` / `telegram-status` / `telegram-down` prepare the dedicated
 `telegram-ops` profile (display: Developer Remote). Ordinary `telegram-up`
 refuses a LIVE_SHAPED token. Live polling of the **second** Developer
-BotFather identity requires `telegram-activate`. The Railway Operator
-token is not moved or modified. See
+BotFather identity requires `telegram-activate` and uses
+`hermes -p telegram-ops gateway run` as uid 10000, not `gateway start`.
+The Railway Operator token is not moved or modified. See
 [`docs/architecture/hermes_r5_telegram_developer_0c_v1.md`](../../docs/architecture/hermes_r5_telegram_developer_0c_v1.md).
 
 Official Desktop (unchanged) uses Remote Gateway

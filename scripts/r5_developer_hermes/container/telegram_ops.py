@@ -101,6 +101,7 @@ SYNTHETIC_TOKEN_MARKERS = (
     "000000000:",
 )
 LIVE_TOKEN_RE = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{20,}$")
+LIVE_TOKEN_SHAPE_RE = re.compile(r"\d{6,}:[A-Za-z0-9_-]{20,}")
 PLACEHOLDER_TOKENS = frozenset(
     {
         "",
@@ -115,11 +116,16 @@ PLACEHOLDER_TOKENS = frozenset(
 HERMES_BIN = "/opt/hermes/.venv/bin/hermes"
 CONTAINER_PROFILE_HOME = "/opt/data/profiles/telegram-ops"
 TOKEN_STORAGE_TARGET = f"{CONTAINER_PROFILE_HOME}/.env"
+CONTAINER_GATEWAY_LOG = f"{CONTAINER_PROFILE_HOME}/logs/gateway.log"
+INTENDED_GATEWAY_USER = "hermes"
+INTENDED_GATEWAY_UID = 10000
+INTENDED_GATEWAY_GID = 10000
 SEED_DIR = Path(__file__).resolve().parent / "profiles" / PROFILE_NAME
 
-GATEWAY_START_ARGV = (HERMES_BIN, "-p", PROFILE_NAME, "gateway", "start")
+# Docker-native primitive. Do not use ``gateway start`` (systemd/launchd).
+GATEWAY_RUN_ARGV = (HERMES_BIN, "-p", PROFILE_NAME, "gateway", "run")
 GATEWAY_STATUS_ARGV = (HERMES_BIN, "-p", PROFILE_NAME, "gateway", "status")
-GATEWAY_STOP_ARGV = (HERMES_BIN, "-p", PROFILE_NAME, "gateway", "stop")
+DOWN_MECHANISM = "PROFILE_PID_STOP"
 
 
 def seed_paths() -> dict[str, Path]:
@@ -297,14 +303,95 @@ def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
 
 
 def gateway_lifecycle_argv(action: str) -> tuple[str, ...]:
-    mapping = {
-        "up": GATEWAY_START_ARGV,
-        "status": GATEWAY_STATUS_ARGV,
-        "down": GATEWAY_STOP_ARGV,
-    }
-    if action not in mapping:
-        raise ValueError(f"unknown telegram lifecycle action {action!r}")
-    return mapping[action]
+    if action == "up":
+        return GATEWAY_RUN_ARGV
+    if action == "status":
+        return GATEWAY_STATUS_ARGV
+    if action == "down":
+        raise ValueError("telegram-down uses profile-specific PID stop, not gateway stop")
+    raise ValueError(f"unknown telegram lifecycle action {action!r}")
+
+
+def looks_like_hermes_serve_command(command: str | None) -> bool:
+    lowered = "" if command is None else str(command).lower()
+    return "hermes serve" in lowered or "hermes_cli.main serve" in lowered
+
+
+def looks_like_telegram_ops_gateway_command(command: str | None) -> bool:
+    """True only for ``hermes -p telegram-ops gateway run``. Never hermes serve."""
+    lowered = "" if command is None else str(command).lower().replace("\x00", " ")
+    if looks_like_hermes_serve_command(lowered):
+        return False
+    if any(
+        token in lowered
+        for token in (
+            "gateway start",
+            "gateway status",
+            "gateway stop",
+            "gateway install",
+            "gateway uninstall",
+        )
+    ):
+        return False
+    has_profile = (
+        f"-p {PROFILE_NAME}" in lowered or f"--profile {PROFILE_NAME}" in lowered
+    )
+    return has_profile and "gateway run" in lowered
+
+
+def parse_upstream_gateway_status(status_text: str | None) -> str:
+    """Interpret ``hermes gateway status`` text. Exit code 0 is not evidence."""
+    lowered = "" if status_text is None else str(status_text).lower()
+    if "gateway is not running" in lowered:
+        return "STOPPED"
+    if "gateway is running" in lowered:
+        return "RUNNING"
+    return "STOPPED"
+
+
+def classify_live_token(token_class: str | None) -> str:
+    return "PRESENT" if token_class == "LIVE_SHAPED" else "MISSING"
+
+
+def classify_gateway_user(uid: int | None, user: str | None = None) -> str:
+    if uid == INTENDED_GATEWAY_UID or user == INTENDED_GATEWAY_USER:
+        return INTENDED_GATEWAY_USER
+    if uid is None and not user:
+        return "NONE"
+    return "other"
+
+
+def classify_live_polling(
+    *,
+    token_class: str,
+    process_running: bool,
+    upstream_status: str | None = None,
+) -> str:
+    """YES only with a live telegram-ops gateway process. Token alone is not enough."""
+    if token_class != "LIVE_SHAPED":
+        return "NO"
+    if not process_running:
+        return "NO"
+    if upstream_status is not None and upstream_status != "RUNNING":
+        return "NO"
+    return "YES"
+
+
+def status_agreement(process_status: str, upstream_status: str) -> str:
+    return "YES" if process_status == upstream_status else "NO"
+
+
+def redact_sensitive_text(text: str | None) -> str:
+    """Strip token-shaped values and allowlist user ids from helper output."""
+    raw = "" if text is None else str(text)
+    redacted = LIVE_TOKEN_SHAPE_RE.sub("[REDACTED_TOKEN]", raw)
+    redacted = re.sub(
+        r"(TELEGRAM_ALLOWED_USERS\s*=\s*)\d{5,20}",
+        r"\1[REDACTED_USER]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    return redacted
 
 
 def may_start_gateway(token_class: str) -> tuple[bool, str]:

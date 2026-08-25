@@ -55,3 +55,9 @@ Operator bot: 24/7 on Railway Operator Hermes.
 Developer bot: only while the Windows host, Docker Desktop, Developer
 Hermes, the Developer Telegram gateway, and the model provider are up.
 Do not move Developer Hermes to Railway.
+
+The Docker-native primitive is `hermes -p telegram-ops gateway run`
+as uid 10000 (`hermes`). Do not use `gateway start` (systemd/launchd)
+and do not run the gateway as root. Status requires a live
+`telegram-ops` `gateway run` process; a stored token or `hermes serve`
+is not polling evidence. `telegram-down` stops that process only.

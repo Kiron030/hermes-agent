@@ -215,10 +215,17 @@ def test_seed_writes_profile_without_a_live_token(tmp_path: Path) -> None:
 
 
 def test_lifecycle_commands_are_deterministic_and_profile_scoped() -> None:
-    assert tg.gateway_lifecycle_argv("up") == tg.GATEWAY_START_ARGV
+    assert tg.gateway_lifecycle_argv("up") == tg.GATEWAY_RUN_ARGV
     assert tg.gateway_lifecycle_argv("status") == tg.GATEWAY_STATUS_ARGV
-    assert tg.gateway_lifecycle_argv("down") == tg.GATEWAY_STOP_ARGV
-    for argv in (tg.GATEWAY_START_ARGV, tg.GATEWAY_STATUS_ARGV, tg.GATEWAY_STOP_ARGV):
+    assert tg.GATEWAY_RUN_ARGV == (tg.HERMES_BIN, "-p", "telegram-ops", "gateway", "run")
+    assert tg.GATEWAY_STATUS_ARGV[-1] == "status"
+    assert tg.DOWN_MECHANISM == "PROFILE_PID_STOP"
+    try:
+        tg.gateway_lifecycle_argv("down")
+        raise AssertionError("down must not be a systemd/gateway-stop argv")
+    except ValueError as exc:
+        assert "PID" in str(exc)
+    for argv in (tg.GATEWAY_RUN_ARGV, tg.GATEWAY_STATUS_ARGV):
         assert argv[0] == tg.HERMES_BIN
         assert argv[1:3] == ("-p", "telegram-ops")
         assert argv[3] == "gateway"
@@ -695,3 +702,124 @@ def test_telegram_activate_without_intent_does_not_start() -> None:
     assert result["OPERATOR_TELEGRAM_CHANGED"] == "NO"
     assert result["RAILWAY_CHANGED"] == "NO"
     assert result["TOKEN_VALUES_RECORDED"] == "NO"
+
+
+def test_developer_docker_lifecycle_uses_gateway_run_not_start() -> None:
+    launch_src = (CONTAINER_DIR / "launch.py").read_text(encoding="utf-8")
+    tg_src = (CONTAINER_DIR / "telegram_ops.py").read_text(encoding="utf-8")
+    assert tg.GATEWAY_RUN_ARGV[-2:] == ("gateway", "run")
+    assert "GATEWAY_START_ARGV" not in tg_src
+    assert 'gateway", "start"' not in tg_src
+    assert "_start_telegram_gateway_run" in launch_src
+    assert "exec_detached" in launch_src
+    assert "HERMES_ALLOW_ROOT_GATEWAY" in launch_src
+    assert "refusing root-gateway" in launch_src
+    tree = ast.parse(launch_src)
+    start_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_start_telegram_gateway_run"
+    )
+    start_text = ast.get_source_segment(launch_src, start_fn) or ""
+    assert "gateway run" in start_text
+    assert "gateway start" not in start_text
+    assert "0:0" not in start_text
+    assert "HERMES_DOCKER_EXEC_AS_ROOT" not in start_text
+
+
+def test_status_requires_telegram_ops_process_not_token_or_serve() -> None:
+    fake_token = "123456789:AAHfakeLiveShapedTokenValueXXX"
+    assert tg.classify_live_token("LIVE_SHAPED") == "PRESENT"
+    assert tg.classify_live_token("MISSING") == "MISSING"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=False,
+        upstream_status="STOPPED",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=False,
+        upstream_status="RUNNING",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=True,
+        upstream_status="STOPPED",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=True,
+        upstream_status="RUNNING",
+    ) == "YES"
+    assert tg.looks_like_hermes_serve_command(
+        "hermes serve --host 0.0.0.0 --port 9119 --skip-build"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "hermes serve --host 0.0.0.0 --port 9119 --skip-build"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes gateway run"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p default gateway run"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway start"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway status"
+    )
+    assert tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway run"
+    )
+    assert tg.parse_upstream_gateway_status("Gateway is not running") == "STOPPED"
+    assert tg.parse_upstream_gateway_status("✓ Gateway is running (PID: 12)") == "RUNNING"
+    assert tg.parse_upstream_gateway_status("") == "STOPPED"
+    assert tg.status_agreement("RUNNING", "STOPPED") == "NO"
+    assert tg.status_agreement("RUNNING", "RUNNING") == "YES"
+    dumped = tg.redact_sensitive_text(
+        f"token={fake_token} TELEGRAM_ALLOWED_USERS=123456789 Gateway is running"
+    )
+    assert fake_token not in dumped
+    assert "123456789" not in dumped
+    assert "REDACTED_TOKEN" in dumped
+
+
+def test_gateway_user_and_nonroot_seed_contract(tmp_path: Path) -> None:
+    assert tg.classify_gateway_user(10000) == "hermes"
+    assert tg.classify_gateway_user(0) == "other"
+    assert tg.classify_gateway_user(None) == "NONE"
+    assert tg.INTENDED_GATEWAY_UID == 10000
+    assert tg.INTENDED_GATEWAY_USER == "hermes"
+    result = tg.seed_telegram_ops_profile(tmp_path)
+    home = tmp_path / "profiles" / "telegram-ops"
+    env = home / ".env"
+    assert result["SEEDED"] == "YES"
+    assert home.is_dir()
+    assert env.is_file()
+    tg_src = (CONTAINER_DIR / "telegram_ops.py").read_text(encoding="utf-8")
+    assert "dest.chmod(0o700)" in tg_src
+    assert "os.chmod(env_target, 0o600)" in tg_src
+    assert "HERMES_ALLOW_ROOT_GATEWAY" not in tg_src
+    assert "HERMES_DOCKER_EXEC_AS_ROOT" not in tg_src
+
+
+def test_telegram_down_stop_script_targets_only_gateway_pids() -> None:
+    launch_src = (CONTAINER_DIR / "launch.py").read_text(encoding="utf-8")
+    tree = ast.parse(launch_src)
+    stop_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_stop_telegram_gateway_run"
+    )
+    stop_text = ast.get_source_segment(launch_src, stop_fn) or ""
+    assert "hermes serve" not in stop_text or "Never touch" in stop_text
+    assert "pkill" not in stop_text
+    assert "gateway stop" not in stop_text
+    assert "_telegram_gateway_process_evidence" in stop_text
+    down_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "telegram_down"
+    )
+    down_text = ast.get_source_segment(launch_src, down_fn) or ""
+    assert "_developer_serve_listening" in down_text
+    assert "_stop_telegram_gateway_run" in down_text
+    assert "gateway stop" not in down_text
