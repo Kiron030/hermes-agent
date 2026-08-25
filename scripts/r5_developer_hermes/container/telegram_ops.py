@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,9 @@ MEDIA_DOWNLOAD_SCOPE = "OUT_OF_SCOPE"
 TRANSPORT = "LONG_POLLING"
 PUBLIC_INBOUND_PORT = False
 SENTINEL_NAME = ".r5-telegram-ops-seed"
-SEED_VERSION = "telegram-ops-0b-v1"
+SEED_VERSION = "telegram-ops-0b-v2"
+PROFILE_POLICY = "READ_FIRST_WITH_APPROVAL_GATED_WRITES"
+WRITE_APPROVAL_PLUGIN = "telegram-ops-write-approval"
 
 # Upstream `file` is atomic. These schema members arrive with read_file.
 FILE_TOOLSET_ATOMIC_WRITE_TOOLS = frozenset({"write_file", "patch"})
@@ -113,7 +116,24 @@ def seed_paths() -> dict[str, Path]:
         "config": SEED_DIR / "config.yaml",
         "soul": SEED_DIR / "SOUL.md",
         "env_template": SEED_DIR / "env.template",
+        "write_approval_plugin": SEED_DIR / "plugins" / WRITE_APPROVAL_PLUGIN,
     }
+
+
+def load_write_approval_plugin():
+    """Load the versioned profile plugin without installing it globally."""
+    import importlib.util
+
+    path = seed_paths()["write_approval_plugin"] / "__init__.py"
+    spec = importlib.util.spec_from_file_location(
+        "telegram_ops_write_approval_seed",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("telegram-ops write-approval plugin is missing")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def load_seed_config_text() -> str:
@@ -176,11 +196,19 @@ def read_dotenv_names_and_token_class(path: Path) -> dict[str, str]:
     }
 
 
+def _refresh_text_file(target: Path, text: str) -> bool:
+    if target.exists() and target.read_text(encoding="utf-8") == text:
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return True
+
+
 def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
-    """Create the dedicated profile if missing. Never overwrite a live .env."""
+    """Create or refresh the dedicated profile. Never overwrite a live .env."""
     dest = profile_home(hermes_home)
     dest.mkdir(parents=True, exist_ok=True)
-    for name in ("sessions", "memories", "logs", "skills"):
+    for name in ("sessions", "memories", "logs", "skills", "plugins"):
         (dest / name).mkdir(exist_ok=True)
     paths = seed_paths()
     wrote = []
@@ -188,10 +216,13 @@ def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
         ("config", "config.yaml"),
         ("soul", "SOUL.md"),
     ):
-        target = dest / dest_name
-        if not target.exists():
-            target.write_text(paths[source_key].read_text(encoding="utf-8"), encoding="utf-8")
+        if _refresh_text_file(dest / dest_name, paths[source_key].read_text(encoding="utf-8")):
             wrote.append(dest_name)
+    plugin_src = paths["write_approval_plugin"]
+    plugin_dest = dest / "plugins" / WRITE_APPROVAL_PLUGIN
+    if plugin_src.is_dir():
+        shutil.copytree(plugin_src, plugin_dest, dirs_exist_ok=True)
+        wrote.append(f"plugins/{WRITE_APPROVAL_PLUGIN}")
     env_target = dest / ".env"
     if not env_target.exists():
         env_target.write_text(paths["env_template"].read_text(encoding="utf-8"), encoding="utf-8")
@@ -201,8 +232,7 @@ def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
             pass
         wrote.append(".env")
     sentinel = dest / SENTINEL_NAME
-    if not sentinel.exists():
-        sentinel.write_text(SEED_VERSION + "\n", encoding="utf-8")
+    if _refresh_text_file(sentinel, SEED_VERSION + "\n"):
         wrote.append(SENTINEL_NAME)
     return {
         "PROFILE_NAME": PROFILE_NAME,
@@ -210,6 +240,7 @@ def seed_telegram_ops_profile(hermes_home: Path) -> dict[str, str]:
         "SEEDED": "YES",
         "WROTE": ",".join(wrote) if wrote else "NONE",
         "TOKEN_CLASS": read_dotenv_names_and_token_class(env_target)["token_class"],
+        "PROFILE_POLICY": PROFILE_POLICY,
     }
 
 
@@ -265,4 +296,8 @@ def profile_invariants(config: dict[str, Any] | None = None) -> dict[str, Any]:
         "UNAUTHORIZED_DM_BEHAVIOR": telegram.get("unauthorized_dm_behavior"),
         "GUEST_MODE": bool(telegram.get("guest_mode")),
         "REQUIRE_MENTION": bool(telegram.get("require_mention")),
+        "PROFILE_POLICY": PROFILE_POLICY,
+        "WRITE_APPROVAL_PLUGIN": WRITE_APPROVAL_PLUGIN,
+        "WRITE_APPROVAL_PLUGIN_ENABLED": WRITE_APPROVAL_PLUGIN
+        in list((payload.get("plugins") or {}).get("enabled") or []),
     }

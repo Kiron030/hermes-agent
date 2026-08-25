@@ -20,20 +20,27 @@ EGRESS_CLASS                     = MESSAGING_PLATFORM
 EGRESS_ALLOWED_HOSTS             = api.telegram.org
 MEDIA_DOWNLOAD                   = OUT_OF_SCOPE
 TOKEN_STORAGE                    = /opt/data/profiles/telegram-ops/.env
+PROFILE_POLICY                   = READ_FIRST_WITH_APPROVAL_GATED_WRITES
 ```
 
 `telegram-ops` is a capability/configuration boundary, not an OS or container
-sandbox. It shares the Developer container, uid, mounts, egress broker, and
-model provider boundary. Safety is the explicit tool allowlist, manual
-approvals, slash-command tiering, numeric Telegram allowlist, and the R5
-outer sandbox.
+sandbox. The R5 outer container remains the real isolation boundary. This
+profile shares the Developer container, uid, mounts, egress broker, and
+model provider boundary. Safety is the explicit tool allowlist, the
+profile-local write-approval plugin, slash-command tiering, numeric Telegram
+allowlist, and that outer sandbox.
 
-Initial authority is read-first. Upstream `file` is atomic, so `write_file`
-and `patch` appear in the schema with `read_file` / `search_files`. They
-cannot run autonomously (`approvals.mode = manual`). Terminal, Git commit,
-Git push, browser, Computer Use, cron, and `/yolo` stay unavailable.
-Repository Git status via terminal is out of scope because exposing
-`terminal` is forbidden.
+Telegram starts READ-FIRST, with write/patch callable only behind explicit
+manual approval. Upstream `file` is atomic, so `write_file` and `patch`
+appear in the callable schema with `read_file` / `search_files`. That is
+not structurally or cryptographically read-only.
+`approvals.mode = manual` alone does not gate ordinary file writes; the
+seeded `telegram-ops-write-approval` plugin escalates write/patch to the
+upstream human approval gate. Writes cannot execute unattended. `/yolo`
+cannot bypass the approval posture. Terminal, Git commit, Git push,
+browser, Computer Use, cron, and `/yolo` stay unavailable. Repository Git
+status via terminal is out of scope because exposing `terminal` is
+forbidden. Activation remains a separate human slice.
 
 Telegram never resolves to the default Developer / Desktop profile
 (`approvals: mode: off` stays local-only). After Developer Hermes reload,
@@ -65,7 +72,7 @@ Do **not** execute this in 0B.
 8. Confirm polling is healthy.
 9. Send one real message from the existing Telegram chat.
 10. Verify the session is `telegram-ops`, not the Desktop default profile.
-11. Verify read-only repository answers work.
+11. Verify read-first repository answers work (Repo A and Repo B).
 12. Verify forbidden tools and `/yolo` are denied.
 13. Test one manual approval flow only if a benign approval-capable action
     exists.

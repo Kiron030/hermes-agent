@@ -48,6 +48,8 @@ IMAGE_INPUT_RELATIVE_PATHS: tuple[str, ...] = (
     "profiles/telegram-ops/config.yaml",
     "profiles/telegram-ops/SOUL.md",
     "profiles/telegram-ops/env.template",
+    "profiles/telegram-ops/plugins/telegram-ops-write-approval/plugin.yaml",
+    "profiles/telegram-ops/plugins/telegram-ops-write-approval/__init__.py",
     "skills/r5-dev-skill/SKILL.md",
     "image_inputs/build_contract.json",
 )

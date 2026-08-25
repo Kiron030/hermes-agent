@@ -1,0 +1,9 @@
+name: telegram-ops-write-approval
+version: "1.0.0"
+description: >-
+  Escalate write_file/patch to the upstream manual approval gate for the
+  telegram-ops profile. Upstream file is atomic; this does not split the
+  toolset. Policy/secret paths are blocked outright.
+author: Powerunits R5
+hooks:
+  - pre_tool_call

@@ -55,6 +55,8 @@ def test_image_input_set_is_the_minimum_material_build_context() -> None:
         "profiles/telegram-ops/config.yaml",
         "profiles/telegram-ops/SOUL.md",
         "profiles/telegram-ops/env.template",
+        "profiles/telegram-ops/plugins/telegram-ops-write-approval/plugin.yaml",
+        "profiles/telegram-ops/plugins/telegram-ops-write-approval/__init__.py",
         "skills/r5-dev-skill/SKILL.md",
         "image_inputs/build_contract.json",
     )

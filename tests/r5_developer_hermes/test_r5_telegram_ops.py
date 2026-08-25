@@ -50,6 +50,7 @@ def test_default_developer_profile_policy_is_unchanged() -> None:
     assert "- file" in default
     assert "TELEGRAM_BOT_TOKEN" not in default
     assert 'PROFILE_NAME = "telegram-ops"' not in default
+    assert "telegram-ops-write-approval" not in default
 
 
 def test_approvals_manual_and_cron_denied() -> None:
@@ -86,10 +87,13 @@ def test_terminal_write_git_and_browser_surfaces() -> None:
     assert not any(name.startswith("browser_") for name in tools)
     assert "computer_use" not in tools
     assert "cronjob" not in tools
-    # Upstream `file` is atomic. write_file/patch are schema members, not a
-    # separate write toolset, and cannot run autonomously under manual approvals.
+    # Upstream `file` is atomic. write_file/patch are callable schema members.
+    # They are approval-gated by the profile plugin, not structurally absent.
     assert tg.FILE_TOOLSET_ATOMIC_WRITE_TOOLS <= tools
-    assert tg.profile_invariants()["APPROVALS_MODE"] == "manual"
+    invariants = tg.profile_invariants()
+    assert invariants["APPROVALS_MODE"] == "manual"
+    assert invariants["PROFILE_POLICY"] == "READ_FIRST_WITH_APPROVAL_GATED_WRITES"
+    assert invariants["WRITE_APPROVAL_PLUGIN_ENABLED"] is True
 
 
 def test_yolo_and_posture_commands_are_unavailable() -> None:
@@ -224,10 +228,13 @@ def test_developer_launch_stays_internal_with_no_public_inbound() -> None:
 
 
 def test_token_never_appears_in_seed_or_docs_as_a_value() -> None:
+    plugin_dir = SEED_DIR / "plugins" / "telegram-ops-write-approval"
     for path in (
         SEED_DIR / "config.yaml",
         SEED_DIR / "SOUL.md",
         SEED_DIR / "env.template",
+        plugin_dir / "plugin.yaml",
+        plugin_dir / "__init__.py",
         CONTAINER_DIR / "telegram_ops.py",
         CONTAINER_DIR / "seed_home.py",
     ):
@@ -244,3 +251,267 @@ def test_operator_and_railway_sources_are_untouched_by_this_module() -> None:
     overlays = REPO_ROOT / "powerunits_telegram_overlays.py"
     assert railway.is_file()
     assert overlays.is_file()
+
+
+def _reset_hermes_config_caches() -> None:
+    from hermes_cli import config as config_mod
+    from model_tools import _clear_tool_defs_cache
+
+    config_mod._LOAD_CONFIG_CACHE.clear()
+    config_mod._RAW_CONFIG_CACHE.clear()
+    _clear_tool_defs_cache()
+
+
+def _dispatch_gated_file_action(
+    monkeypatch,
+    tool_name: str,
+    args: dict,
+    *,
+    approved: bool | None,
+) -> tuple[str, str]:
+    """Same gate as tool_executor: plugin directive, then execute only if clear."""
+    plugin = tg.load_write_approval_plugin()
+
+    def fake_invoke(hook_name, **kwargs):
+        if hook_name != "pre_tool_call":
+            return []
+        result = plugin.pre_tool_call(
+            tool_name=kwargs.get("tool_name", ""),
+            args=kwargs.get("args") or {},
+        )
+        return [result] if result else []
+
+    monkeypatch.setattr("hermes_cli.plugins.invoke_hook", fake_invoke)
+    if approved is None:
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no approval presented")),
+        )
+    else:
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *a, **k: {
+                "approved": approved,
+                "message": None if approved else "denied",
+            },
+        )
+    from hermes_cli.plugins import resolve_pre_tool_block
+
+    block = resolve_pre_tool_block(tool_name, args)
+    if block is not None:
+        return "blocked", block
+    from tools.file_tools import patch_tool, write_file_tool
+
+    if tool_name == "write_file":
+        return "executed", write_file_tool(args["path"], args["content"])
+    return "executed", patch_tool(
+        mode="replace",
+        path=args["path"],
+        old_string=args.get("old_string"),
+        new_string=args.get("new_string"),
+    )
+
+
+def test_seed_installs_write_approval_plugin(tmp_path: Path) -> None:
+    tg.seed_telegram_ops_profile(tmp_path)
+    home = tmp_path / "profiles" / "telegram-ops"
+    plugin = home / "plugins" / tg.WRITE_APPROVAL_PLUGIN
+    assert (plugin / "plugin.yaml").is_file()
+    assert (plugin / "__init__.py").is_file()
+    seeded = (home / "config.yaml").read_text(encoding="utf-8")
+    assert tg.WRITE_APPROVAL_PLUGIN in seeded
+    assert "READ_FIRST_WITH_APPROVAL_GATED_WRITES" in (SEED_DIR / "config.yaml").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_write_without_approval_does_not_mutate(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    fixture = tmp_path / "disposable-approval-fixture.txt"
+    original = b"keep-original-bytes\n"
+    fixture.write_bytes(original)
+    status, detail = _dispatch_gated_file_action(
+        monkeypatch,
+        "write_file",
+        {"path": str(fixture), "content": "mutated-without-approval\n"},
+        approved=None,
+    )
+    assert status == "blocked"
+    assert "approval" in detail.lower() or "blocked" in detail.lower()
+    assert fixture.read_bytes() == original
+
+
+def test_write_denied_produces_zero_mutation(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    fixture = tmp_path / "disposable-deny-fixture.txt"
+    original = b"deny-must-keep\n"
+    fixture.write_bytes(original)
+    status, detail = _dispatch_gated_file_action(
+        monkeypatch,
+        "write_file",
+        {"path": str(fixture), "content": "should-not-land\n"},
+        approved=False,
+    )
+    assert status == "blocked"
+    assert "denied" in detail.lower() or "blocked" in detail.lower()
+    assert fixture.read_bytes() == original
+
+
+def test_patch_denied_produces_zero_mutation(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    fixture = tmp_path / "disposable-patch-fixture.txt"
+    original = b"alpha-line\n"
+    fixture.write_bytes(original)
+    status, _detail = _dispatch_gated_file_action(
+        monkeypatch,
+        "patch",
+        {
+            "path": str(fixture),
+            "old_string": "alpha-line",
+            "new_string": "beta-line",
+        },
+        approved=False,
+    )
+    assert status == "blocked"
+    assert fixture.read_bytes() == original
+
+
+def test_write_executes_only_after_approval(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    fixture = tmp_path / "disposable-approve-fixture.txt"
+    fixture.write_bytes(b"before-approval\n")
+    status, _detail = _dispatch_gated_file_action(
+        monkeypatch,
+        "write_file",
+        {"path": str(fixture), "content": "after-approval\n"},
+        approved=True,
+    )
+    assert status == "executed"
+    assert fixture.read_text(encoding="utf-8") == "after-approval\n"
+
+
+def test_profile_policy_files_are_blocked_even_if_approved(
+    tmp_path: Path, monkeypatch
+) -> None:
+    tg.seed_telegram_ops_profile(tmp_path)
+    home = tmp_path / "profiles" / "telegram-ops"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    target = home / "config.yaml"
+    original = target.read_bytes()
+    status, detail = _dispatch_gated_file_action(
+        monkeypatch,
+        "write_file",
+        {"path": str(target), "content": "approvals:\n  mode: off\n"},
+        approved=True,
+    )
+    assert status == "blocked"
+    assert "policy" in detail.lower() or "refuses" in detail.lower()
+    assert target.read_bytes() == original
+
+
+def test_yolo_and_allowed_commands_cannot_relax_approval_posture() -> None:
+    from gateway.slash_access import policy_from_extra
+
+    seed = tg.load_seed_config()
+    telegram = seed["platforms"]["telegram"]
+    policy = policy_from_extra(telegram, "dm")
+    assert policy.enabled is True
+    assert policy.can_run("123456789", "yolo") is False
+    assert policy.can_run("123456789", "tools") is False
+    assert policy.can_run("123456789", "toolsets") is False
+    assert policy.can_run("123456789", "model") is False
+    assert policy.can_run("123456789", "cron") is False
+    assert policy.can_run("123456789", "approve") is True
+    assert policy.can_run("123456789", "deny") is True
+    assert policy.is_admin("123456789") is False
+    assert telegram["allow_admin_from"] == ["0"]
+    assert seed["approvals"]["cron_mode"] == "deny"
+    handler_src = (REPO_ROOT / "gateway" / "slash_commands.py").read_text(encoding="utf-8")
+    for fn_name in (
+        "_handle_profile_command",
+        "_handle_status_command",
+        "_handle_stop_command",
+        "_handle_approve_command",
+    ):
+        start = handler_src.index(f"async def {fn_name}")
+        nxt = handler_src.find("\n    async def ", start + 1)
+        body = handler_src[start:nxt]
+        assert "approvals.mode" not in body
+        assert "cron_mode" not in body
+    yolo_start = handler_src.index("async def _handle_yolo_command")
+    yolo_body = handler_src[yolo_start : handler_src.find("\n    async def ", yolo_start + 1)]
+    assert "enable_session_yolo" in yolo_body
+    assert "yolo" not in {
+        str(item).lstrip("/").lower() for item in telegram["user_allowed_commands"]
+    }
+
+
+def test_callable_schema_exposes_file_writes_and_hides_terminal(
+    tmp_path: Path, monkeypatch
+) -> None:
+    tg.seed_telegram_ops_profile(tmp_path)
+    home = tmp_path / "profiles" / "telegram-ops"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.delenv("HERMES_POWERUNITS_RUNTIME_POLICY", raising=False)
+    _reset_hermes_config_caches()
+    try:
+        from model_tools import get_tool_definitions
+
+        seed = tg.load_seed_config()
+        defs = get_tool_definitions(
+            enabled_toolsets=list(seed["platform_toolsets"]["telegram"]),
+            disabled_toolsets=list(seed["agent"]["disabled_toolsets"]),
+            quiet_mode=True,
+        )
+        names = {item["function"]["name"] for item in defs}
+    finally:
+        _reset_hermes_config_caches()
+    assert "read_file" in names
+    assert "search_files" in names
+    assert "write_file" in names
+    assert "patch" in names
+    assert "terminal" not in names
+    assert "process" not in names
+    assert "execute_code" not in names
+    assert "git_commit" not in names
+    assert "git_push" not in names
+    assert "delegate_task" not in names
+    assert "computer_use" not in names
+    assert not any(name.startswith("browser_") for name in names)
+
+
+def test_repo_a_and_repo_b_are_readable_through_file_tools(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import json
+
+    from r5_developer_hermes.container.contract import (
+        BIND_MOUNTS,
+        ENV_ALLOWLIST,
+        HOST_REPO_A,
+        HOST_REPO_B,
+        REPO_A_CONTAINER,
+        REPO_B_CONTAINER,
+    )
+    from tools.file_tools import read_file_tool
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    (tmp_path / "hermes-home").mkdir()
+    tools = _resolved_telegram_tools()
+    assert "read_file" in tools
+    assert "search_files" in tools
+    destinations = {dest for _src, dest in BIND_MOUNTS}
+    assert REPO_A_CONTAINER in destinations
+    assert REPO_B_CONTAINER in destinations
+    assert "/workspace" in ENV_ALLOWLIST["HERMES_WRITE_SAFE_ROOT"]
+    repo_a = REPO_ROOT if (REPO_ROOT / "AGENTS.md").is_file() else HOST_REPO_A
+    result_a = json.loads(read_file_tool(str(repo_a / "AGENTS.md"), offset=1, limit=8))
+    assert not result_a.get("error")
+    text_a = str(result_a.get("content") or result_a)
+    assert "hermes" in text_a.lower()
+    repo_b = HOST_REPO_B if HOST_REPO_B.is_dir() else REPO_ROOT.parent / "EU-PP-Database"
+    assert repo_b.is_dir()
+    marker = next(repo_b.glob("README*"))
+    result_b = json.loads(read_file_tool(str(marker), offset=1, limit=8))
+    assert not result_b.get("error")
+    assert result_b.get("content") or result_b.get("lines")

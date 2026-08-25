@@ -7,9 +7,12 @@
 #
 # Upstream `file` is atomic: read_file + search_files + write_file + patch.
 # 0B enables `file` so Repo A/B can be read without exposing `terminal`.
-# write_file/patch therefore appear in the schema. They cannot run
-# autonomously because approvals.mode is manual. Git commit/push require
+# write_file/patch therefore appear in the callable schema. They are not
+# structurally read-only. The profile-local write-approval plugin escalates
+# them to the upstream manual approval gate. Git commit/push require
 # terminal and stay absent. Media download is OUT_OF_SCOPE.
+#
+# PROFILE_POLICY = READ_FIRST_WITH_APPROVAL_GATED_WRITES
 
 model: gpt-5.6-terra
 provider: openai-api
@@ -36,6 +39,9 @@ platform_toolsets:
 approvals:
   mode: manual
   cron_mode: deny
+plugins:
+  enabled:
+    - telegram-ops-write-approval
 gateway:
   unauthorized_dm_behavior: ignore
   multiplex_profiles: false
