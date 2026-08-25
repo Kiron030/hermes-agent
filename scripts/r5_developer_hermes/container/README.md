@@ -91,6 +91,9 @@ python scripts/r5_developer_hermes/container/launch.py build
 python scripts/r5_developer_hermes/container/launch.py up
 python scripts/r5_developer_hermes/container/launch.py prove-dx
 python scripts/r5_developer_hermes/container/launch.py reset
+python scripts/r5_developer_hermes/container/launch.py telegram-up
+python scripts/r5_developer_hermes/container/launch.py telegram-status
+python scripts/r5_developer_hermes/container/launch.py telegram-down
 python scripts/r5_developer_hermes/container/launch.py down
 ```
 

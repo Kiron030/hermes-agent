@@ -88,6 +88,7 @@ The policy therefore classifies destinations, not packets:
 | `OS_PACKAGE_REGISTRY` | Debian archive + security mirrors | Requests only | ALLOW |
 | `SUPPLY_CHAIN_SAFETY` | vulnerability/malware lookup used before running fetched packages | Package names | ALLOW |
 | `RUNTIME_ARTIFACT` | pinned runtime/toolchain downloads | Requests only | ALLOW on demand |
+| `MESSAGING_PLATFORM` | `api.telegram.org` long polling | Outbound poll/send only; media download `OUT_OF_SCOPE` | ALLOW — named host |
 | `OTHER_ARBITRARY_NETWORK` | everything else, including raw TCP, SSH, arbitrary DNS resolvers | — | **DENY, fail closed** |
 
 The distinction survives the obvious objection: an approved processor is

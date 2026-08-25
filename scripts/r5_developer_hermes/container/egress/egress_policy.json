@@ -81,6 +81,13 @@
       "rationale": "Class exists for pinned toolchain downloads. Deliberately empty: Developer Hermes runs pinned pure upstream from /opt/hermes and updates by image rebuild, not by runtime download.",
       "hosts": []
     },
+    "MESSAGING_PLATFORM": {
+      "decision": "ALLOW",
+      "approved_processor": false,
+      "content_sent": "Outbound long-poll and send traffic only. No inbound webhook. Telegram media/file download is OUT_OF_SCOPE for 0B PREP; the same host would cover /file/bot… if a later slice opts in.",
+      "rationale": "Named host for the existing Telegram Bot API. Long polling uses api.telegram.org only. No wildcard, no adjacent CDN, no webhook, no public inbound port.",
+      "hosts": ["api.telegram.org"]
+    },
     "OTHER_ARBITRARY_NETWORK": {
       "decision": "DENY",
       "approved_processor": false,

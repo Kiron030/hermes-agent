@@ -17,6 +17,8 @@ RUN npm install -g typescript@7.0.2 \
 
 COPY entrypoint.sh /opt/r5-developer/entrypoint.sh
 COPY seed_home.py /opt/r5-developer/seed_home.py
+COPY telegram_ops.py /opt/r5-developer/telegram_ops.py
+COPY profiles/telegram-ops /opt/r5-developer/profiles/telegram-ops
 COPY skills/r5-dev-skill /opt/r5-developer/skills/r5-dev-skill
 COPY image_inputs/build_contract.json /opt/r5-developer/image_inputs/build_contract.json
 RUN sed -i 's/\r$//' /opt/r5-developer/entrypoint.sh \

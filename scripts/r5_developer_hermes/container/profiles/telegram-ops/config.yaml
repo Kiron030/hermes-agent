@@ -1,0 +1,69 @@
+# Dedicated Developer-Hermes Telegram profile.
+# Capability/configuration boundary only — NOT an OS/container sandbox.
+# Shares the Developer container, uid, mounts, egress broker, and model boundary.
+#
+# TELEGRAM_PROFILE_IS_DEDICATED = YES
+# This profile is never the Developer default / Desktop profile.
+#
+# Upstream `file` is atomic: read_file + search_files + write_file + patch.
+# 0B enables `file` so Repo A/B can be read without exposing `terminal`.
+# write_file/patch therefore appear in the callable schema. They are not
+# structurally read-only. The profile-local write-approval plugin escalates
+# them to the upstream manual approval gate. Git commit/push require
+# terminal and stay absent. Media download is OUT_OF_SCOPE.
+#
+# PROFILE_POLICY = READ_FIRST_WITH_APPROVAL_GATED_WRITES
+
+model: gpt-5.6-terra
+provider: openai-api
+security:
+  allow_lazy_installs: false
+agent:
+  reasoning_effort: medium
+  disabled_toolsets:
+    - terminal
+    - delegation
+    - browser
+    - computer_use
+    - cronjob
+    - web
+    - skills
+    - memory
+  final_allowed_toolsets:
+    - file
+platform_toolsets:
+  telegram:
+    - file
+  cli:
+    - file
+approvals:
+  mode: manual
+  cron_mode: deny
+plugins:
+  enabled:
+    - telegram-ops-write-approval
+gateway:
+  unauthorized_dm_behavior: ignore
+  multiplex_profiles: false
+platforms:
+  telegram:
+    unauthorized_dm_behavior: ignore
+    require_mention: true
+    guest_mode: false
+    allowed_chats:
+      - __dm_only__
+    group_allowed_chats: []
+    allow_admin_from:
+      - "0"
+    user_allowed_commands:
+      - help
+      - whoami
+      - status
+      - profile
+      - approve
+      - deny
+      - new
+      - stop
+    group_allow_admin_from:
+      - "0"
+    group_user_allowed_commands: []

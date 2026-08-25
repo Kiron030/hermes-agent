@@ -51,6 +51,12 @@ def test_image_input_set_is_the_minimum_material_build_context() -> None:
         ".dockerignore",
         "entrypoint.sh",
         "seed_home.py",
+        "telegram_ops.py",
+        "profiles/telegram-ops/config.yaml",
+        "profiles/telegram-ops/SOUL.md",
+        "profiles/telegram-ops/env.template",
+        "profiles/telegram-ops/plugins/telegram-ops-write-approval/plugin.yaml",
+        "profiles/telegram-ops/plugins/telegram-ops-write-approval/__init__.py",
         "skills/r5-dev-skill/SKILL.md",
         "image_inputs/build_contract.json",
     )
@@ -61,6 +67,8 @@ def test_image_input_set_is_the_minimum_material_build_context() -> None:
         assert relative.split("/", 1)[0] in dockerignore or relative in dockerignore
     assert "COPY entrypoint.sh" in dockerfile
     assert "COPY seed_home.py" in dockerfile
+    assert "COPY telegram_ops.py" in dockerfile
+    assert "COPY profiles/telegram-ops" in dockerfile
     assert "COPY skills/r5-dev-skill" in dockerfile
     assert "COPY image_inputs/build_contract.json" in dockerfile
     assert "launch.py" not in IMAGE_INPUT_RELATIVE_PATHS
