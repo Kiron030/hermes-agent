@@ -919,6 +919,25 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_db_observe": {
+        "description": (
+            "**DB health observe (read-only)** — seven HTTP POSTs to "
+            "`/internal/hermes/bounded/v1/db-health/{storage,planner,indexes,vacuum,sessions,statements,timescale}`. "
+            "Catalog/stat views only. Requires `HERMES_POWERUNITS_DB_HEALTH_READ_ENABLED` + bounded "
+            "execute credentials. No SQL from Hermes, no DB credential, no writes, no advisor."
+        ),
+        "tools": [
+            "read_powerunits_db_health_storage_v1",
+            "read_powerunits_db_health_planner_v1",
+            "read_powerunits_db_health_indexes_v1",
+            "read_powerunits_db_health_vacuum_v1",
+            "read_powerunits_db_health_sessions_v1",
+            "read_powerunits_db_health_statements_v1",
+            "read_powerunits_timescale_observe_v1",
+        ],
+        "includes": [],
+    },
+
     "powerunits_multi_country_data_health": {
         "description": (
             "**Multi-country data-health analyst (read-only orchestrator)** — runs snapshot + inventory + "

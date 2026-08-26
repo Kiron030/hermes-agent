@@ -391,6 +391,21 @@ def country_coverage_inspect_requirement_text() -> str:
     )
 
 
+# Cross-cutting read-only **DB health observe** (catalog/stat views via Repo B).
+DB_HEALTH_READ_PRIMARY_ENV = "HERMES_POWERUNITS_DB_HEALTH_READ_ENABLED"
+
+
+def db_health_read_enabled() -> bool:
+    return _truthy(DB_HEALTH_READ_PRIMARY_ENV)
+
+
+def db_health_read_requirement_text() -> str:
+    return (
+        f"{DB_HEALTH_READ_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "db-health observe; no SQL from Hermes, no jobs, no writes)"
+    )
+
+
 # Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
 BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
 

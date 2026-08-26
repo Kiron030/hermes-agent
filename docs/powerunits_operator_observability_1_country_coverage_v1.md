@@ -1,7 +1,7 @@
 # Operator observability 1 — country coverage inspect
 
 **Slice:** `OPERATOR_OBSERVABILITY_1_COUNTRY_COVERAGE`  
-**Status:** implemented in Repo A + Repo B; **not deployed**. Human merge gate required.  
+**Status:** implemented in Repo A + Repo B; production Human acceptance PASS. Live Operator capability remains `inspect_powerunits_country_coverage_v1`.  
 **Predecessor:** [`powerunits_operator_observability_0a_v1.md`](powerunits_operator_observability_0a_v1.md)
 
 ```text
