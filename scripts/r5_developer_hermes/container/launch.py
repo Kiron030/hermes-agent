@@ -939,20 +939,272 @@ def stop_desktop() -> dict[str, Any]:
     }
 
 
-def _telegram_token_class_in_container() -> str:
+def _telegram_secret_state_in_container() -> dict[str, str]:
     probe = (
-        "import sys; sys.path.insert(0, '/opt/r5-developer'); "
+        "import json,sys; sys.path.insert(0, '/opt/r5-developer'); "
         "from pathlib import Path; "
         "from telegram_ops import read_dotenv_names_and_token_class, token_env_path; "
-        "print(read_dotenv_names_and_token_class(token_env_path(Path('/opt/data')))['token_class'])"
+        "print(json.dumps(read_dotenv_names_and_token_class(token_env_path(Path('/opt/data')))))"
     )
     completed = exec_in(
         ["/opt/hermes/.venv/bin/python", "-c", probe],
         check=False,
     )
     if completed.returncode != 0:
-        return "UNKNOWN"
-    return (completed.stdout or "").strip() or "UNKNOWN"
+        return {
+            "token_class": "UNKNOWN",
+            "allowed_users_present": "UNKNOWN",
+            "allowed_users_class": "UNKNOWN",
+            "allow_all_set": "UNKNOWN",
+            "webhook_set": "UNKNOWN",
+        }
+    try:
+        payload = json.loads((completed.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        return {
+            "token_class": "UNKNOWN",
+            "allowed_users_present": "UNKNOWN",
+            "allowed_users_class": "UNKNOWN",
+            "allow_all_set": "UNKNOWN",
+            "webhook_set": "UNKNOWN",
+        }
+    return {
+        "token_class": str(payload.get("token_class") or "UNKNOWN"),
+        "allowed_users_present": str(payload.get("allowed_users_present") or "NO"),
+        "allowed_users_class": str(payload.get("allowed_users_class") or "MISSING"),
+        "allow_all_set": str(payload.get("allow_all_set") or "NO"),
+        "webhook_set": str(payload.get("webhook_set") or "NO"),
+    }
+
+
+def _telegram_token_class_in_container() -> str:
+    return _telegram_secret_state_in_container()["token_class"]
+
+
+def _telegram_conflict_signal(status_text: str) -> str:
+    lowered = tg_ops.redact_sensitive_text(status_text).lower()
+    if "409" in lowered or "conflict" in lowered:
+        return "YES"
+    return "NO"
+
+
+def _telegram_gateway_process_scan_script() -> str:
+    """Scan /proc for telegram-ops gateway run. Never echoes command lines."""
+    return f"""
+import json
+import os
+profile = {tg_ops.PROFILE_NAME!r}
+hits = []
+if os.path.isdir("/proc"):
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            with open(f"/proc/{{entry}}/cmdline", "rb") as handle:
+                command = handle.read().decode("utf-8", errors="replace").replace("\\x00", " ")
+            uid = None
+            with open(f"/proc/{{entry}}/status", encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    if line.startswith("Uid:"):
+                        uid = int(line.split()[1])
+                        break
+        except (OSError, ValueError):
+            continue
+        lowered = command.lower()
+        if "hermes serve" in lowered or "hermes_cli.main serve" in lowered:
+            continue
+        if any(
+            token in lowered
+            for token in (
+                "gateway start",
+                "gateway status",
+                "gateway stop",
+                "gateway install",
+                "gateway uninstall",
+            )
+        ):
+            continue
+        has_profile = f"-p {{profile}}" in lowered or f"--profile {{profile}}" in lowered
+        if has_profile and "gateway run" in lowered:
+            hits.append({{"pid": int(entry), "uid": uid}})
+print(json.dumps(hits))
+"""
+
+
+def _activation_payload_from_stdin() -> dict[str, Any] | None:
+    if sys.stdin.isatty():
+        return None
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("REFUSE_ACTIVATION_PAYLOAD") from exc
+    return tg_ops.parse_activation_payload(parsed)
+
+
+def _write_live_secrets_via_stdin(payload: dict[str, str]) -> dict[str, Any]:
+    script = (
+        "import json,sys; sys.path.insert(0,'/opt/r5-developer'); "
+        "from pathlib import Path; "
+        "from telegram_ops import apply_live_secrets; "
+        "print(json.dumps(apply_live_secrets(Path('/opt/data'), json.load(sys.stdin))))"
+    )
+    completed = subprocess.run(
+        [
+            docker_exe(),
+            "exec",
+            "-i",
+            "-u",
+            f"{RUNTIME_UID}:{RUNTIME_GID}",
+            "-w",
+            CONTAINER_WORKDIR,
+            CONTAINER_NAME,
+            "/opt/hermes/.venv/bin/python",
+            "-c",
+            script,
+        ],
+        input=json.dumps(
+            {
+                tg_ops.ACTIVATION_STDIN_TOKEN_KEY: payload[tg_ops.ACTIVATION_STDIN_TOKEN_KEY],
+                tg_ops.ACTIVATION_STDIN_USER_KEY: payload[tg_ops.ACTIVATION_STDIN_USER_KEY],
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "telegram secret write failed: "
+            f"{(completed.stderr or completed.stdout).strip()[:200]}"
+        )
+    try:
+        return json.loads((completed.stdout or "").strip().splitlines()[-1])
+    except (json.JSONDecodeError, IndexError) as exc:
+        raise RuntimeError("telegram secret write produced no status") from exc
+
+
+def _telegram_gateway_process_evidence() -> dict[str, Any]:
+    """Profile-specific live process proof. hermes serve never counts."""
+    empty = {
+        "GATEWAY_PROCESS": "STOPPED",
+        "ACTIVE_GATEWAY_PROFILE": "NONE",
+        "GATEWAY_USER": "NONE",
+        "GATEWAY_PID_COUNT": 0,
+    }
+    if not container_running():
+        return empty
+    completed = exec_in(
+        ["/opt/hermes/.venv/bin/python", "-c", _telegram_gateway_process_scan_script()],
+        check=False,
+    )
+    if completed.returncode != 0:
+        return empty
+    try:
+        hits = json.loads((completed.stdout or "").strip() or "[]")
+    except json.JSONDecodeError:
+        return empty
+    if not isinstance(hits, list) or not hits:
+        return empty
+    users = {
+        tg_ops.classify_gateway_user(item.get("uid") if isinstance(item, dict) else None)
+        for item in hits
+    }
+    user = tg_ops.INTENDED_GATEWAY_USER if users == {tg_ops.INTENDED_GATEWAY_USER} else (
+        next(iter(users)) if len(users) == 1 else "other"
+    )
+    return {
+        "GATEWAY_PROCESS": "RUNNING",
+        "ACTIVE_GATEWAY_PROFILE": tg_ops.PROFILE_NAME,
+        "GATEWAY_USER": user,
+        "GATEWAY_PID_COUNT": len(hits),
+        "_pids": [int(item["pid"]) for item in hits if isinstance(item, dict) and "pid" in item],
+    }
+
+
+def _telegram_log_conflict_signal() -> str:
+    completed = exec_in(
+        [
+            "sh",
+            "-c",
+            f"tail -n 80 {tg_ops.CONTAINER_GATEWAY_LOG} 2>/dev/null || true",
+        ],
+        check=False,
+    )
+    return _telegram_conflict_signal(tg_ops.redact_sensitive_text(completed.stdout or ""))
+
+
+def _start_telegram_gateway_run() -> dict[str, Any]:
+    """Detach ``hermes -p telegram-ops gateway run`` as uid 10000."""
+    existing = _telegram_gateway_process_evidence()
+    if existing["GATEWAY_PROCESS"] == "RUNNING":
+        return {"GATEWAY_LAUNCH": "already-running"}
+    exec_in(["mkdir", "-p", f"{tg_ops.CONTAINER_PROFILE_HOME}/logs"], check=False)
+    launched = exec_detached(
+        [
+            "sh",
+            "-c",
+            (
+                f"exec {tg_ops.HERMES_BIN} -p {tg_ops.PROFILE_NAME} gateway run "
+                f">>{tg_ops.CONTAINER_GATEWAY_LOG} 2>&1"
+            ),
+        ]
+    )
+    if launched.returncode != 0:
+        raise RuntimeError(
+            "telegram-ops gateway run failed to detach: "
+            f"{(launched.stderr or launched.stdout or '').strip()[:300]}"
+        )
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        if _telegram_gateway_process_evidence()["GATEWAY_PROCESS"] == "RUNNING":
+            return {"GATEWAY_LAUNCH": "started"}
+        time.sleep(1)
+    return {"GATEWAY_LAUNCH": "started-unconfirmed"}
+
+
+def _stop_telegram_gateway_run() -> dict[str, Any]:
+    """Stop telegram-ops gateway run only. Never touch hermes serve."""
+    evidence = _telegram_gateway_process_evidence()
+    pids = [int(pid) for pid in evidence.get("_pids") or [] if int(pid) > 1]
+    if not pids:
+        return {"GATEWAY_STOP": "already-stopped", "STOPPED_PID_COUNT": 0}
+    script = f"""
+import os
+import signal
+import time
+pids = {pids!r}
+for pid in pids:
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        pass
+deadline = time.time() + 8
+alive = list(pids)
+while alive and time.time() < deadline:
+    nxt = []
+    for pid in alive:
+        try:
+            os.kill(pid, 0)
+            nxt.append(pid)
+        except OSError:
+            pass
+    alive = nxt
+    time.sleep(0.2)
+for pid in alive:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+print(len(pids))
+"""
+    completed = exec_in(["/opt/hermes/.venv/bin/python", "-c", script], check=False)
+    return {
+        "GATEWAY_STOP": "stopped" if completed.returncode == 0 else "stop-failed",
+        "STOPPED_PID_COUNT": len(pids),
+    }
 
 
 def telegram_status() -> dict[str, Any]:
@@ -961,58 +1213,178 @@ def telegram_status() -> dict[str, Any]:
     running = container_running()
     result: dict[str, Any] = {
         "PROFILE": tg_ops.PROFILE_NAME,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "PROFILE_ROLE": tg_ops.PROFILE_ROLE,
+        "ARCHITECTURE": tg_ops.ARCHITECTURE,
         "CONTAINER_RUNNING": "YES" if running else "NO",
         "TRANSPORT": tg_ops.TRANSPORT,
         "PUBLIC_INBOUND_PORT": "NO",
         "TOKEN_STORAGE_TARGET": tg_ops.TOKEN_STORAGE_TARGET,
+        "TOKEN_VALUES_RECORDED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
+        "GATEWAY_PROCESS": "STOPPED",
+        "ACTIVE_GATEWAY_PROFILE": "NONE",
+        "UPSTREAM_GATEWAY_STATUS": "STOPPED",
+        "HELPER_GATEWAY_STATUS": "STOPPED",
+        "GATEWAY_USER": "NONE",
+        "LIVE_TOKEN": "MISSING",
         "LIVE_POLLING": "NO",
+        "STATUS_CONSISTENT": "YES",
+        "TELEGRAM_POLL_CONFLICT_409": "NO",
+        "GATEWAY": "DOWN",
+        "GATEWAY_PRIMITIVE": " ".join(tg_ops.GATEWAY_RUN_ARGV),
+        "DOWN_MECHANISM": tg_ops.DOWN_MECHANISM,
     }
     if not running:
-        result["GATEWAY"] = "DOWN"
         return result
     seeded = exec_in(
         ["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"],
         check=False,
     )
     result["PROFILE_SEEDED"] = "YES" if seeded.returncode == 0 else "NO"
-    result["TOKEN_CLASS"] = _telegram_token_class_in_container()
+    state = _telegram_secret_state_in_container()
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["ALLOWED_USERS_PRESENT"] = state["allowed_users_present"]
+    result["ALLOWED_USERS_CLASS"] = state["allowed_users_class"]
+    result["ALLOW_ALL_SET"] = state["allow_all_set"]
+    result["WEBHOOK_SET"] = state["webhook_set"]
+    result["LIVE_TOKEN"] = tg_ops.classify_live_token(state["token_class"])
+    evidence = _telegram_gateway_process_evidence()
+    result["GATEWAY_PROCESS"] = evidence["GATEWAY_PROCESS"]
+    result["ACTIVE_GATEWAY_PROFILE"] = evidence["ACTIVE_GATEWAY_PROFILE"]
+    result["GATEWAY_USER"] = evidence["GATEWAY_USER"]
     status = exec_in(list(tg_ops.GATEWAY_STATUS_ARGV), check=False)
-    result["GATEWAY_STATUS_EXIT"] = status.returncode
-    result["GATEWAY"] = "UP" if status.returncode == 0 else "DOWN"
-    if result["TOKEN_CLASS"] == "LIVE_SHAPED" and result["GATEWAY"] == "UP":
-        result["LIVE_POLLING"] = "POSSIBLE"
+    status_text = tg_ops.redact_sensitive_text(f"{status.stdout or ''}\n{status.stderr or ''}")
+    result["UPSTREAM_GATEWAY_STATUS"] = tg_ops.parse_upstream_gateway_status(status_text)
+    result["HELPER_GATEWAY_STATUS"] = evidence["GATEWAY_PROCESS"]
+    result["STATUS_CONSISTENT"] = tg_ops.status_agreement(
+        result["HELPER_GATEWAY_STATUS"],
+        result["UPSTREAM_GATEWAY_STATUS"],
+    )
+    result["GATEWAY"] = "UP" if evidence["GATEWAY_PROCESS"] == "RUNNING" else "DOWN"
+    result["TELEGRAM_POLL_CONFLICT_409"] = (
+        "YES"
+        if _telegram_conflict_signal(status_text) == "YES"
+        or _telegram_log_conflict_signal() == "YES"
+        else "NO"
+    )
+    result["LIVE_POLLING"] = tg_ops.classify_live_polling(
+        token_class=state["token_class"],
+        process_running=evidence["GATEWAY_PROCESS"] == "RUNNING",
+        upstream_status=result["UPSTREAM_GATEWAY_STATUS"],
+    )
     return result
 
 
 def telegram_up() -> dict[str, Any]:
-    """Prepare and optionally start the telegram-ops gateway.
-
-    PREP refuses a live-shaped token so Railway keeps the existing poller.
-    A missing token starts the process without enabling Telegram polling.
-    A synthetic token may start for lifecycle proof only.
-    """
+    """Prepare the telegram-ops gateway. Ordinary up still refuses live tokens."""
     _assert_host_execution_trust()
     started = up()
     exec_in(["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"])
-    token_class = _telegram_token_class_in_container()
-    allowed, reason = tg_ops.may_start_gateway(token_class)
+    state = _telegram_secret_state_in_container()
+    allowed, reason = tg_ops.may_start_gateway(state["token_class"])
     result: dict[str, Any] = {
         **started,
         "PROFILE": tg_ops.PROFILE_NAME,
-        "TOKEN_CLASS": token_class,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "TOKEN_CLASS": state["token_class"],
         "TOKEN_VALUES_RECORDED": "NO",
-        "LIFECYCLE_ARGV": list(tg_ops.GATEWAY_START_ARGV),
+        "LIFECYCLE_ARGV": list(tg_ops.GATEWAY_RUN_ARGV),
         "START_PERMITTED": "YES" if allowed else "NO",
         "START_REASON": reason,
         "LIVE_TOKEN_MOVED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
     }
     if not allowed:
         result["GATEWAY"] = "NOT_STARTED"
         return result
-    launched = exec_in(list(tg_ops.GATEWAY_START_ARGV), check=False)
-    result["GATEWAY_START_EXIT"] = launched.returncode
+    launched = _start_telegram_gateway_run()
+    result.update(launched)
     result.update(telegram_status())
-    result["TOKEN_CLASS"] = token_class
+    result["TOKEN_CLASS"] = state["token_class"]
+    return result
+
+
+def telegram_activate(*, confirmed: bool) -> dict[str, Any]:
+    """Explicit live activation for the dedicated Developer Telegram bot."""
+    _assert_host_execution_trust()
+    result: dict[str, Any] = {
+        "PROFILE": tg_ops.PROFILE_NAME,
+        "DISPLAY_NAME": tg_ops.DISPLAY_NAME,
+        "PROFILE_ROLE": tg_ops.PROFILE_ROLE,
+        "ARCHITECTURE": tg_ops.ARCHITECTURE,
+        "TOKEN_VALUES_RECORDED": "NO",
+        "LIVE_TOKEN_MOVED": "NO",
+        "OPERATOR_TELEGRAM_CHANGED": "NO",
+        "RAILWAY_CHANGED": "NO",
+    }
+    if not confirmed:
+        result.update(
+            {
+                "GATEWAY": "NOT_STARTED",
+                "START_PERMITTED": "NO",
+                "START_REASON": "REFUSE_MISSING_ACTIVATION_INTENT",
+            }
+        )
+        return result
+    started = up()
+    exec_in(["/opt/hermes/.venv/bin/python", "/opt/r5-developer/seed_home.py"])
+    state = _telegram_secret_state_in_container()
+    result["launch"] = {
+        "action": started.get("action"),
+        "convergence": started.get("convergence"),
+    }
+    if state["token_class"] != "LIVE_SHAPED" or state["allowed_users_present"] != "YES":
+        payload = _activation_payload_from_stdin()
+        if payload is None:
+            result.update(
+                {
+                    **state,
+                    "TOKEN_CLASS": state["token_class"],
+                    "GATEWAY": "NOT_STARTED",
+                    "START_PERMITTED": "NO",
+                    "START_REASON": "WAITING_HUMAN_SECRET",
+                    "HUMAN_ACTION": (
+                        "Run launch-developer-hermes.ps1 -Mode telegram-activate "
+                        "in a local terminal outside Cursor chat, then enter the "
+                        "NEW Developer bot token and one numeric Telegram user id."
+                    ),
+                }
+            )
+            return result
+        written = _write_live_secrets_via_stdin(payload)
+        result["SECRET_WRITE"] = written.get("REASON")
+        if written.get("APPLIED") != "YES":
+            result.update(
+                {
+                    "GATEWAY": "NOT_STARTED",
+                    "START_PERMITTED": "NO",
+                    "START_REASON": written.get("REASON") or "REFUSE_SECRET_WRITE",
+                    "TOKEN_CLASS": written.get("token_class") or state["token_class"],
+                }
+            )
+            return result
+        state = _telegram_secret_state_in_container()
+    allowed, reason = tg_ops.may_start_live_gateway(
+        state["token_class"],
+        live_activation=True,
+        allowed_users_present=state["allowed_users_present"],
+        allow_all_set=state["allow_all_set"],
+        webhook_set=state["webhook_set"],
+    )
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["ALLOWED_USERS_PRESENT"] = state["allowed_users_present"]
+    result["START_PERMITTED"] = "YES" if allowed else "NO"
+    result["START_REASON"] = reason
+    if not allowed:
+        result["GATEWAY"] = "NOT_STARTED"
+        return result
+    launched = _start_telegram_gateway_run()
+    result.update(launched)
+    result.update(telegram_status())
+    result["TOKEN_CLASS"] = state["token_class"]
+    result["START_PERMITTED"] = "YES"
+    result["START_REASON"] = reason
     return result
 
 
@@ -1024,12 +1396,20 @@ def telegram_down() -> dict[str, Any]:
             "PROFILE": tg_ops.PROFILE_NAME,
             "GATEWAY": "DOWN",
             "CONTAINER_RUNNING": "NO",
+            "GATEWAY_PROCESS": "STOPPED",
+            "DESKTOP_GATEWAY": "DOWN",
         }
-    stopped = exec_in(list(tg_ops.GATEWAY_STOP_ARGV), check=False)
+    serve_before = _developer_serve_listening()
+    stopped = _stop_telegram_gateway_run()
+    status = telegram_status()
+    serve_after = _developer_serve_listening()
     return {
         "PROFILE": tg_ops.PROFILE_NAME,
-        "GATEWAY_STOP_EXIT": stopped.returncode,
-        **telegram_status(),
+        **stopped,
+        **status,
+        "DESKTOP_SERVE_BEFORE": "UP" if serve_before else "DOWN",
+        "DESKTOP_SERVE_AFTER": "UP" if serve_after else "DOWN",
+        "DESKTOP_GATEWAY": "UP" if serve_after else "DOWN",
     }
 
 
@@ -1056,6 +1436,40 @@ def desktop_up() -> dict[str, Any]:
     }
 
 
+def exec_detached(
+    args: list[str],
+    *,
+    workdir: str = CONTAINER_WORKDIR,
+) -> subprocess.CompletedProcess[str]:
+    """Host-returning docker exec -d as the Developer runtime user."""
+    for item in args:
+        if "HERMES_ALLOW_ROOT_GATEWAY" in item or "HERMES_DOCKER_EXEC_AS_ROOT" in item:
+            raise RuntimeError("refusing root-gateway telegram launch")
+    cmd = [
+        docker_exe(),
+        "exec",
+        "-d",
+        "-u",
+        f"{RUNTIME_UID}:{RUNTIME_GID}",
+        "-w",
+        workdir,
+        "-e",
+        f"HERMES_HOME={CONTAINER_HERMES_HOME}",
+        "-e",
+        f"HOME={CONTAINER_HERMES_HOME}",
+        CONTAINER_NAME,
+        *args,
+    ]
+    return subprocess.run(
+        cmd,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
+
+
 def exec_in(
     args: list[str],
     *,
@@ -1076,6 +1490,8 @@ def exec_in(
     completed = subprocess.run(
         cmd,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
         timeout=timeout,
@@ -2079,6 +2495,7 @@ def main() -> int:
             "telegram-up",
             "telegram-status",
             "telegram-down",
+            "telegram-activate",
             "migrate-home",
             "inspect",
             "preflight",
@@ -2096,6 +2513,15 @@ def main() -> int:
         "--desktop",
         action="store_true",
         help="Also start authenticated hermes serve plus the localhost Desktop sidecar",
+    )
+    parser.add_argument(
+        "--i-understand-this-starts-the-developer-telegram-bot",
+        action="store_true",
+        dest="developer_telegram_live_activation",
+        help=(
+            "Required intent for telegram-activate. Ordinary telegram-up still "
+            "refuses LIVE_SHAPED tokens. Never pass the token on the command line."
+        ),
     )
     parser.add_argument(
         "--apply",
@@ -2171,19 +2597,31 @@ def main() -> int:
         payload = telegram_up()
         write_json(artifacts_dir() / "container_telegram_up.json", payload)
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME', tg_ops.DISPLAY_NAME)}")
         print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
         print(f"START_PERMITTED = {payload.get('START_PERMITTED')}")
         print(f"START_REASON = {payload.get('START_REASON')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
         print("LIVE_TOKEN_MOVED = NO")
+        print("OPERATOR_TELEGRAM_CHANGED = NO")
         return 0
     if args.command == "telegram-status":
         payload = telegram_status()
         write_json(artifacts_dir() / "container_telegram_status.json", payload)
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print(f"GATEWAY_PROCESS = {payload.get('GATEWAY_PROCESS')}")
+        print(f"ACTIVE_GATEWAY_PROFILE = {payload.get('ACTIVE_GATEWAY_PROFILE')}")
+        print(f"UPSTREAM_GATEWAY_STATUS = {payload.get('UPSTREAM_GATEWAY_STATUS')}")
+        print(f"HELPER_GATEWAY_STATUS = {payload.get('HELPER_GATEWAY_STATUS')}")
+        print(f"STATUS_CONSISTENT = {payload.get('STATUS_CONSISTENT')}")
+        print(f"GATEWAY_USER = {payload.get('GATEWAY_USER')}")
         print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"LIVE_TOKEN = {payload.get('LIVE_TOKEN')}")
+        print(f"ALLOWED_USERS_PRESENT = {payload.get('ALLOWED_USERS_PRESENT')}")
         print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
+        print(f"TELEGRAM_POLL_CONFLICT_409 = {payload.get('TELEGRAM_POLL_CONFLICT_409')}")
         return 0
     if args.command == "migrate-home":
         payload = migrate_home(apply=args.apply)
@@ -2199,7 +2637,34 @@ def main() -> int:
         write_json(artifacts_dir() / "container_telegram_down.json", payload)
         print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
         print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print(f"GATEWAY_PROCESS = {payload.get('GATEWAY_PROCESS')}")
+        print(f"DESKTOP_GATEWAY = {payload.get('DESKTOP_GATEWAY')}")
+        print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
         return 0
+    if args.command == "telegram-activate":
+        payload = telegram_activate(confirmed=args.developer_telegram_live_activation)
+        write_json(artifacts_dir() / "container_telegram_activate.json", payload)
+        print(f"TELEGRAM_PROFILE = {payload.get('PROFILE')}")
+        print(f"DISPLAY_NAME = {payload.get('DISPLAY_NAME', tg_ops.DISPLAY_NAME)}")
+        print(f"TOKEN_CLASS = {payload.get('TOKEN_CLASS')}")
+        print(f"ALLOWED_USERS_PRESENT = {payload.get('ALLOWED_USERS_PRESENT')}")
+        print(f"START_PERMITTED = {payload.get('START_PERMITTED')}")
+        print(f"START_REASON = {payload.get('START_REASON')}")
+        print(f"GATEWAY = {payload.get('GATEWAY')}")
+        print(f"GATEWAY_PROCESS = {payload.get('GATEWAY_PROCESS')}")
+        print(f"ACTIVE_GATEWAY_PROFILE = {payload.get('ACTIVE_GATEWAY_PROFILE')}")
+        print(f"UPSTREAM_GATEWAY_STATUS = {payload.get('UPSTREAM_GATEWAY_STATUS')}")
+        print(f"HELPER_GATEWAY_STATUS = {payload.get('HELPER_GATEWAY_STATUS')}")
+        print(f"STATUS_CONSISTENT = {payload.get('STATUS_CONSISTENT')}")
+        print(f"GATEWAY_USER = {payload.get('GATEWAY_USER')}")
+        print(f"LIVE_TOKEN = {payload.get('LIVE_TOKEN')}")
+        print(f"LIVE_POLLING = {payload.get('LIVE_POLLING')}")
+        print("TOKEN_VALUES_RECORDED = NO")
+        print("OPERATOR_TELEGRAM_CHANGED = NO")
+        print("RAILWAY_CHANGED = NO")
+        if payload.get("HUMAN_ACTION"):
+            print(f"HUMAN_ACTION = {payload['HUMAN_ACTION']}")
+        return 0 if payload.get("START_REASON") != "REFUSE_MISSING_ACTIVATION_INTENT" else 2
     if args.command == "prove-desktop":
         result = prove_desktop()
         print(f"DESKTOP_PROOF = {result['DESKTOP_PROOF']}")

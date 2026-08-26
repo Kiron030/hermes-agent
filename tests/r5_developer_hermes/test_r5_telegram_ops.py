@@ -33,6 +33,9 @@ def test_telegram_profile_is_dedicated_and_not_default() -> None:
     default = (CONTAINER_DIR / "seed_home.py").read_text(encoding="utf-8")
     seed = tg.load_seed_config()
     assert tg.PROFILE_NAME == "telegram-ops"
+    assert tg.DISPLAY_NAME == "Developer Remote"
+    assert tg.PROFILE_ROLE == "DEVELOPER_TELEGRAM"
+    assert tg.ARCHITECTURE == "TWO_BOT"
     assert tg.TELEGRAM_PROFILE_IS_DEDICATED is True
     assert tg.PROFILE_IS_OS_SANDBOX is False
     assert 'mode: off' in default
@@ -159,6 +162,35 @@ def test_token_classification_never_starts_live_polling() -> None:
     assert reason == "REFUSE_LIVE_TOKEN"
     assert tg.may_start_gateway("MISSING") == (True, "NO_TOKEN_NO_POLL")
     assert tg.may_start_gateway("SYNTHETIC") == (True, "SYNTHETIC_OK")
+    live_ok, live_reason = tg.may_start_live_gateway(
+        "LIVE_SHAPED",
+        live_activation=True,
+        allowed_users_present="YES",
+    )
+    assert live_ok is True
+    assert live_reason == "LIVE_ACTIVATION_OK"
+    assert tg.may_start_live_gateway(
+        "LIVE_SHAPED",
+        live_activation=False,
+        allowed_users_present="YES",
+    ) == (False, "REFUSE_LIVE_TOKEN")
+    assert tg.may_start_live_gateway(
+        "LIVE_SHAPED",
+        live_activation=True,
+        allowed_users_present="NO",
+    ) == (False, "REFUSE_MISSING_ALLOWED_USER")
+    assert tg.may_start_live_gateway(
+        "LIVE_SHAPED",
+        live_activation=True,
+        allowed_users_present="YES",
+        allow_all_set="YES",
+    ) == (False, "REFUSE_ALLOW_ALL")
+    assert tg.may_start_live_gateway(
+        "LIVE_SHAPED",
+        live_activation=True,
+        allowed_users_present="YES",
+        webhook_set="YES",
+    ) == (False, "REFUSE_WEBHOOK")
 
 
 def test_seed_writes_profile_without_a_live_token(tmp_path: Path) -> None:
@@ -171,7 +203,10 @@ def test_seed_writes_profile_without_a_live_token(tmp_path: Path) -> None:
     assert (home / ".env").is_file()
     assert (home / "sessions").is_dir()
     assert (home / "memories").is_dir()
-    assert "not an os or container sandbox" in (home / "SOUL.md").read_text(encoding="utf-8").lower()
+    soul = (home / "SOUL.md").read_text(encoding="utf-8").lower()
+    assert "not an os or container sandbox" in soul
+    assert "developer remote" in soul
+    assert "railway operator" in soul
     existing = home / ".env"
     existing.write_text("TELEGRAM_BOT_TOKEN=000000000:SYNTHETIC_TEST_TOKEN_DO_NOT_POLL\n", encoding="utf-8")
     again = tg.seed_telegram_ops_profile(tmp_path)
@@ -180,10 +215,17 @@ def test_seed_writes_profile_without_a_live_token(tmp_path: Path) -> None:
 
 
 def test_lifecycle_commands_are_deterministic_and_profile_scoped() -> None:
-    assert tg.gateway_lifecycle_argv("up") == tg.GATEWAY_START_ARGV
+    assert tg.gateway_lifecycle_argv("up") == tg.GATEWAY_RUN_ARGV
     assert tg.gateway_lifecycle_argv("status") == tg.GATEWAY_STATUS_ARGV
-    assert tg.gateway_lifecycle_argv("down") == tg.GATEWAY_STOP_ARGV
-    for argv in (tg.GATEWAY_START_ARGV, tg.GATEWAY_STATUS_ARGV, tg.GATEWAY_STOP_ARGV):
+    assert tg.GATEWAY_RUN_ARGV == (tg.HERMES_BIN, "-p", "telegram-ops", "gateway", "run")
+    assert tg.GATEWAY_STATUS_ARGV[-1] == "status"
+    assert tg.DOWN_MECHANISM == "PROFILE_PID_STOP"
+    try:
+        tg.gateway_lifecycle_argv("down")
+        raise AssertionError("down must not be a systemd/gateway-stop argv")
+    except ValueError as exc:
+        assert "PID" in str(exc)
+    for argv in (tg.GATEWAY_RUN_ARGV, tg.GATEWAY_STATUS_ARGV):
         assert argv[0] == tg.HERMES_BIN
         assert argv[1:3] == ("-p", "telegram-ops")
         assert argv[3] == "gateway"
@@ -194,7 +236,13 @@ def test_lifecycle_commands_are_deterministic_and_profile_scoped() -> None:
     launch_src = (CONTAINER_DIR / "launch.py").read_text(encoding="utf-8")
     tree = ast.parse(launch_src)
     names = {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
-    assert {"telegram_up", "telegram_status", "telegram_down"} <= names
+    assert {"telegram_up", "telegram_status", "telegram_down", "telegram_activate"} <= names
+    assert "telegram-activate" in text
+    assert "--i-understand-this-starts-the-developer-telegram-bot" in launch_src
+    assert "ACTIVATE-DEVELOPER-TELEGRAM" in text
+    assert "Read-Host 'Developer Telegram bot token' -AsSecureString" in text
+    assert "telegram_bot_token" in text
+    assert "--token" not in text
 
 
 def test_messaging_platform_is_the_only_new_named_host() -> None:
@@ -528,3 +576,250 @@ def test_repo_a_and_repo_b_are_readable_through_file_tools(
     result_b = json.loads(read_file_tool(str(marker), offset=1, limit=8))
     assert not result_b.get("error")
     assert result_b.get("content") or result_b.get("lines")
+
+
+def test_dotenv_flags_detect_allow_all_and_webhook(tmp_path: Path) -> None:
+    path = tmp_path / ".env"
+    path.write_text(
+        "TELEGRAM_BOT_TOKEN=123456789:AAHfakeLiveShapedTokenValueXXX\n"
+        "TELEGRAM_ALLOWED_USERS=123456789\n"
+        "TELEGRAM_ALLOW_ALL_USERS=true\n"
+        "TELEGRAM_WEBHOOK_URL=https://example.invalid/hook\n",
+        encoding="utf-8",
+    )
+    state = tg.read_dotenv_names_and_token_class(path)
+    assert state["token_class"] == "LIVE_SHAPED"
+    assert state["allowed_users_present"] == "YES"
+    assert state["allowed_users_class"] == "NUMERIC_SINGLE"
+    assert state["allow_all_set"] == "YES"
+    assert state["webhook_set"] == "YES"
+    dumped = str(state)
+    assert "AAHfake" not in dumped
+    assert "example.invalid" not in dumped
+
+
+def test_apply_live_secrets_writes_restricted_env_without_returning_values(
+    tmp_path: Path,
+) -> None:
+    token = "123456789:AAHfakeLiveShapedTokenValueXXX"
+    user = "123456789"
+    result = tg.apply_live_secrets(
+        tmp_path,
+        {
+            tg.ACTIVATION_STDIN_TOKEN_KEY: token,
+            tg.ACTIVATION_STDIN_USER_KEY: user,
+        },
+    )
+    assert result["APPLIED"] == "YES"
+    assert result["token_class"] == "LIVE_SHAPED"
+    assert result["allowed_users_present"] == "YES"
+    assert result["allowed_users_class"] == "NUMERIC_SINGLE"
+    assert result["allow_all_set"] == "NO"
+    assert result["webhook_set"] == "NO"
+    assert token not in str(result)
+    assert user not in str(result)
+    env_text = (tmp_path / "profiles" / "telegram-ops" / ".env").read_text(encoding="utf-8")
+    assert f"TELEGRAM_BOT_TOKEN={token}" in env_text
+    assert f"TELEGRAM_ALLOWED_USERS={user}" in env_text
+    assert "TELEGRAM_ALLOW_ALL_USERS=" in env_text
+    assert not any(
+        line.startswith("TELEGRAM_ALLOW_ALL_USERS=") and line.split("=", 1)[1].strip()
+        for line in env_text.splitlines()
+        if not line.startswith("#")
+    )
+    again = tg.apply_live_secrets(
+        tmp_path,
+        {
+            tg.ACTIVATION_STDIN_TOKEN_KEY: "999999999:AAHanotherLiveShapedTokenXXX",
+            tg.ACTIVATION_STDIN_USER_KEY: "999999999",
+        },
+    )
+    assert again["APPLIED"] == "NO"
+    assert again["REASON"] == "REFUSE_OVERWRITE_EXISTING_LIVE_SECRET"
+    assert "999999999" not in (tmp_path / "profiles" / "telegram-ops" / ".env").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_apply_live_secrets_refuses_non_live_and_non_numeric(tmp_path: Path) -> None:
+    missing = tg.apply_live_secrets(
+        tmp_path,
+        {
+            tg.ACTIVATION_STDIN_TOKEN_KEY: "",
+            tg.ACTIVATION_STDIN_USER_KEY: "123456789",
+        },
+    )
+    assert missing["APPLIED"] == "NO"
+    assert missing["REASON"] == "REFUSE_NON_LIVE_TOKEN"
+    invalid_user = tg.apply_live_secrets(
+        tmp_path,
+        {
+            tg.ACTIVATION_STDIN_TOKEN_KEY: "123456789:AAHfakeLiveShapedTokenValueXXX",
+            tg.ACTIVATION_STDIN_USER_KEY: "@not-numeric,2",
+        },
+    )
+    assert invalid_user["APPLIED"] == "NO"
+    assert invalid_user["REASON"] == "REFUSE_NON_NUMERIC_USER"
+    assert invalid_user["allowed_users_class"] == "INVALID"
+
+
+def test_activation_payload_parser_is_strict() -> None:
+    parsed = tg.parse_activation_payload(
+        {
+            "telegram_bot_token": "123456789:AAHfakeLiveShapedTokenValueXXX",
+            "telegram_allowed_users": "123456789",
+        }
+    )
+    assert set(parsed) == {
+        tg.ACTIVATION_STDIN_TOKEN_KEY,
+        tg.ACTIVATION_STDIN_USER_KEY,
+    }
+    try:
+        tg.parse_activation_payload({"telegram_bot_token": "x"})
+        raise AssertionError("expected missing-user reject")
+    except ValueError as exc:
+        assert "REFUSE_ACTIVATION_PAYLOAD" in str(exc)
+    try:
+        tg.parse_activation_payload(
+            {
+                "telegram_bot_token": "x",
+                "telegram_allowed_users": "1",
+                "extra": "nope",
+            }
+        )
+        raise AssertionError("expected extra-field reject")
+    except ValueError as exc:
+        assert "REFUSE_ACTIVATION_EXTRA_FIELDS" in str(exc)
+
+
+def test_telegram_activate_without_intent_does_not_start() -> None:
+    from r5_developer_hermes.container.launch import telegram_activate
+
+    result = telegram_activate(confirmed=False)
+    assert result["START_PERMITTED"] == "NO"
+    assert result["START_REASON"] == "REFUSE_MISSING_ACTIVATION_INTENT"
+    assert result["GATEWAY"] == "NOT_STARTED"
+    assert result["OPERATOR_TELEGRAM_CHANGED"] == "NO"
+    assert result["RAILWAY_CHANGED"] == "NO"
+    assert result["TOKEN_VALUES_RECORDED"] == "NO"
+
+
+def test_developer_docker_lifecycle_uses_gateway_run_not_start() -> None:
+    launch_src = (CONTAINER_DIR / "launch.py").read_text(encoding="utf-8")
+    tg_src = (CONTAINER_DIR / "telegram_ops.py").read_text(encoding="utf-8")
+    assert tg.GATEWAY_RUN_ARGV[-2:] == ("gateway", "run")
+    assert "GATEWAY_START_ARGV" not in tg_src
+    assert 'gateway", "start"' not in tg_src
+    assert "_start_telegram_gateway_run" in launch_src
+    assert "exec_detached" in launch_src
+    assert "HERMES_ALLOW_ROOT_GATEWAY" in launch_src
+    assert "refusing root-gateway" in launch_src
+    tree = ast.parse(launch_src)
+    start_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_start_telegram_gateway_run"
+    )
+    start_text = ast.get_source_segment(launch_src, start_fn) or ""
+    assert "gateway run" in start_text
+    assert "gateway start" not in start_text
+    assert "0:0" not in start_text
+    assert "HERMES_DOCKER_EXEC_AS_ROOT" not in start_text
+
+
+def test_status_requires_telegram_ops_process_not_token_or_serve() -> None:
+    fake_token = "123456789:AAHfakeLiveShapedTokenValueXXX"
+    assert tg.classify_live_token("LIVE_SHAPED") == "PRESENT"
+    assert tg.classify_live_token("MISSING") == "MISSING"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=False,
+        upstream_status="STOPPED",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=False,
+        upstream_status="RUNNING",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=True,
+        upstream_status="STOPPED",
+    ) == "NO"
+    assert tg.classify_live_polling(
+        token_class="LIVE_SHAPED",
+        process_running=True,
+        upstream_status="RUNNING",
+    ) == "YES"
+    assert tg.looks_like_hermes_serve_command(
+        "hermes serve --host 0.0.0.0 --port 9119 --skip-build"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "hermes serve --host 0.0.0.0 --port 9119 --skip-build"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes gateway run"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p default gateway run"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway start"
+    )
+    assert not tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway status"
+    )
+    assert tg.looks_like_telegram_ops_gateway_command(
+        "/opt/hermes/.venv/bin/hermes -p telegram-ops gateway run"
+    )
+    assert tg.parse_upstream_gateway_status("Gateway is not running") == "STOPPED"
+    assert tg.parse_upstream_gateway_status("✓ Gateway is running (PID: 12)") == "RUNNING"
+    assert tg.parse_upstream_gateway_status("") == "STOPPED"
+    assert tg.status_agreement("RUNNING", "STOPPED") == "NO"
+    assert tg.status_agreement("RUNNING", "RUNNING") == "YES"
+    dumped = tg.redact_sensitive_text(
+        f"token={fake_token} TELEGRAM_ALLOWED_USERS=123456789 Gateway is running"
+    )
+    assert fake_token not in dumped
+    assert "123456789" not in dumped
+    assert "REDACTED_TOKEN" in dumped
+
+
+def test_gateway_user_and_nonroot_seed_contract(tmp_path: Path) -> None:
+    assert tg.classify_gateway_user(10000) == "hermes"
+    assert tg.classify_gateway_user(0) == "other"
+    assert tg.classify_gateway_user(None) == "NONE"
+    assert tg.INTENDED_GATEWAY_UID == 10000
+    assert tg.INTENDED_GATEWAY_USER == "hermes"
+    result = tg.seed_telegram_ops_profile(tmp_path)
+    home = tmp_path / "profiles" / "telegram-ops"
+    env = home / ".env"
+    assert result["SEEDED"] == "YES"
+    assert home.is_dir()
+    assert env.is_file()
+    tg_src = (CONTAINER_DIR / "telegram_ops.py").read_text(encoding="utf-8")
+    assert "dest.chmod(0o700)" in tg_src
+    assert "os.chmod(env_target, 0o600)" in tg_src
+    assert "HERMES_ALLOW_ROOT_GATEWAY" not in tg_src
+    assert "HERMES_DOCKER_EXEC_AS_ROOT" not in tg_src
+
+
+def test_telegram_down_stop_script_targets_only_gateway_pids() -> None:
+    launch_src = (CONTAINER_DIR / "launch.py").read_text(encoding="utf-8")
+    tree = ast.parse(launch_src)
+    stop_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_stop_telegram_gateway_run"
+    )
+    stop_text = ast.get_source_segment(launch_src, stop_fn) or ""
+    assert "hermes serve" not in stop_text or "Never touch" in stop_text
+    assert "pkill" not in stop_text
+    assert "gateway stop" not in stop_text
+    assert "_telegram_gateway_process_evidence" in stop_text
+    down_fn = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "telegram_down"
+    )
+    down_text = ast.get_source_segment(launch_src, down_fn) or ""
+    assert "_developer_serve_listening" in down_text
+    assert "_stop_telegram_gateway_run" in down_text
+    assert "gateway stop" not in down_text

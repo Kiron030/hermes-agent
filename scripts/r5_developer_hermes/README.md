@@ -92,6 +92,7 @@ python scripts/r5_developer_hermes/container/launch.py prove-desktop
 python scripts/r5_developer_hermes/container/launch.py telegram-up
 python scripts/r5_developer_hermes/container/launch.py telegram-status
 python scripts/r5_developer_hermes/container/launch.py telegram-down
+python scripts/r5_developer_hermes/container/launch.py telegram-activate --i-understand-this-starts-the-developer-telegram-bot
 python scripts/r5_developer_hermes/desktop_remote_client.py locate-source
 python scripts/r5_developer_hermes/desktop_remote_client.py seed-connection
 python scripts/r5_developer_hermes/desktop_remote_client.py pack
@@ -100,14 +101,17 @@ python scripts/r5_developer_hermes/desktop_remote_client.py preflight
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode desktop
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode telegram-up
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode telegram-status
+.\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode telegram-activate
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
 ```
 
 `telegram-up` / `telegram-status` / `telegram-down` prepare the dedicated
-`telegram-ops` profile. They do **not** move the live Railway Telegram
-token. A live-shaped token is refused so the existing poller is not
-interrupted. See
-[`docs/architecture/hermes_r5_telegram_ops_0b_v1.md`](../../docs/architecture/hermes_r5_telegram_ops_0b_v1.md).
+`telegram-ops` profile (display: Developer Remote). Ordinary `telegram-up`
+refuses a LIVE_SHAPED token. Live polling of the **second** Developer
+BotFather identity requires `telegram-activate` and uses
+`hermes -p telegram-ops gateway run` as uid 10000, not `gateway start`.
+The Railway Operator token is not moved or modified. See
+[`docs/architecture/hermes_r5_telegram_developer_0c_v1.md`](../../docs/architecture/hermes_r5_telegram_developer_0c_v1.md).
 
 Official Desktop (unchanged) uses Remote Gateway
 `http://127.0.0.1:19119`. Credentials are minted once at

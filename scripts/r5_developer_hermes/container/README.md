@@ -97,6 +97,7 @@ python scripts/r5_developer_hermes/container/launch.py reset
 python scripts/r5_developer_hermes/container/launch.py telegram-up
 python scripts/r5_developer_hermes/container/launch.py telegram-status
 python scripts/r5_developer_hermes/container/launch.py telegram-down
+python scripts/r5_developer_hermes/container/launch.py telegram-activate --i-understand-this-starts-the-developer-telegram-bot
 python scripts/r5_developer_hermes/container/launch.py migrate-home
 python scripts/r5_developer_hermes/container/launch.py migrate-home --apply
 python scripts/r5_developer_hermes/container/launch.py down

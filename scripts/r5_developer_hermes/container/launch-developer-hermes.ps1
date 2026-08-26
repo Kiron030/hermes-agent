@@ -28,10 +28,11 @@
     .\launch-developer-hermes.ps1 -Mode reset -WhatIf
     .\launch-developer-hermes.ps1 -Mode reset
     .\launch-developer-hermes.ps1 -Mode desktop
+    .\launch-developer-hermes.ps1 -Mode telegram-activate
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset', 'desktop', 'desktop-down', 'telegram-up', 'telegram-status', 'telegram-down')]
+    [ValidateSet('shell', 'up', 'down', 'prove', 'build', 'reset', 'desktop', 'desktop-down', 'telegram-up', 'telegram-status', 'telegram-down', 'telegram-activate')]
     [string] $Mode = 'shell'
 )
 
@@ -128,11 +129,56 @@ switch ($Mode) {
     'desktop-down' { Invoke-Launch 'desktop-down'; break }
     'telegram-up' {
         Invoke-Launch 'telegram-up'
-        Write-Host 'telegram-ops PREP: does not move the live Railway token.'
+        Write-Host 'telegram-ops / Developer Remote: ordinary up refuses LIVE_SHAPED tokens.'
+        Write-Host 'Operator Railway bot is not modified. Use -Mode telegram-activate for live polling.'
         break
     }
     'telegram-status' { Invoke-Launch 'telegram-status'; break }
     'telegram-down' { Invoke-Launch 'telegram-down'; break }
+    'telegram-activate' {
+        Write-Host 'DEVELOPER TELEGRAM LIVE ACTIVATION'
+        Write-Host 'Starts the local Developer Remote bot (profile telegram-ops).'
+        Write-Host 'Does NOT modify the Railway Operator Telegram bot or Railway variables.'
+        $confirm = Read-Host 'Type ACTIVATE-DEVELOPER-TELEGRAM to continue'
+        if ($confirm -ne 'ACTIVATE-DEVELOPER-TELEGRAM') {
+            throw 'Activation cancelled. Explicit intent is required.'
+        }
+        Invoke-Launch 'telegram-status'
+        $statusPath = Join-Path $RepoRoot '.r5-dev\artifacts\container_telegram_status.json'
+        $tokenClass = 'MISSING'
+        if (Test-Path -LiteralPath $statusPath) {
+            $status = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
+            $tokenClass = [string]$status.TOKEN_CLASS
+        }
+        if ($tokenClass -eq 'LIVE_SHAPED') {
+            Write-Host 'Developer token class is already LIVE_SHAPED. Starting the dedicated gateway.'
+            & $python $LaunchPy telegram-activate --i-understand-this-starts-the-developer-telegram-bot
+        }
+        else {
+            Write-Host 'Enter the NEW Developer BotFather token. Input is hidden.'
+            Write-Host 'Do not paste it into Cursor chat. Operator token must not be used.'
+            $secureToken = Read-Host 'Developer Telegram bot token' -AsSecureString
+            $allowedUser = Read-Host 'Your numeric Telegram user ID (digits only)'
+            $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+            try {
+                $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+                $payload = @{ telegram_bot_token = $plain; telegram_allowed_users = $allowedUser } | ConvertTo-Json -Compress
+                $payload | & $python $LaunchPy telegram-activate --i-understand-this-starts-the-developer-telegram-bot
+            }
+            finally {
+                if ($bstr -ne [IntPtr]::Zero) {
+                    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+                }
+                $plain = $null
+                $payload = $null
+                $secureToken = $null
+            }
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Developer Telegram activation failed.'
+        }
+        break
+    }
     'down'  { Invoke-Launch 'down'; break }
     'prove' { Invoke-Launch 'prove-dx'; break }
     'reset' {
