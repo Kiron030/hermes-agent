@@ -1,0 +1,113 @@
+{
+  "recovery_schema_version": "developer-hermes-recovery-v1",
+  "recovery_architecture": "PINNED_GIT_REBUILD_PLUS_ENCRYPTED_HOME",
+  "created_at": "<generated-utc>",
+  "off_device_encrypted_backup": "NOT_YET",
+  "repo_a": {
+    "remote": "https://github.com/Kiron030/hermes-agent.git",
+    "canonical_branch": "powerunits-internal-setup",
+    "canonical_sha": "<origin-at-generation>"
+  },
+  "repo_b": {
+    "remote": "https://github.com/Kiron030/Powerunits.io.git",
+    "canonical_branch": "main",
+    "canonical_sha": "<origin-at-generation>",
+    "local_name": "EU-PP-Database"
+  },
+  "hermes": {
+    "upstream_release": "<from pin.json>",
+    "upstream_project_version": "<from pin.json>",
+    "upstream_release_sha": "<from pin.json>",
+    "upstream_image_digest": "<from pin.json>"
+  },
+  "developer_image_contract_version": "<from pin.json / contract.py>",
+  "runtime": {
+    "user": "hermes",
+    "uid": 10000,
+    "gid": 10000,
+    "HERMES_HOME": "/opt/data"
+  },
+  "required_named_volumes": ["r5-developer-hermes-home"],
+  "named_volumes": [
+    {
+      "name": "r5-developer-hermes-home",
+      "class": "MUST_BACKUP_ENCRYPTED_FULL_LOGICAL",
+      "mechanism": "LOGICAL_VOLUME_EXPORT",
+      "raw_docker_desktop_path_copy": "FORBIDDEN"
+    },
+    {
+      "name": "r5-egress-broker-state",
+      "class": "REGENERATABLE_FROM_GIT_AND_HOST_SLOTS"
+    },
+    {
+      "name": "r5-egress-ca-pub",
+      "class": "REGENERATABLE_FROM_GIT_AND_HOST_SLOTS"
+    },
+    {
+      "name": "r5-egress-broker-home",
+      "class": "REGENERATABLE_FROM_GIT_AND_HOST_SLOTS"
+    }
+  ],
+  "required_host_paths": [
+    "W:\\hermes-dev\\workspace\\hermes-agent",
+    "W:\\hermes-dev\\workspace\\EU-PP-Database",
+    "W:\\hermes-dev\\credentials",
+    "W:\\cache\\hermes-desktop-official-v2026.8.19"
+  ],
+  "host_path_portability": {
+    "current_constraint": "LITERAL_W_DRIVE",
+    "restore_design": "PRESERVE_W_ON_REPLACEMENT_MACHINE",
+    "later_parameterize": "DEFERRED"
+  },
+  "profile_names": ["default", "telegram-ops"],
+  "desktop": {
+    "official_upstream_source_pin": "W:\\cache\\hermes-desktop-official-v2026.8.19",
+    "expected_packaging_path": "W:\\cache\\hermes-desktop-official-v2026.8.19\\apps\\desktop",
+    "source_of_truth": "OFFICIAL_PINNED_SOURCE_NOT_BUILT_EXE",
+    "built_exe_is_source_of_truth": "NO"
+  },
+  "recovery_staging_pack": {
+    "path": "W:\\Workbench\\backups\\recovery-0b-local-git-safety-20260826T1445Z",
+    "hash_manifest": "hashes.sha256",
+    "creation_timestamp": "2026-08-26T14:45:00Z"
+  },
+  "future_backup": {
+    "tool": "restic",
+    "status": "NOT_YET",
+    "snapshot_id": null,
+    "artifact_checksums": {}
+  },
+  "developer_secret_slots": [
+    {
+      "id": "developer-hermes-model",
+      "purpose": "Developer model provider keys",
+      "path": "W:\\hermes-dev\\credentials\\developer-hermes-model.env",
+      "expected_filename": "developer-hermes-model.env",
+      "kind": "host_file"
+    },
+    {
+      "id": "developer-hermes-desktop",
+      "purpose": "Developer Desktop gateway basic-auth",
+      "path": "W:\\hermes-dev\\credentials\\developer-hermes-desktop.env",
+      "expected_filename": "developer-hermes-desktop.env",
+      "kind": "host_file"
+    },
+    {
+      "id": "developer-hermes-egress",
+      "purpose": "Developer egress broker token",
+      "path": "W:\\hermes-dev\\credentials\\developer-hermes-egress.token",
+      "expected_filename": "developer-hermes-egress.token",
+      "kind": "host_file"
+    },
+    {
+      "id": "developer-telegram-ops-env",
+      "purpose": "Developer Telegram profile token slot",
+      "path": "/opt/data/profiles/telegram-ops/.env",
+      "expected_filename": ".env",
+      "kind": "volume_logical"
+    }
+  ],
+  "production_secret_paths_excluded": [
+    "%USERPROFILE%\\.powerunits\\secrets"
+  ]
+}
