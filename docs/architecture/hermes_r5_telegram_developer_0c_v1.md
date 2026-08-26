@@ -1,7 +1,7 @@
 # Telegram Developer second-bot 0C ACTIVATE
 
 **Slice:** `TELEGRAM_DEVELOPER_SECOND_BOT_0C_ACTIVATE`  
-**Status:** source path for live activation. `R5_GATE = CLOSED`.  
+**Status:** human smoke complete. `R5_GATE = CLOSED`.  
 **Architecture:** `TWO_BOT`
 
 Operator Hermes keeps the existing Railway Telegram bot. Developer Hermes
@@ -61,3 +61,27 @@ as uid 10000 (`hermes`). Do not use `gateway start` (systemd/launchd)
 and do not run the gateway as root. Status requires a live
 `telegram-ops` `gateway run` process; a stored token or `hermes serve`
 is not polling evidence. `telegram-down` stops that process only.
+
+## Human smoke evidence
+
+Observed on the live Developer Remote bot (`telegram-ops`). No tokens,
+numeric user ids, chat ids, or secret-bearing logs are recorded here.
+
+```text
+HUMAN_RUNTIME_SMOKE                    = PASS
+HUMAN_PIN_SMOKE                        = PASS
+HUMAN_REPO_B_SMOKE                     = PASS
+HUMAN_YOLO_SMOKE                       = PASS
+HUMAN_DENY_SMOKE                       = PASS
+DENY_PRODUCES_ZERO_MUTATION            = PASS
+HUMAN_APPROVE_ONCE_SMOKE               = PASS
+APPROVE_EXECUTES_EXACT_MUTATION        = PASS
+TWO_BOT_COEXISTENCE                    = PASS
+YOLO_ENABLED                           = NO
+```
+
+Runtime/read checks used the existing workspace mounts only. Deny left
+`.telegram-deny-smoke-2.txt` absent. Approve Once created only the
+requested approve fixture with the exact requested contents; that
+fixture was deleted after verification. Operator Telegram stayed on
+Railway. No 409 polling conflict was observed.
