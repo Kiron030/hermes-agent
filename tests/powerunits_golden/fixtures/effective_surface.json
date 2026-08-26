@@ -14,6 +14,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -65,6 +66,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -175,6 +177,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -257,6 +260,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -391,6 +395,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -446,7 +451,7 @@
         "web"
       ],
       "tier": 0,
-      "tool_count": 57
+      "tool_count": 58
     },
     "1": {
       "callable": [
@@ -460,6 +465,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -513,6 +519,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -625,6 +632,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -709,6 +717,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -845,6 +854,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -901,7 +911,7 @@
         "web"
       ],
       "tier": 1,
-      "tool_count": 59
+      "tool_count": 60
     },
     "2": {
       "callable": [
@@ -915,6 +925,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -973,6 +984,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -1092,6 +1104,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -1181,6 +1194,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -1322,6 +1336,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -1379,7 +1394,7 @@
         "web"
       ],
       "tier": 2,
-      "tool_count": 64
+      "tool_count": 65
     },
     "3": {
       "callable": [
@@ -1395,6 +1410,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -1457,6 +1473,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -1586,6 +1603,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -1681,6 +1699,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -1826,6 +1845,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -1884,7 +1904,7 @@
         "web"
       ],
       "tier": 3,
-      "tool_count": 70
+      "tool_count": 71
     },
     "4": {
       "callable": [
@@ -1900,6 +1920,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -1968,6 +1989,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -2103,6 +2125,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_roadmap_dir",
@@ -2204,6 +2227,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -2355,6 +2379,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -2414,7 +2439,7 @@
         "web"
       ],
       "tier": 4,
-      "tool_count": 76
+      "tool_count": 77
     },
     "5": {
       "callable": [
@@ -2432,6 +2457,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_governance_workspace",
@@ -2506,6 +2532,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -2653,6 +2680,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_governance_workspace",
@@ -2762,6 +2790,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -2919,6 +2948,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -2979,7 +3009,7 @@
         "web"
       ],
       "tier": 5,
-      "tool_count": 84
+      "tool_count": 85
     },
     "6": {
       "callable": [
@@ -2999,6 +3029,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_bounded_workflow_workspace",
@@ -3079,6 +3110,7 @@
       "callable_not_catalogued": [],
       "capability_groups": {
         "coverage": [
+          "inspect_powerunits_country_coverage_v1",
           "inventory_powerunits_bounded_coverage_v1",
           "preview_powerunits_baseline_layer_coverage_de",
           "read_powerunits_coverage_snapshot_v1",
@@ -3238,6 +3270,7 @@
         "execute_powerunits_option_d_bounded_slice",
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "list_hermes_workspace",
         "list_powerunits_bounded_workflow_workspace",
@@ -3355,6 +3388,7 @@
         "execute_powerunits_outage_repair_bounded_slice",
         "governance_powerunits_bounded_rollout_read_v1",
         "image_generate",
+        "inspect_powerunits_country_coverage_v1",
         "inventory_powerunits_bounded_coverage_v1",
         "kanban_attach",
         "kanban_attach_url",
@@ -3518,6 +3552,7 @@
         "powerunits_bounded_coverage_inventory",
         "powerunits_bounded_coverage_snapshot",
         "powerunits_bounded_rollout_governance",
+        "powerunits_country_coverage_inspect",
         "powerunits_de_stack_remediation_planner",
         "powerunits_docs",
         "powerunits_energy_web_research",
@@ -3579,7 +3614,7 @@
         "web"
       ],
       "tier": 6,
-      "tool_count": 92
+      "tool_count": 93
     }
   }
 }

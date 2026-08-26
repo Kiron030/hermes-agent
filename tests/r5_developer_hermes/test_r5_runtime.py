@@ -46,6 +46,7 @@ def test_developer_surface_is_powerful_not_operator_clamped() -> None:
     names = set(result["callable_tools"])
     assert {"read_file", "write_file", "terminal", "skills_list", "skill_view"} <= names
     assert "execute_powerunits_option_d_bounded_slice" not in names
+    assert "inspect_powerunits_country_coverage_v1" not in names
     assert result["has_operator_execute"] is False
 
 

@@ -551,12 +551,14 @@ def test_exactly_one_runtime_resolver_owns_getenv() -> None:
 
 def test_representative_schemas_have_no_host_path_or_url_params() -> None:
     from tools import powerunits_bounded_coverage_snapshot_tool as snap
+    from tools import powerunits_country_coverage_inspect_tool as inspect
     from tools import powerunits_option_d_execute_tool as exe
     from tools import powerunits_option_d_validate_tool as val
 
     forbidden = {"url", "host", "hostname", "base_url", "path", "route"}
     for schema in (
         snap.COVERAGE_SNAPSHOT_SCHEMA_V1,
+        inspect.COUNTRY_COVERAGE_INSPECT_SCHEMA_V1,
         exe.EXECUTE_OPTION_D_SCHEMA,
         val.VALIDATE_OPTION_D_SCHEMA,
     ):
