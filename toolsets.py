@@ -907,6 +907,18 @@ TOOLSETS = {
         "includes": [],
     },
 
+    "powerunits_country_coverage_inspect": {
+        "description": (
+            "**Country coverage inspect (read-only)** — one HTTP POST to "
+            "`/internal/hermes/bounded/v1/country-coverage/inspect`. Generic ISO2 + bounded dataset "
+            "catalog (gaps, freshness, coverage ratio). Requires "
+            "`HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED` + bounded execute credentials. "
+            "No SQL from Hermes, no DB credential, no writes."
+        ),
+        "tools": ["inspect_powerunits_country_coverage_v1"],
+        "includes": [],
+    },
+
     "powerunits_multi_country_data_health": {
         "description": (
             "**Multi-country data-health analyst (read-only orchestrator)** — runs snapshot + inventory + "

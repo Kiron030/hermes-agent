@@ -26,6 +26,7 @@ ArgStyle = Literal[
     "empirical",
     "bzn_prices",
     "bzn_readiness",
+    "country_coverage",
 ]
 
 NegativeKind = Literal[
@@ -172,6 +173,14 @@ def args_for(contract: BoundedHttpContract) -> dict[str, Any]:
             "table_version": "v1",
             **contract.extra_happy_args,
         }
+    if style == "country_coverage":
+        return {
+            "country": "AT",
+            "dataset": "demand",
+            "start": FIXED_WINDOW_START,
+            "end": FIXED_WINDOW_END,
+            **contract.extra_happy_args,
+        }
     raise ValueError(style)
 
 
@@ -241,6 +250,19 @@ BOUNDED_HTTP_CONTRACTS: tuple[BoundedHttpContract, ...] = (
         False,
         "feature_disabled",
         _COMMON_READ_FIELDS,
+    ),
+    BoundedHttpContract(
+        "inspect_powerunits_country_coverage_v1",
+        "tools.powerunits_country_coverage_inspect_tool",
+        "inspect_powerunits_country_coverage_v1",
+        "/internal/hermes/bounded/v1/country-coverage/inspect",
+        ("HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED",),
+        "country_coverage",
+        "READ",
+        False,
+        "feature_disabled",
+        _COMMON_READ_FIELDS + ("chat_summary", "read_attempted", "http_status_from_repo_b"),
+        ("items", "no_data"),
     ),
     BoundedHttpContract(
         "read_powerunits_entsoe_bzn_price_readiness_v1",

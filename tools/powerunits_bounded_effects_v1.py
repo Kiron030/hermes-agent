@@ -47,6 +47,7 @@ EFFECT_CLASS_BY_OPERATION: dict[str, str] = {
     "browse_powerunits_skills_tree": READ,
     "diagnose_powerunits_skills_signals": READ,
     "governance_powerunits_bounded_rollout_read_v1": READ,
+    "inspect_powerunits_country_coverage_v1": READ,
     "inventory_powerunits_bounded_coverage_v1": READ,
     "list_hermes_workspace": READ,
     "list_powerunits_bounded_workflow_workspace": READ,

@@ -376,6 +376,21 @@ def worker_country_coverage_freshness_requirement_text() -> str:
     )
 
 
+# Cross-cutting read-only **country coverage inspect** (generic ISO2 + dataset catalog).
+COUNTRY_COVERAGE_INSPECT_PRIMARY_ENV = "HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED"
+
+
+def country_coverage_inspect_enabled() -> bool:
+    return _truthy(COUNTRY_COVERAGE_INSPECT_PRIMARY_ENV)
+
+
+def country_coverage_inspect_requirement_text() -> str:
+    return (
+        f"{COUNTRY_COVERAGE_INSPECT_PRIMARY_ENV} must be truthy (read-only Repo B "
+        "country-coverage inspect; no SQL from Hermes, no jobs)"
+    )
+
+
 # Cross-cutting **rollout governance** readout (POST …/rollout-governance + Hermes gate overlay — no matrix persisted).
 BOUNDED_ROLLOUT_GOVERNANCE_PRIMARY_ENV = "HERMES_POWERUNITS_BOUNDED_ROLLOUT_GOVERNANCE_ENABLED"
 

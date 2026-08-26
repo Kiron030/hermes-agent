@@ -1,9 +1,10 @@
 {
-  "bounded_operation_count": 37,
+  "bounded_operation_count": 38,
   "bounded_operations": [
     "read_powerunits_coverage_snapshot_v1",
     "inventory_powerunits_bounded_coverage_v1",
     "read_powerunits_worker_country_coverage_freshness_v1",
+    "inspect_powerunits_country_coverage_v1",
     "read_powerunits_entsoe_bzn_price_readiness_v1",
     "read_powerunits_entsoe_bzn_prices_v1",
     "readiness_powerunits_option_d_bounded_window",
@@ -43,8 +44,8 @@
   "effective_surface": "fixtures/effective_surface.json",
   "env_profile": "operator_ready_gates_on_synthetic",
   "gold_kind": "GOLDEN_BEHAVIOUR",
-  "happy_path_fixtures": 37,
-  "negative_path_fixtures": 37,
+  "happy_path_fixtures": 38,
+  "negative_path_fixtures": 38,
   "not": "GOLDEN_IMPLEMENTATION",
   "policy": "first_safe_v1",
   "r3_consumption": {

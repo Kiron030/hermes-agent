@@ -20,6 +20,7 @@ These are **`HERMES_POWERUNITS_*_ENABLED`**-style gates as of **2026** refactor 
 | **ENTSO‑E BZN day-ahead prices read** | **`HERMES_POWERUNITS_ENTSOE_BZN_PRICES_READ_ENABLED`** | **Read-only** Repo B **`POST …/entsoe-bzn-prices/read`** (`market_prices_day_ahead_bzn_v1`-backed rows); same **`POWERUNITS_INTERNAL_EXECUTE_BASE_URL`** + bearer as other internals; Hermes performs **no** jobs, ingestion, writes, Hermes‑side DB reads, or national Tier‑v1 promotion assertions. |
 | **Baseline preview** | `BASELINE_LAYER_PREVIEW_ENABLED` | Already **single** gate; fits target model as-is. |
 | **Bounded coverage inventory** | **`HERMES_POWERUNITS_BOUNDED_COVERAGE_INVENTORY_ENABLED`** | **Read-only** aggregator — Repo B **`…/coverage-inventory`**; default inventory v1 aggregates **four** Repo B evaluator families (**ERA5**, ENTSO‑E **market**, **outage awareness**, ENTSO‑E **forecast**). Hermes persists **no** inventory matrix (`csv_export` is turn-local only). Requires same bounded execute **base URL** + bearer as other **`internal/hermes/bounded`** tools. |
+| **Country coverage inspect** | **`HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED`** | **Read-only** generic ISO2 coverage inspect — Repo B **`…/country-coverage/inspect`**. Same bounded execute **base URL** + bearer. **No** SQL from Hermes, **no** Timescale DSN on this tool. Included in **`stage1_read_health`**. |
 | **DE stack remediation planner** | **`HERMES_POWERUNITS_REMEDIATION_PLANNER_ENABLED`** | **Read-only** cross-family aggregator (**one** Repo B planner POST; starts **no** jobs). |
 | **Outage awareness bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ENABLED`; **legacy:** `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_{VALIDATE,SUMMARY}_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_AWARENESS_BOUNDED_ALLOWED_COUNTRIES` | **Read-only** Hermes POSTs to **`…/outage-awareness/*`** — **no** outage ingest, **no** hourly outage recompute, **no** market-feature or driver jobs. |
 | **Outage repair bounded (DE)** | **Primary:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ENABLED`; optional `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_ALLOWED_COUNTRIES`; **legacy:** `HERMES_POWERUNITS_OUTAGE_REPAIR_BOUNDED_EXECUTE_ENABLED` | **Write** bounded path (**Step A + Step B**) via **`…/outage-repair/recompute`**; **no auto** **`market_feature_job`** / **`market_driver_feature_job`**. Separate family from awareness. |
@@ -131,6 +132,10 @@ Hermes **`inventory_powerunits_bounded_coverage_v1`** → Repo B **`POST /intern
 ### Worker country coverage freshness v1 (read-only post-deploy rollup)
 
 Hermes **`read_powerunits_worker_country_coverage_freshness_v1`** → Repo B **`POST /internal/hermes/bounded/v1/worker-country-coverage/freshness/read`**. **Gate:** **`HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED`**. Telegram toolset **`powerunits_worker_country_coverage_freshness`** is in **`first_safe_v1`** base overlays. Complements post-deploy worker smoke docs in Repo B.
+
+### Country coverage inspect v1 (read-only generic ISO2 catalog)
+
+Hermes **`inspect_powerunits_country_coverage_v1`** → Repo B **`POST /internal/hermes/bounded/v1/country-coverage/inspect`**. **Gate:** **`HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED`**. Telegram toolset **`powerunits_country_coverage_inspect`** is in **`first_safe_v1`** base overlays and **`stage1_read_health`**. Generic country + optional dataset; **no** SQL from Hermes. See **`docs/powerunits_operator_observability_1_country_coverage_v1.md`**.
 
 ### DE bounded stack remediation planner (read-only)
 

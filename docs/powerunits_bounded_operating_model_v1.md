@@ -60,7 +60,7 @@ Aligned with Repo B architecture note:
 
 ## 6. Step pattern (not every family has every step)
 
-Conceptual order: **preflight** (Hermes-local, no Repo B HTTP) → **execute** (write) → **validate** / **readiness** → **summary** → optional **coverage-scan** (read-only multi-window) → optional **campaign** (Hermes orchestration) → **coverage-inventory** (matrix) → **planner** (read-only cross-family DE).
+Conceptual order: **preflight** (Hermes-local, no Repo B HTTP) → **execute** (write) → **validate** / **readiness** → **summary** → optional **coverage-scan** (read-only multi-window) → optional **campaign** (Hermes orchestration) → **coverage-inventory** (matrix) → **country-coverage/inspect** (generic ISO2 catalog) → **planner** (read-only cross-family DE).
 
 Per-family tool names, env keys, and ADR links: **`ACCESS_MATRIX.md`** documentation map and family `docs/powerunits_*_bounded_operator_v1.md` files.
 

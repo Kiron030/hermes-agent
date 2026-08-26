@@ -133,6 +133,10 @@ def test_apply_policy_telegram_always_includes_entsoe_bzn_readiness_and_prices_l
     ) + 1
     assert "powerunits_bounded_coverage_inventory" in tg
     assert "powerunits_worker_country_coverage_freshness" in tg
+    assert "powerunits_country_coverage_inspect" in tg
+    assert tg.index("powerunits_country_coverage_inspect") == tg.index(
+        "powerunits_worker_country_coverage_freshness"
+    ) + 1
 
 
 def test_apply_policy_includes_phase2b_toolset_when_capability_tier_ge_two(
