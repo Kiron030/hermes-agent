@@ -34,7 +34,7 @@ from r5_developer_hermes.recovery.contract import (
     TEMPLATE_PATH,
 )
 from r5_developer_hermes.recovery.desktop_state import inspect_desktop_source
-from r5_developer_hermes.recovery.git_state import GitSnapshot, classify_local_work
+from r5_developer_hermes.recovery.git_state import GitSnapshot, classify_local_work, inspect_repo_a
 from r5_developer_hermes.recovery.manifest import (
     build_manifest,
     canonicalize,
@@ -48,6 +48,7 @@ from r5_developer_hermes.recovery.secrets import (
     find_secret_shaped_leaks,
     inspect_developer_secret_slots,
     production_paths_are_excluded,
+    sanitize_git_remote,
 )
 from r5_developer_hermes.recovery.staging import file_sha256, verify_staging_hashes
 
@@ -468,7 +469,7 @@ def test_staging_stash_patches_cover_and_pgurl_stash_is_excluded() -> None:
     )
     by_subject = {item.identity: item.coverage for item in items}
     assert by_subject["On research/x: local-env-pgurl-before-merge"] == "EXCLUDED_NOT_SOURCE"
-    assert by_subject["On feature/y: wip-untracked-e2e-script"] == "STAGING_COVERED"
+    assert by_subject["On feature/y: wip-untracked-e2e-script"] == "LOCAL_ONLY_BUT_RECOVERY_STAGED"
 
 
 def test_github_reachable_is_not_ready_by_itself() -> None:
@@ -493,3 +494,35 @@ def test_github_reachable_is_not_ready_by_itself() -> None:
         staging_status="PASS",
     )
     assert status != READINESS_READY
+
+
+def test_git_remote_userinfo_is_stripped() -> None:
+    dirty = "https://user:MyProductionPassword123@github.com/Kiron030/hermes-agent.git"
+    assert sanitize_git_remote(dirty) == "https://github.com/Kiron030/hermes-agent.git"
+    tokenish = "https://oauth2:abcdefghijklmnopqrstuvwxyz0123456789ABCD@github.com/org/repo.git"
+    assert "abcdefghijklmnopqrstuvwxyz0123456789ABCD" not in sanitize_git_remote(tokenish)
+    answers = _clean_git_answers(CANONICAL_A)
+    answers[("remote", "get-url", "origin")] = dirty
+    snap = inspect_repo_a(Path("."), runner=_git_runner(answers))
+    assert snap.remote == "https://github.com/Kiron030/hermes-agent.git"
+    assert "MyProductionPassword123" not in json.dumps(snap.to_dict())
+
+
+def test_stash_subject_is_not_serialized() -> None:
+    snap = GitSnapshot(
+        root="W:/tmp/repo",
+        remote="https://github.com/Kiron030/hermes-agent.git",
+        branch="powerunits-internal-setup",
+        head=CANONICAL_A,
+        canonical_branch="powerunits-internal-setup",
+        canonical_sha=CANONICAL_A,
+        canonical_sha_source="ORIGIN_LS_REMOTE",
+        stash_count=1,
+        stash_subjects=["On main: wip contains nonstandardtokenvalueXYZ"],
+        dirty_state="clean",
+    )
+    items = classify_local_work(snap, repo="A", staging_index={})
+    serialized = [item.to_dict() for item in items]
+    blob = json.dumps(serialized)
+    assert "nonstandardtokenvalueXYZ" not in blob
+    assert all(item["identity"] == "stash" for item in serialized if item["kind"] == "stash")

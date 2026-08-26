@@ -11,6 +11,7 @@ import re
 import stat
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlsplit, urlunsplit
 
 from r5_developer_hermes.recovery.contract import (
     DEVELOPER_CREDENTIALS_DIR,
@@ -82,6 +83,20 @@ def production_paths_are_excluded(required_paths: Iterable[str], slot_paths: Ite
     slots = {normalize_compare_path(path) for path in slot_paths}
     forbidden = {normalize_compare_path(path) for path in PRODUCTION_SECRET_PATHS_EXCLUDED}
     return required.isdisjoint(forbidden) and slots.isdisjoint(forbidden)
+
+
+def sanitize_git_remote(url: str) -> str:
+    """Strip userinfo from a Git remote. Never keep embedded credentials."""
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    if "://" in raw:
+        parts = urlsplit(raw)
+        host = parts.hostname or ""
+        if parts.port:
+            host = f"{host}:{parts.port}"
+        return urlunsplit((parts.scheme, host, parts.path, "", ""))
+    return raw
 
 
 def normalize_compare_path(path: str) -> str:

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from r5_developer_hermes.recovery.secrets import sanitize_git_remote
 from r5_developer_hermes.recovery.contract import (
     COVERAGE_EXCLUDED_NOT_SOURCE,
     COVERAGE_REMOTE_SAFE,
@@ -100,7 +101,9 @@ def inspect_git(
     runner: GitRunner | None = None,
 ) -> GitSnapshot:
     git = runner or default_git_runner
-    remote = _git_ok(git, ["remote", "get-url", "origin"], root) or expected_remote
+    remote = sanitize_git_remote(
+        _git_ok(git, ["remote", "get-url", "origin"], root) or expected_remote
+    )
     branch = _git_ok(git, ["rev-parse", "--abbrev-ref", "HEAD"], root) or "HEAD"
     head = _git_ok(git, ["rev-parse", "HEAD"], root)
     tracking = _git_ok(git, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], root) or None
@@ -198,10 +201,13 @@ class LocalWorkItem:
     reason: str
 
     def to_dict(self) -> dict[str, str]:
+        identity = self.identity
+        if self.kind == "stash":
+            identity = "stash"
         return {
             "repo": self.repo,
             "kind": self.kind,
-            "identity": self.identity,
+            "identity": identity,
             "coverage": self.coverage,
             "reason": self.reason,
         }
