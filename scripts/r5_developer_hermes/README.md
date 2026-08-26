@@ -274,6 +274,17 @@ WEB_PROBE = NOT_RUN_CREDENTIAL_REQUIRED
 
 That does not weaken R5.
 
+## Recovery readiness (Slice 1)
+
+Non-secret recovery contract and a read-only host audit. Encrypted backup
+is **not** implemented (`OFF_DEVICE_ENCRYPTED_BACKUP = NOT_YET`).
+
+```powershell
+.\scripts\r5_developer_hermes\audit-developer-hermes-recovery.ps1
+```
+
+Runbook: [`hermes_r5_developer_recovery_v1.md`](../../docs/architecture/hermes_r5_developer_recovery_v1.md).
+
 ## Tests
 
 ```bash

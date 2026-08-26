@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://powerunits.local/developer-hermes-recovery-manifest.schema.json",
+  "title": "Developer Hermes recovery manifest",
+  "description": "Non-secret recovery contract. Secret values are forbidden.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "recovery_schema_version",
+    "created_at",
+    "repo_a",
+    "repo_b",
+    "hermes",
+    "developer_image_contract_version",
+    "runtime",
+    "required_named_volumes",
+    "required_host_paths",
+    "profile_names",
+    "desktop",
+    "recovery_staging_pack",
+    "future_backup"
+  ],
+  "properties": {
+    "recovery_schema_version": {
+      "type": "string",
+      "const": "developer-hermes-recovery-v1"
+    },
+    "recovery_architecture": {
+      "type": "string",
+      "const": "PINNED_GIT_REBUILD_PLUS_ENCRYPTED_HOME"
+    },
+    "created_at": { "type": "string" },
+    "off_device_encrypted_backup": {
+      "type": "string",
+      "const": "NOT_YET"
+    },
+    "repo_a": { "$ref": "#/$defs/repo_pin" },
+    "repo_b": { "$ref": "#/$defs/repo_pin" },
+    "hermes": {
+      "type": "object",
+      "required": [
+        "upstream_release",
+        "upstream_project_version",
+        "upstream_release_sha",
+        "upstream_image_digest"
+      ],
+      "properties": {
+        "upstream_release": { "type": "string" },
+        "upstream_project_version": { "type": "string" },
+        "upstream_release_sha": { "type": "string" },
+        "upstream_image_digest": { "type": "string" }
+      }
+    },
+    "developer_image_contract_version": { "type": "string" },
+    "runtime": {
+      "type": "object",
+      "required": ["user", "uid", "gid", "HERMES_HOME"],
+      "properties": {
+        "user": { "type": "string" },
+        "uid": { "type": "integer" },
+        "gid": { "type": "integer" },
+        "HERMES_HOME": { "type": "string" }
+      }
+    },
+    "required_named_volumes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "named_volumes": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "required_host_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "profile_names": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "desktop": { "type": "object" },
+    "recovery_staging_pack": { "type": "object" },
+    "future_backup": {
+      "type": "object",
+      "required": ["tool", "status"],
+      "properties": {
+        "tool": { "type": "string" },
+        "status": { "type": "string" },
+        "snapshot_id": { "type": ["string", "null"] },
+        "artifact_checksums": { "type": "object" }
+      }
+    }
+  },
+  "$defs": {
+    "repo_pin": {
+      "type": "object",
+      "required": ["remote", "canonical_branch", "canonical_sha"],
+      "properties": {
+        "remote": { "type": "string" },
+        "canonical_branch": { "type": "string" },
+        "canonical_sha": { "type": "string" },
+        "local_name": { "type": "string" }
+      }
+    }
+  }
+}

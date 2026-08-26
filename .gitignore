@@ -153,6 +153,9 @@ docs/superpowers/*
 # R5 developer instance (isolated HERMES_HOME, scratch git, optional worktree)
 .r5-dev/
 
+# Live Developer recovery manifest (machine-specific; schema/template stay tracked)
+developer-hermes-recovery-manifest.local.json
+
 # Interrupted-update breadcrumb + recovery lock written next to the shared venv
 # by `hermes update` / launch-time self-heal. Runtime state, never a code change
 # — ignore so `git status` stays clean and update's autostash skips them.
