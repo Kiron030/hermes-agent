@@ -46,6 +46,8 @@ At container start, `apply_powerunits_runtime_policy.py` fills **missing** profi
 | `read_powerunits_worker_country_coverage_freshness_v1` | `HERMES_POWERUNITS_WORKER_COUNTRY_COVERAGE_FRESHNESS_READ_ENABLED=1` |
 | `read_powerunits_multi_country_data_health_v1` | All three gates above |
 | `validate_powerunits_entsoe_empirical_candidate_window_v1` | `HERMES_POWERUNITS_ENTSOE_EMPIRICAL_CANDIDATE_VALIDATE_ENABLED=1` |
+| `inspect_powerunits_country_coverage_v1` | `HERMES_POWERUNITS_COUNTRY_COVERAGE_INSPECT_ENABLED=1` |
+| `read_powerunits_db_health_*_v1` / `read_powerunits_timescale_observe_v1` | `HERMES_POWERUNITS_DB_HEALTH_READ_ENABLED=1` |
 
 **Skills:** `powerunits-data-health-triptychon`, `powerunits-multi-country-analyst-read-v1`
 

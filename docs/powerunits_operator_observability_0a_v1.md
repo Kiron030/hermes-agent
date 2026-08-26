@@ -2,7 +2,7 @@
 
 **Slice:** `OPERATOR_OBSERVABILITY_0A`  
 **Status:** discovery + architecture only — no production authority, no credentials created, no Railway/Vercel/DB mutation, no deploy.  
-**Follow-on:** slice 1 is implemented in [`powerunits_operator_observability_1_country_coverage_v1.md`](powerunits_operator_observability_1_country_coverage_v1.md) (`inspect_powerunits_country_coverage_v1`). **Not deployed.**  
+**Follow-on:** slice 1 is implemented in [`powerunits_operator_observability_1_country_coverage_v1.md`](powerunits_operator_observability_1_country_coverage_v1.md) (`inspect_powerunits_country_coverage_v1`; live Operator PASS). Slice 2 is implemented in [`powerunits_operator_observability_2_db_health_v1.md`](powerunits_operator_observability_2_db_health_v1.md). **Not deployed.**  
 **Audience:** operators deciding how Operator Hermes becomes a safe PowerUnits operational-intelligence agent.  
 **Runtimes:** this initiative belongs to **Operator Hermes** (Railway). It must **not** be given to Developer Hermes.
 

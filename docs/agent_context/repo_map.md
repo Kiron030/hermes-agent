@@ -25,7 +25,8 @@
 | Telegram 0C second bot (`telegram-ops` / Developer Remote) | [`hermes_r5_telegram_developer_0c_v1.md`](../architecture/hermes_r5_telegram_developer_0c_v1.md) — TWO_BOT; explicit `telegram-activate`; no Railway change |
 | Developer Hermes recovery (Slice 1) | [`hermes_r5_developer_recovery_v1.md`](../architecture/hermes_r5_developer_recovery_v1.md) — manifest + audit + readiness; `OFF_DEVICE_ENCRYPTED_BACKUP = NOT_YET` |
 | Operator observability 0A (design) | [`powerunits_operator_observability_0a_v1.md`](../powerunits_operator_observability_0a_v1.md) |
-| Operator observability 1 (country coverage) | [`powerunits_operator_observability_1_country_coverage_v1.md`](../powerunits_operator_observability_1_country_coverage_v1.md) — `inspect_powerunits_country_coverage_v1`; not deployed |
+| Operator observability 1 (country coverage) | [`powerunits_operator_observability_1_country_coverage_v1.md`](../powerunits_operator_observability_1_country_coverage_v1.md) — `inspect_powerunits_country_coverage_v1`; live Operator PASS |
+| Operator observability 2 (DB health read) | [`powerunits_operator_observability_2_db_health_v1.md`](../powerunits_operator_observability_2_db_health_v1.md) — `read_powerunits_db_health_*_v1` + `read_powerunits_timescale_observe_v1`; not deployed |
 
 ## Task → entry points
 
