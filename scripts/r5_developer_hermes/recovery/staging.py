@@ -42,18 +42,18 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_staging_hashes(root: Path) -> dict[str, Any]:
-    manifest = root / STAGING_HASH_MANIFEST_NAME
+def verify_checksum_file(root: Path, name: str = STAGING_HASH_MANIFEST_NAME) -> dict[str, Any]:
+    manifest = root / name
     result: dict[str, Any] = {
         "path": str(root),
-        "hash_manifest": STAGING_HASH_MANIFEST_NAME,
+        "hash_manifest": name,
         "status": "FAIL",
         "checked": 0,
         "missing": [],
         "mismatched": [],
     }
     if not root.is_dir() or not manifest.is_file():
-        result["missing"].append(STAGING_HASH_MANIFEST_NAME)
+        result["missing"].append(name)
         return result
     entries = parse_sha256_manifest(manifest.read_text(encoding="utf-8"))
     for expected, relative in entries:
@@ -68,6 +68,10 @@ def verify_staging_hashes(root: Path) -> dict[str, Any]:
     if not result["missing"] and not result["mismatched"]:
         result["status"] = "PASS"
     return result
+
+
+def verify_staging_hashes(root: Path) -> dict[str, Any]:
+    return verify_checksum_file(root, STAGING_HASH_MANIFEST_NAME)
 
 
 def load_staging_index(
@@ -104,6 +108,18 @@ def load_staging_index(
         "bundle_heads": heads,
         "hash_manifest": STAGING_HASH_MANIFEST_NAME,
     }
+
+
+def write_sha256_manifest(path: Path, files: list[Path], *, root: Path | None = None) -> Path:
+    lines: list[str] = []
+    base = root or path.parent
+    for item in files:
+        if not item.is_file():
+            continue
+        relative = item.relative_to(base)
+        lines.append(f"{file_sha256(item)}  {relative.as_posix()}")
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    return path
 
 
 def staging_record(root: Path, verification: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:

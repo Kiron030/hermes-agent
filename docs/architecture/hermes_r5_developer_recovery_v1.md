@@ -2,16 +2,17 @@
 
 **Slice:** `RECOVERY_1_MANIFEST_AND_AUDIT`  
 **Architecture:** `PINNED_GIT_REBUILD_PLUS_ENCRYPTED_HOME`  
-**Status:** contract + audit only. Encrypted backup is **not** implemented.
+**Status:** contract + audit. Encrypted USB backup is Recovery 2.
 
 ```text
-OFF_DEVICE_ENCRYPTED_BACKUP = NOT_YET
+OFF_DEVICE_ENCRYPTED_BACKUP = NOT_YET   # until a verified USB snapshot exists
 ```
 
-This document is the human runbook for Slice 1. It does not claim that an
-off-device encrypted backup exists. Recovery 2 introduces restic and the
-encrypted `HERMES_HOME` + Developer-secret backup. Do not treat GitHub
-reachability as backup readiness.
+This document is the human runbook for Slice 1. A read-only audit does not
+create an off-device backup. Recovery 2 implements restic and the encrypted
+`HERMES_HOME` + Developer-secret USB pack. See
+[`hermes_r5_developer_recovery_v2.md`](./hermes_r5_developer_recovery_v2.md).
+Do not treat GitHub reachability as backup readiness.
 
 ## What Git reconstructs
 
@@ -118,7 +119,6 @@ until a later slice parameterizes host roots.
 
 ## Next slice
 
-`RECOVERY_2_ENCRYPTED_BACKUP` — install/use restic, encrypt
-`r5-developer-hermes-home` plus Developer secret slots, verify restore.
-Do not start that work from this document alone; wait for the Recovery 2
-brief.
+`RECOVERY_2_USB_ENCRYPTED_BACKUP` is implemented in
+[`hermes_r5_developer_recovery_v2.md`](./hermes_r5_developer_recovery_v2.md).
+Full restore remains Recovery 3.

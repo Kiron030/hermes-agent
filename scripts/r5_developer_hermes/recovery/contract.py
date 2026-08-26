@@ -13,8 +13,19 @@ from typing import Any
 RECOVERY_SCHEMA_VERSION = "developer-hermes-recovery-v1"
 RECOVERY_ARCHITECTURE = "PINNED_GIT_REBUILD_PLUS_ENCRYPTED_HOME"
 OFF_DEVICE_ENCRYPTED_BACKUP = "NOT_YET"
+OFF_DEVICE_ENCRYPTED_BACKUP_YES = "YES"
 FUTURE_BACKUP_TOOL = "restic"
 FUTURE_BACKUP_STATUS = "NOT_YET"
+BACKUP_TOOL = "restic"
+BACKUP_STATUS_PRESENT = "PRESENT"
+RESTIC_VERSION = "0.18.1"
+RESTIC_WINDOWS_AMD64_NAME = "restic_0.18.1_windows_amd64.zip"
+RESTIC_WINDOWS_AMD64_SHA256 = "0c1a713440578cb400d2e76208feb24f1b339426b075a21f73b6b2132692515d"
+RESTIC_RELEASE_BASE = "https://github.com/restic/restic/releases/download/v0.18.1"
+USB_LAYOUT_ROOT_NAME = "HERMES-RECOVERY"
+USB_RECOMMENDED_LABEL = "HERMES_RECOVERY"
+BACKUP_SPACE_MARGIN_BYTES = 512 * 1024 * 1024
+BACKUP_SPACE_MARGIN_RATIO = 0.20
 
 REPO_A_CANONICAL_REMOTE = "https://github.com/Kiron030/hermes-agent.git"
 REPO_A_CANONICAL_BRANCH = "powerunits-internal-setup"
@@ -154,12 +165,20 @@ VOLATILE_MANIFEST_FIELDS: tuple[str, ...] = (
     "created_at",
     "audit_run_id",
     "future_backup.snapshot_id",
+    "encrypted_backup.snapshot_id",
+    "encrypted_backup.created_at",
     "recovery_staging_pack.verified_at",
 )
 
 READINESS_READY = "READY_FOR_RECOVERY_2"
 READINESS_BLOCKED = "BLOCKED"
 READINESS_BLOCKED_LOCAL_WORK = "BLOCKED_LOCAL_WORK"
+BACKUP_BLOCKED_LOCAL_WORK = "BACKUP_BLOCKED_LOCAL_WORK"
+USB_SYSTEM_DRIVE = "USB_SYSTEM_DRIVE"
+USB_NOT_REMOVABLE = "USB_NOT_REMOVABLE"
+USB_AMBIGUOUS = "USB_AMBIGUOUS"
+USB_NOT_CONFIRMED = "USB_NOT_CONFIRMED"
+USB_INSUFFICIENT_SPACE = "USB_INSUFFICIENT_SPACE"
 
 COVERAGE_REMOTE_SAFE = "REMOTE_SAFE"
 COVERAGE_STAGING_COVERED = "LOCAL_ONLY_BUT_RECOVERY_STAGED"
@@ -246,6 +265,14 @@ def contract_identity() -> dict[str, Any]:
             "tool": FUTURE_BACKUP_TOOL,
             "status": FUTURE_BACKUP_STATUS,
             "snapshot_id": None,
+            "artifact_checksums": {},
+        },
+        "encrypted_backup": {
+            "tool": BACKUP_TOOL,
+            "status": FUTURE_BACKUP_STATUS,
+            "restic_version": RESTIC_VERSION,
+            "snapshot_id": None,
+            "created_at": None,
             "artifact_checksums": {},
         },
     }

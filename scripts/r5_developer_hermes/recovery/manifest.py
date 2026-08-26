@@ -10,11 +10,13 @@ from typing import Any, Mapping
 
 from r5_developer_hermes.harness import load_pin
 from r5_developer_hermes.recovery.contract import (
+    BACKUP_TOOL,
     FUTURE_BACKUP_STATUS,
     FUTURE_BACKUP_TOOL,
     OFF_DEVICE_ENCRYPTED_BACKUP,
     RECOVERY_ARCHITECTURE,
     RECOVERY_SCHEMA_VERSION,
+    RESTIC_VERSION,
     SCHEMA_PATH,
     TEMPLATE_PATH,
     VOLATILE_MANIFEST_FIELDS,
@@ -91,6 +93,7 @@ def required_template_keys() -> tuple[str, ...]:
         "desktop",
         "recovery_staging_pack",
         "future_backup",
+        "encrypted_backup",
     )
 
 
@@ -103,6 +106,8 @@ def build_manifest(
     desktop: Mapping[str, Any] | None = None,
     recovery_staging_pack: Mapping[str, Any] | None = None,
     future_backup: Mapping[str, Any] | None = None,
+    encrypted_backup: Mapping[str, Any] | None = None,
+    off_device_encrypted_backup: str | None = None,
     created_at: str | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -114,7 +119,7 @@ def build_manifest(
         "recovery_schema_version": RECOVERY_SCHEMA_VERSION,
         "recovery_architecture": RECOVERY_ARCHITECTURE,
         "created_at": created_at or utc_now(),
-        "off_device_encrypted_backup": OFF_DEVICE_ENCRYPTED_BACKUP,
+        "off_device_encrypted_backup": off_device_encrypted_backup or OFF_DEVICE_ENCRYPTED_BACKUP,
         "repo_a": {
             "remote": repo_a.get("remote") or identity["repo_a"]["remote"],
             "canonical_branch": repo_a.get("canonical_branch") or identity["repo_a"]["canonical_branch"],
@@ -154,6 +159,17 @@ def build_manifest(
                 "tool": FUTURE_BACKUP_TOOL,
                 "status": FUTURE_BACKUP_STATUS,
                 "snapshot_id": None,
+                "artifact_checksums": {},
+            }
+        ),
+        "encrypted_backup": dict(
+            encrypted_backup
+            or {
+                "tool": BACKUP_TOOL,
+                "status": FUTURE_BACKUP_STATUS,
+                "restic_version": RESTIC_VERSION,
+                "snapshot_id": None,
+                "created_at": None,
                 "artifact_checksums": {},
             }
         ),
