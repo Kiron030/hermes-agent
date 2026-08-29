@@ -32,8 +32,11 @@
     "created_at": { "type": "string" },
     "off_device_encrypted_backup": {
       "type": "string",
-      "const": "NOT_YET"
+      "enum": ["NOT_YET", "YES"]
     },
+    "encrypted_backup": { "type": "object" },
+    "usb": { "type": "object" },
+    "repo_capsules": { "type": "object" },
     "repo_a": { "$ref": "#/$defs/repo_pin" },
     "repo_b": { "$ref": "#/$defs/repo_pin" },
     "hermes": {

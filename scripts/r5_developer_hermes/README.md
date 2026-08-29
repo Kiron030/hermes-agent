@@ -103,7 +103,16 @@ python scripts/r5_developer_hermes/desktop_remote_client.py preflight
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode telegram-status
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode telegram-activate
 .\scripts\r5_developer_hermes\container\launch-developer-hermes.ps1 -Mode reset
+.\scripts\r5_developer_hermes\audit-developer-hermes-recovery.ps1
+.\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\
+.\scripts\r5_developer_hermes\verify-developer-hermes-usb-backup.ps1 -UsbRoot E:\
 ```
+
+Encrypted USB backup (Recovery 2) writes self-contained Repo A/B Git capsules
+plus a logical `r5-developer-hermes-home` export into a restic repository on
+an explicitly confirmed removable drive. The recovery password is never stored
+on the USB. Restore is Recovery 3. See
+[`hermes_r5_developer_recovery_v2.md`](../../docs/architecture/hermes_r5_developer_recovery_v2.md).
 
 `telegram-up` / `telegram-status` / `telegram-down` prepare the dedicated
 `telegram-ops` profile (display: Developer Remote). Ordinary `telegram-up`

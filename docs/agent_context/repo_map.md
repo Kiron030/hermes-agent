@@ -23,7 +23,8 @@
 | Developer Hermes egress boundary | [`hermes_r5_egress_policy_gate_v1.md`](../architecture/hermes_r5_egress_policy_gate_v1.md), policy in `scripts/r5_developer_hermes/container/egress/egress_policy.json` |
 | Telegram 0B PREP (`telegram-ops`) | [`hermes_r5_telegram_ops_0b_v1.md`](../architecture/hermes_r5_telegram_ops_0b_v1.md) — dedicated Developer Remote profile seed; Operator token stays on Railway |
 | Telegram 0C second bot (`telegram-ops` / Developer Remote) | [`hermes_r5_telegram_developer_0c_v1.md`](../architecture/hermes_r5_telegram_developer_0c_v1.md) — TWO_BOT; explicit `telegram-activate`; no Railway change |
-| Developer Hermes recovery (Slice 1) | [`hermes_r5_developer_recovery_v1.md`](../architecture/hermes_r5_developer_recovery_v1.md) — manifest + audit + readiness; `OFF_DEVICE_ENCRYPTED_BACKUP = NOT_YET` |
+| Developer Hermes recovery (Slice 1) | [`hermes_r5_developer_recovery_v1.md`](../architecture/hermes_r5_developer_recovery_v1.md) — manifest + audit + readiness |
+| Developer Hermes recovery (Slice 2) | [`hermes_r5_developer_recovery_v2.md`](../architecture/hermes_r5_developer_recovery_v2.md) — restic USB backup; restore is Recovery 3 |
 | Operator observability 0A (design) | [`powerunits_operator_observability_0a_v1.md`](../powerunits_operator_observability_0a_v1.md) |
 | Operator observability 1 (country coverage) | [`powerunits_operator_observability_1_country_coverage_v1.md`](../powerunits_operator_observability_1_country_coverage_v1.md) — `inspect_powerunits_country_coverage_v1`; not deployed |
 
