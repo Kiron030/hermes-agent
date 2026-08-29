@@ -15,7 +15,8 @@
     DEDICATED_CONTAINER_CLONES = DO_NOT_EXECUTE_ON_HOST
 
 .EXAMPLE
-    .\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\
+    .\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\ -WhatIf
+    .\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\ -AllowResticDownload
     .\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
@@ -116,6 +117,31 @@ if (-not $Match) {
     exit 2
 }
 
+$Python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $Python)) {
+    $Python = 'python'
+}
+$BackupPy = Join-Path $ResolvedScriptRoot 'recovery\backup.py'
+
+if ($WhatIfPreference) {
+    Write-Host "DRY_RUN = YES"
+    Write-Host "USB_WRITES = NO"
+    Write-Host "NETWORK_DOWNLOADS = NO"
+    Write-Host "SECRET_INPUT_REQUIRED = NO"
+    Write-Host "RUNTIME_MUTATIONS = NO"
+    Write-Host "Inspecting removable destination: $ResolvedUsb"
+    $ArgList = @($BackupPy, '--usb-root', $ResolvedUsb, '--dry-run')
+    if ($AllowResticDownload) { $ArgList += '--allow-restic-download' }
+    if ($Json) { $ArgList += '--json' }
+    if ($RepoB) { $ArgList += @('--repo-b', $RepoB) }
+    if ($CredentialsDir) { $ArgList += @('--credentials-dir', $CredentialsDir) }
+    if ($env:RESTIC_PASSWORD) {
+        Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
+    }
+    & $Python @ArgList
+    exit $LASTEXITCODE
+}
+
 Write-Host ''
 Write-Host 'This will write an encrypted restic repository to:'
 Write-Host "  $ResolvedUsb"
@@ -139,11 +165,6 @@ if ($Plain -ne $PlainConfirm -or [string]::IsNullOrEmpty($Plain)) {
     exit 2
 }
 
-$Python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $Python)) {
-    $Python = 'python'
-}
-$BackupPy = Join-Path $ResolvedScriptRoot 'recovery\backup.py'
 $ArgList = @($BackupPy, '--usb-root', $ResolvedUsb, '--confirm-usb')
 if ($AllowResticDownload) { $ArgList += '--allow-restic-download' }
 if ($SkipRuntime) { $ArgList += '--skip-runtime' }

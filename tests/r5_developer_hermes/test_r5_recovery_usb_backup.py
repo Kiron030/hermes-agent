@@ -26,6 +26,8 @@ from r5_developer_hermes.recovery.contract import (
     OFF_DEVICE_ENCRYPTED_BACKUP_YES,
     PRODUCTION_SECRET_PATHS_EXCLUDED,
     RESTIC_VERSION,
+    RESTIC_WINDOWS_AMD64_MEMBER,
+    RESTIC_WINDOWS_AMD64_NAME,
     RESTIC_WINDOWS_AMD64_SHA256,
     USB_AMBIGUOUS,
     USB_NOT_CONFIRMED,
@@ -35,11 +37,17 @@ from r5_developer_hermes.recovery.contract import (
 from r5_developer_hermes.recovery.git_state import GitSnapshot
 from r5_developer_hermes.recovery.restic import (
     PASSWORD_ENV,
+    ResticError,
     assert_checksum,
+    bootstrap_restic,
+    extract_pinned_restic_exe,
     init_or_existing,
     parse_sha256sums,
     redact_command,
     repository_exists,
+    select_restic_zip_member,
+    sha256_bytes,
+    write_checksum_sidecar,
 )
 from r5_developer_hermes.recovery.runtime_window import restart_after_snapshot, stop_for_snapshot, RuntimeWindow
 from r5_developer_hermes.recovery.secrets import assert_no_secret_leaks, find_secret_shaped_leaks
@@ -120,11 +128,13 @@ def _fake_restic(store: Path):
     snapshots: list[dict] = []
 
     def run(argv: list[str], env):
-        assert PASSWORD_ENV in (env or {}), "restic must receive RESTIC_PASSWORD via env"
         joined = " ".join(argv)
         assert "-p " not in joined
         assert "--password" not in joined
         assert PASSWORD not in joined
+        if "version" in argv:
+            return subprocess.CompletedProcess(argv, 0, f"restic {RESTIC_VERSION}\n", "")
+        assert PASSWORD_ENV in (env or {}), "restic must receive RESTIC_PASSWORD via env"
         repo = Path(argv[argv.index("--repo") + 1])
         if "init" in argv:
             repo.mkdir(parents=True, exist_ok=True)
@@ -163,8 +173,6 @@ def _fake_restic(store: Path):
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         dest.write_bytes(item.read_bytes())
             return subprocess.CompletedProcess(argv, 0, "restored\n", "")
-        if "version" in argv:
-            return subprocess.CompletedProcess(argv, 0, f"restic {RESTIC_VERSION}\n", "")
         return subprocess.CompletedProcess(argv, 1, "", "unexpected")
 
     run.snapshots = snapshots  # type: ignore[attr-defined]
@@ -530,6 +538,8 @@ def test_scripts_never_format_or_log_password() -> None:
         assert "--password" not in text
         assert "Write-Host $Plain" not in text
         assert "Write-Host $env:RESTIC_PASSWORD" not in text
+    assert "$WhatIfPreference" in backup_ps1
+    assert "--dry-run" in backup_ps1
 
 
 def test_capacity_estimate_has_margin() -> None:
@@ -621,3 +631,222 @@ def test_human_backup_report_has_no_password() -> None:
     )
     assert PASSWORD not in text
     assert "PASSWORD_STORED_ON_USB = NO" in text
+
+
+def _official_restic_zip(tmp: Path, *names: str) -> Path:
+    archive = tmp / RESTIC_WINDOWS_AMD64_NAME
+    import zipfile
+
+    with zipfile.ZipFile(archive, "w") as zipped:
+        for name in names or (RESTIC_WINDOWS_AMD64_MEMBER,):
+            zipped.writestr(name, b"MZ-fake-restic")
+    return archive
+
+
+def test_official_versioned_exe_is_normalized(tmp_path: Path) -> None:
+    archive = _official_restic_zip(tmp_path)
+    dest = tmp_path / "restic.exe"
+    member = extract_pinned_restic_exe(archive, dest)
+    assert member == RESTIC_WINDOWS_AMD64_MEMBER
+    assert dest.is_file()
+    assert select_restic_zip_member([RESTIC_WINDOWS_AMD64_MEMBER]) == RESTIC_WINDOWS_AMD64_MEMBER
+    assert select_restic_zip_member(["restic.exe"]) == "restic.exe"
+
+
+def test_zip_without_expected_exe_fails_closed(tmp_path: Path) -> None:
+    archive = _official_restic_zip(tmp_path, "readme.txt")
+    with pytest.raises(ResticError, match="did not contain"):
+        extract_pinned_restic_exe(archive, tmp_path / "restic.exe")
+
+
+def test_zip_with_ambiguous_exes_fails_closed() -> None:
+    with pytest.raises(ResticError, match="multiple"):
+        select_restic_zip_member(["restic.exe", RESTIC_WINDOWS_AMD64_MEMBER])
+
+
+def test_zip_slip_member_rejected() -> None:
+    with pytest.raises(ResticError, match="zip-slip|unexpected"):
+        select_restic_zip_member(["../restic.exe"])
+    with pytest.raises(ResticError, match="unexpected"):
+        select_restic_zip_member([r"dir\\restic_0.18.1_windows_amd64.exe"])
+
+
+def test_bootstrap_checksum_mismatch_before_extract(tmp_path: Path) -> None:
+    def opener(url: str) -> bytes:
+        if url.endswith("SHA256SUMS"):
+            return f"{RESTIC_WINDOWS_AMD64_SHA256}  {RESTIC_WINDOWS_AMD64_NAME}\n".encode()
+        return b"not-the-official-zip"
+
+    with pytest.raises(ResticError, match="checksum"):
+        bootstrap_restic(tmp_path / "cache", allow_download=True, opener=opener)
+    assert not (tmp_path / "cache" / "restic.exe").exists()
+
+
+def test_bootstrap_version_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    archive = _official_restic_zip(tmp_path)
+    payload = archive.read_bytes()
+    digest = sha256_bytes(payload)
+    monkeypatch.setattr("r5_developer_hermes.recovery.restic.RESTIC_WINDOWS_AMD64_SHA256", digest)
+
+    def opener(url: str) -> bytes:
+        if url.endswith("SHA256SUMS"):
+            return f"{digest}  {RESTIC_WINDOWS_AMD64_NAME}\n".encode()
+        return payload
+
+    def runner(argv, env):
+        return subprocess.CompletedProcess(argv, 0, "restic 0.18.10 compiled with go\n", "")
+
+    with pytest.raises(ResticError, match="version"):
+        bootstrap_restic(tmp_path / "cache", allow_download=True, opener=opener, runner=runner)
+    assert not (tmp_path / "cache" / "restic.exe").exists()
+
+
+def test_existing_verified_binary_reused_without_download(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    exe = cache / "restic.exe"
+    exe.write_bytes(b"MZ-cached")
+    write_checksum_sidecar(exe)
+    downloads = {"n": 0}
+
+    def opener(url: str) -> bytes:
+        downloads["n"] += 1
+        raise AssertionError("download must not run")
+
+    def runner(argv, env):
+        return subprocess.CompletedProcess(argv, 0, f"restic {RESTIC_VERSION} compiled with go\n", "")
+
+    result = bootstrap_restic(cache, allow_download=True, opener=opener, runner=runner)
+    assert result["source"] == "bootstrap-cache"
+    assert downloads["n"] == 0
+
+
+def test_whatif_without_restic_is_dry_run_pass(tmp_path: Path) -> None:
+    kwargs = _base_backup(tmp_path)
+    kwargs["dry_run"] = True
+    kwargs["restic_binary"] = None
+    kwargs["allow_restic_download"] = False
+    kwargs.pop("password", None)
+    os.environ.pop(PASSWORD_ENV, None)
+    downloads = {"n": 0}
+
+    def opener(url: str) -> bytes:
+        downloads["n"] += 1
+        raise AssertionError("WhatIf must not download")
+
+    kwargs["restic_opener"] = opener
+    report = run_backup(**kwargs)
+    assert report["status"] == "PASS"
+    assert report["dry_run"] == "YES"
+    assert report["usb_writes"] == "NO"
+    assert report["network_downloads"] == "NO"
+    assert report["secret_input_required"] == "NO"
+    assert report["runtime_mutations"] == "NO"
+    assert report["restic_download"] == "WOULD_DOWNLOAD"
+    assert downloads["n"] == 0
+    assert not (tmp_path / "usb" / "HERMES-RECOVERY" / "repository" / "config").exists()
+    assert PASSWORD_ENV not in os.environ
+
+
+def test_whatif_allow_download_does_not_download(tmp_path: Path) -> None:
+    kwargs = _base_backup(tmp_path)
+    kwargs["dry_run"] = True
+    kwargs["allow_restic_download"] = True
+    kwargs["restic_binary"] = None
+    kwargs.pop("password", None)
+    downloads = {"n": 0}
+
+    def opener(url: str) -> bytes:
+        downloads["n"] += 1
+        raise AssertionError("WhatIf must not download")
+
+    kwargs["restic_opener"] = opener
+    report = run_backup(**kwargs)
+    assert report["status"] == "PASS"
+    assert report["restic_download"] == "WOULD_DOWNLOAD"
+    assert report["network_downloads"] == "NO"
+    assert report["usb_writes"] == "NO"
+    assert report["secret_input_required"] == "NO"
+    assert report["runtime_mutations"] == "NO"
+    assert downloads["n"] == 0
+    assert PASSWORD_ENV not in os.environ
+
+
+def test_whatif_human_report_marks_true_dry_run() -> None:
+    text = format_human_report(
+        {
+            "slice": "RECOVERY_2_USB_ENCRYPTED_BACKUP",
+            "status": "PASS",
+            "dry_run": "YES",
+            "usb_writes": "NO",
+            "network_downloads": "NO",
+            "secret_input_required": "NO",
+            "runtime_mutations": "NO",
+            "restic_download": "WOULD_DOWNLOAD",
+            "backup_tool": "restic",
+            "restic_version": RESTIC_VERSION,
+            "password_stored_on_usb": "NO",
+            "password_printed": "NO",
+        }
+    )
+    assert "DRY_RUN = YES" in text
+    assert "USB_WRITES = NO" in text
+    assert "NETWORK_DOWNLOADS = NO" in text
+    assert "SECRET_INPUT_REQUIRED = NO" in text
+    assert "RUNTIME_MUTATIONS = NO" in text
+    assert "RESTIC_DOWNLOAD = WOULD_DOWNLOAD" in text
+
+
+def test_real_run_download_only_after_destination_confirmation(tmp_path: Path) -> None:
+    kwargs = _base_backup(tmp_path)
+    kwargs["confirmed"] = False
+    kwargs["restic_binary"] = None
+    kwargs["allow_restic_download"] = True
+    downloads = {"n": 0}
+
+    def opener(url: str) -> bytes:
+        downloads["n"] += 1
+        return b""
+
+    kwargs["restic_opener"] = opener
+    kwargs["restic_runner"] = _fake_restic(tmp_path / "store")
+    with pytest.raises(UsbDestinationError):
+        run_backup(**kwargs)
+    assert downloads["n"] == 0
+
+
+def test_real_run_download_permitted_after_confirmation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = _official_restic_zip(tmp_path)
+    payload = archive.read_bytes()
+    digest = sha256_bytes(payload)
+    monkeypatch.setattr("r5_developer_hermes.recovery.restic.RESTIC_WINDOWS_AMD64_SHA256", digest)
+    downloads = {"n": 0}
+
+    def opener(url: str) -> bytes:
+        downloads["n"] += 1
+        if url.endswith("SHA256SUMS"):
+            return f"{digest}  {RESTIC_WINDOWS_AMD64_NAME}\n".encode()
+        return payload
+
+    kwargs = _base_backup(tmp_path)
+    kwargs["restic_binary"] = None
+    kwargs["allow_restic_download"] = True
+    kwargs["restic_opener"] = opener
+    report = run_backup(**kwargs)
+    assert downloads["n"] >= 2
+    assert report["status"] == "PASS"
+    assert report["repo_a_recovery"] == "SELF_CONTAINED"
+    assert report["hermes_home_backup"] == "FULL_ENCRYPTED_LOGICAL"
+
+
+def test_whatif_wrong_destination_fails_closed(tmp_path: Path) -> None:
+    kwargs = _base_backup(tmp_path)
+    kwargs["dry_run"] = True
+    kwargs["system_drive"] = _volume_letter(tmp_path / "usb")
+    kwargs.pop("password", None)
+    with pytest.raises(UsbDestinationError) as exc:
+        run_backup(**kwargs)
+    assert exc.value.code == USB_SYSTEM_DRIVE
+

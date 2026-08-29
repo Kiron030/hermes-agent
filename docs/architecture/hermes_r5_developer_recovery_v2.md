@@ -19,9 +19,16 @@ Restore is **not** implemented in this slice. Recovery 3 is the restore bootstra
 From the Workbench checkout (never from `W:\hermes-dev`):
 
 ```powershell
-.\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\
+.\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\ -WhatIf
+.\scripts\r5_developer_hermes\backup-developer-hermes-usb.ps1 -UsbRoot E:\ -AllowResticDownload
 .\scripts\r5_developer_hermes\verify-developer-hermes-usb-backup.ps1 -UsbRoot E:\
 ```
+
+`-WhatIf` is a true dry run: no USB writes, no download, no password, no runtime
+stop. The official Windows restic `0.18.1` zip contains
+`restic_0.18.1_windows_amd64.exe`; bootstrap verifies the zip SHA-256, extracts
+that member, and normalizes it to `restic.exe` only after `restic version`
+matches the pin.
 
 If `-UsbRoot` is omitted, the script lists removable drives. One drive still requires
 an explicit path plus `YES`. Multiple drives never auto-select.

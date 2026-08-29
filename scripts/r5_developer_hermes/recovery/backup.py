@@ -64,7 +64,9 @@ from r5_developer_hermes.recovery.restic import (  # noqa: E402
     ResticError,
     backup_path,
     bootstrap_restic,
+    host_restic_cache_dir,
     init_or_existing,
+    inspect_pinned_restic,
     list_snapshots,
     repository_exists,
     restic_check,
@@ -188,6 +190,7 @@ def run_backup(
     staging_root: Path | None = None,
     restic_binary: Path | None = None,
     allow_restic_download: bool = False,
+    restic_opener=None,
     restic_runner=None,
     git_runner=None,
     docker_runner=None,
@@ -202,6 +205,7 @@ def run_backup(
     skip_restic: bool = False,
     skip_health: bool = False,
     include_desktop_exe: bool = True,
+    dry_run: bool = False,
     password: str | None = None,
     now: datetime | None = None,
     launch_hooks: Mapping[str, Callable[[], Any]] | None = None,
@@ -210,16 +214,96 @@ def run_backup(
 ) -> dict[str, Any]:
     if not skip_host_trust:
         assert_trusted_host_launcher(Path(__file__), repo_a_root or REPO_ROOT)
-    if password is not None:
+    previous_password = os.environ.get(PASSWORD_ENV)
+    try:
+        return _run_backup_body(
+            usb_root=usb_root,
+            confirmed=confirmed,
+            drives=drives,
+            enumerator=enumerator,
+            system_drive=system_drive,
+            repo_a_root=repo_a_root,
+            repo_b=repo_b,
+            credentials_dir=credentials_dir,
+            desktop_root=desktop_root,
+            staging_root=staging_root,
+            restic_binary=restic_binary,
+            allow_restic_download=allow_restic_download,
+            restic_opener=restic_opener,
+            restic_runner=restic_runner,
+            git_runner=git_runner,
+            docker_runner=docker_runner,
+            inspect_payload=inspect_payload,
+            volumes_present=volumes_present,
+            telegram_meta=telegram_meta,
+            telegram_status=telegram_status,
+            pin=pin,
+            skip_runtime=skip_runtime,
+            skip_volume_export=skip_volume_export,
+            skip_restic=skip_restic,
+            skip_health=skip_health,
+            include_desktop_exe=include_desktop_exe,
+            dry_run=dry_run,
+            password=password,
+            now=now,
+            launch_hooks=launch_hooks,
+            volume_export_fn=volume_export_fn,
+            health_fn=health_fn,
+        )
+    finally:
+        if dry_run or password is not None:
+            os.environ.pop(PASSWORD_ENV, None)
+            if not dry_run and previous_password is not None:
+                os.environ[PASSWORD_ENV] = previous_password
+
+
+def _run_backup_body(
+    *,
+    usb_root: str | Path | None,
+    confirmed: bool = False,
+    drives=None,
+    enumerator=None,
+    system_drive: str | None = None,
+    repo_a_root: Path | None = None,
+    repo_b: Path | None = None,
+    credentials_dir: Path | None = None,
+    desktop_root: Path | None = None,
+    staging_root: Path | None = None,
+    restic_binary: Path | None = None,
+    allow_restic_download: bool = False,
+    restic_opener=None,
+    restic_runner=None,
+    git_runner=None,
+    docker_runner=None,
+    inspect_payload: dict[str, Any] | None = None,
+    volumes_present: dict[str, bool] | None = None,
+    telegram_meta: dict[str, Any] | None = None,
+    telegram_status: Mapping[str, Any] | None = None,
+    pin: Mapping[str, Any] | None = None,
+    skip_runtime: bool = False,
+    skip_volume_export: bool = False,
+    skip_restic: bool = False,
+    skip_health: bool = False,
+    include_desktop_exe: bool = True,
+    dry_run: bool = False,
+    password: str | None = None,
+    now: datetime | None = None,
+    launch_hooks: Mapping[str, Callable[[], Any]] | None = None,
+    volume_export_fn=None,
+    health_fn=None,
+) -> dict[str, Any]:
+    if dry_run:
+        os.environ.pop(PASSWORD_ENV, None)
+    elif password is not None:
         os.environ[PASSWORD_ENV] = password
-    if not os.environ.get(PASSWORD_ENV) and not skip_restic:
+    if not dry_run and not os.environ.get(PASSWORD_ENV) and not skip_restic:
         raise ResticError("RESTIC_PASSWORD is missing; refusing to start backup")
 
     dest = resolve_destination(
         usb_root,
         drives=drives,
         enumerator=enumerator,
-        confirmed=confirmed,
+        confirmed=True if dry_run and usb_root else confirmed,
         system_drive=system_drive,
     )
     root_a = Path(repo_a_root) if repo_a_root is not None else REPO_ROOT
@@ -241,6 +325,39 @@ def run_backup(
         credentials_dir=credentials_dir,
         telegram_meta=docker.telegram_slot,
     )
+    cache_dir = host_restic_cache_dir(repo_root=root_a)
+    restic_plan = inspect_pinned_restic(
+        cache_dir,
+        existing=restic_binary,
+        runner=restic_runner,
+    )
+    if dry_run:
+        download = restic_plan.get("download") or "WOULD_DOWNLOAD"
+        report = {
+            "slice": "RECOVERY_2_USB_ENCRYPTED_BACKUP",
+            "status": "PASS",
+            "dry_run": "YES",
+            "usb_writes": "NO",
+            "network_downloads": "NO",
+            "secret_input_required": "NO",
+            "runtime_mutations": "NO",
+            "restic_download": download,
+            "restic_version": RESTIC_VERSION,
+            "restic_asset": restic_plan.get("asset"),
+            "restic_member": restic_plan.get("member"),
+            "restic_sha256": restic_plan.get("sha256"),
+            "backup_tool": BACKUP_TOOL,
+            "password_stored_on_usb": "NO",
+            "password_printed": "NO",
+            "operator_changed": "NO",
+            "railway_changed": "NO",
+            "usb": dest.to_dict(),
+            "allow_restic_download": "YES" if allow_restic_download else "NO",
+            "restic_available": "YES" if restic_plan.get("available") else "NO",
+            "hermes_home_volume_present": "YES" if docker.hermes_home_volume_present else "NO",
+        }
+        assert_no_secret_leaks(report, context="usb-backup-dry-run")
+        return report
     if unexpected_slots(slots) or missing_host_slots(slots):
         raise RuntimeError("Developer secret-slot allowlist failed")
     if not docker.hermes_home_volume_present and not skip_volume_export:
@@ -267,9 +384,14 @@ def run_backup(
 
     restic_info = {"binary": str(restic_binary or ""), "version": RESTIC_VERSION, "source": "injected"}
     if restic_binary is None and not skip_restic:
-        restic_info = bootstrap_restic(bootstrap_dir, allow_download=allow_restic_download, runner=restic_runner)
+        restic_info = bootstrap_restic(
+            cache_dir,
+            allow_download=allow_restic_download,
+            opener=restic_opener,
+            runner=restic_runner,
+        )
         restic_binary = Path(restic_info["binary"])
-    elif restic_binary is not None:
+    if restic_binary is not None:
         write_usb_bootstrap(recovery_root, restic_binary)
 
     staging = Path(staging_root) if staging_root is not None else Path(tempfile.mkdtemp(prefix="hermes-recovery2-"))
@@ -295,6 +417,10 @@ def run_backup(
     report: dict[str, Any] = {
         "slice": "RECOVERY_2_USB_ENCRYPTED_BACKUP",
         "status": "FAIL",
+        "dry_run": "NO",
+        "usb_writes": "YES",
+        "network_downloads": "YES" if allow_restic_download else "NO",
+        "secret_input_required": "YES",
         "usb": dest.to_dict(),
         "backup_tool": BACKUP_TOOL,
         "restic_version": RESTIC_VERSION,
@@ -498,6 +624,12 @@ def format_human_report(report: Mapping[str, Any]) -> str:
     lines = [
         f"SLICE = {report.get('slice')}",
         f"SLICE_STATUS = {report.get('status')}",
+        f"DRY_RUN = {report.get('dry_run') or 'NO'}",
+        f"USB_WRITES = {report.get('usb_writes') or 'YES'}",
+        f"NETWORK_DOWNLOADS = {report.get('network_downloads') or 'YES'}",
+        f"SECRET_INPUT_REQUIRED = {report.get('secret_input_required') or 'YES'}",
+        f"RUNTIME_MUTATIONS = {report.get('runtime_mutations')}",
+        f"RESTIC_DOWNLOAD = {report.get('restic_download') or 'NOT_PLANNED'}",
         f"BACKUP_TOOL = {report.get('backup_tool')}",
         f"RESTIC_VERSION = {report.get('restic_version')}",
         f"REPO_A_RECOVERY = {report.get('repo_a_recovery')}",
@@ -529,6 +661,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--credentials-dir", default="")
     parser.add_argument("--allow-restic-download", action="store_true")
     parser.add_argument("--skip-runtime", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="WhatIf: inspect only, no USB/network/secret/runtime mutation")
     args = parser.parse_args(argv)
     try:
         report = run_backup(
@@ -538,6 +671,7 @@ def main(argv: list[str] | None = None) -> int:
             credentials_dir=Path(args.credentials_dir) if args.credentials_dir else None,
             allow_restic_download=args.allow_restic_download,
             skip_runtime=args.skip_runtime,
+            dry_run=args.dry_run,
         )
     except (UsbDestinationError, CapsuleError, ResticError, RuntimeError) as exc:
         print(f"SLICE_STATUS = FAIL\nERROR = {exc}", file=sys.stderr)
