@@ -125,16 +125,18 @@ def _owner_alive(pid: Any, started_at: Any) -> bool:
         current_start = None
     if current_start is None:
         # No such process (or unreadable) — treat unreadable-but-extant
-        # processes as alive only if the pid exists.
+        # processes as alive only if the pid exists. Never a raw sig-0 probe:
+        # on Windows os.kill is GenerateConsoleCtrlEvent and can Ctrl+C the
+        # owner's whole console group (bpo-14484).
         try:
-            os.kill(pid, 0)  # windows-footgun: ok — EPERM counts as alive below
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-        return True
+            from gateway.status import _pid_liveness
+
+            alive = _pid_liveness(pid)
+        except Exception:
+            alive = None
+        # Fail safe: only a proven-gone owner releases its row; an uncertain
+        # probe holds it (claiming it would risk a duplicate redelivery).
+        return alive is not False
     if started_at is None:
         return True
     try:

@@ -85,15 +85,17 @@ def _default_registry_path() -> Path:
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    # Never a raw sig-0 probe: on Windows os.kill is GenerateConsoleCtrlEvent
+    # and can Ctrl+C the compute host's whole console group (bpo-14484).
     try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
+        from gateway.status import _pid_liveness
+
+        alive = _pid_liveness(pid)
     except Exception:
-        return False
+        alive = None
+    # Fail safe: uncertain reads alive (keep the registry); reconcile still
+    # identity-checks the PID before signalling, so holding never hits a stranger.
+    return alive is not False
 
 
 def _pid_command(pid: int) -> str:

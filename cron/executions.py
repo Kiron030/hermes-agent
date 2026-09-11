@@ -73,8 +73,10 @@ def _process_start_time(pid: int) -> Optional[int]:
 
 def _owner_is_live(pid: int, started_at: Optional[int]) -> bool:
     try:
-        from gateway.status import _pid_exists
-        if not _pid_exists(pid):
+        from gateway.status import _pid_liveness
+        # Fail safe: only proven absence frees the record; an undeterminable
+        # probe (None) is treated as alive and the start-time check decides.
+        if _pid_liveness(pid) is False:
             return False
     except Exception:
         return True  # fail safe: inability to prove death must not rewrite state
