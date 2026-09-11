@@ -223,11 +223,9 @@ def read_powerunits_repo_b_allowlisted(
         return tool_error("GitHub fetch failed (see logs for error type).", error_code="github_error")
 
     provenance = github_read_provenance(
-        repo=repo,
         read_sha=ref,
         approved_ref=approved_ref,
         approved_ref_commit_time=approved_ref_commit_time,
-        token=token,
     )
     truncated = len(body) > lim
     out = body if not truncated else body[:lim] + "\n\n[... truncated to max_output_chars ...]\n"
