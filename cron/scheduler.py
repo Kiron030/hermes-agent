@@ -3747,8 +3747,14 @@ def run_one_job(job: dict, *, adapters=None, loop=None, verbose: bool = False) -
             return True  # not an error — already handled/removed
 
         # The attempt is claimed durably before executor/provider dispatch and
-        # becomes running only immediately before the actual run.
-        mark_execution_running(execution_id)
+        # becomes running only immediately before the actual run. Only the
+        # winner of the claimed->running compare-and-set may start side effects.
+        if mark_execution_running(execution_id) is None:
+            logger.warning(
+                "Cron job %s lost execution ownership before start; skipping",
+                job["id"],
+            )
+            return True
 
         # Run the job under the profile's secret scope. get_secret() fails
         # closed outside a scope once profile isolation is in play (multiple
