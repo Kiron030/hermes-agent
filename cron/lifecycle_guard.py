@@ -12,12 +12,18 @@ Ported from upstream release tag v2026.9.7 (MUSTPORT-5B). Fork-local deviations 
 * no heredoc-body masking (upstream ``tools.shell_heredoc``): its consumer allowlist includes
   ``python``/``osascript`` (which execute the body) and path-prefixed ``cat``, and a masked
   ``cat > file`` body can be executed later in the same text;
-* Branch A still matches a path-invoked CLI (``/usr/local/bin/hermes gateway restart``);
+* Branch A and the order-independent launchctl pass keep the pre-port LEFT-UNANCHORED form (no
+  lookbehind before ``hermes``/``launchctl``), and Branch A has no trailing boundary. A character
+  glued in front of ``hermes`` is not proof of an inert word — shell expansions vanish at runtime —
+  so inert look-alikes (``myhermes gateway restart``, ``.hermes …``, ``hermes gateway restarted``)
+  are blocked on purpose, as is a path-invoked CLI (``/usr/local/bin/hermes gateway restart``);
 * Branch D keeps no leading word boundary, so ``skill``/``fkill`` process killers still match;
 * no data-sink argument exemption: ``psql \\o |cmd``, ``ag --pager``, sqlite3 ``edit()`` and
   ``$(grep -o ...)`` turn "data" arguments into execution;
-* the cron ``script`` read does not skip binary-magic files: bash runs a ``MZ``/``\\x7fELF``-prefixed
-  text file and python runs a ``PK`` zipapp, so their content is still scanned.
+* the binary skip is scoped by reference position: only a native executable referenced where the
+  executing program refuses to run it as a script (a direct-exec path, a ``bash X`` operand) is
+  skipped. ``sh``/``dash``/``ksh``/``zsh``/``ash``/``busybox sh X``, ``.``/``source X`` and the cron
+  ``script`` read never skip: those run a magic-prefixed or NUL-bearing file as text.
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ import os
 import re
 import shlex
 import stat
+from itertools import chain, islice
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
@@ -43,36 +50,20 @@ class GatewayLifecycleBlocked(ValueError):
 _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
     # Branch A: destructive `hermes gateway` ops. `start` is excluded: starting from inside a
-    # gateway is benign and a job may legitimately start a sibling profile. The lookbehind keeps
-    # `hermes` from being a *lexical* word tail (`myhermes`, `.hermes`, `x-hermes`, `restarted`)
-    # while every real command position (text start, whitespace, `;`/`&`/`|`, `$(`, backtick,
-    # U+FFFD) still matches. See #77173.
-    # A word character before `hermes` is NOT proof of an inert word tail: bash *expansions* can
-    # produce a word char that then vanishes at runtime. `$1hermes gateway restart` runs
-    # `hermes gateway restart` because `$1`..`$9` (single-digit positional parameters) expand to
-    # nothing under `bash -c`/cron, leaving a bare `hermes`. The digit sits between `$` and
-    # `hermes`, so the `(?<![\w.\-])` alternative alone would (wrongly) treat it as a word tail and
-    # ALLOW it — a regression against the pre-port guard, which blocked it as a substring. The
-    # second `(?<=\$\d)` alternative restores that block for every `$0`..`$9` form (MUSTPORT-5B r1).
-    # Other special parameters glued to `hermes` are handled by the first alternative or are
-    # genuinely inert; see the special-parameter table below.
-    #   BLOCK (expansion yields a bare `hermes`):
-    #     `${x}hermes` (`}`), `$@hermes` (`@`), `$*hermes` (`*`), `$!hermes` (`!`, empty when no bg
-    #     job) — all preceded by a non-`[\w.\-]` char, so `(?<![\w.\-])` already matches them.
-    #   OVER-BLOCK, fail-closed (expansion yields `<something>hermes`, i.e. NOT the CLI, but the
-    #   preceding char is non-word so the first alternative matches anyway — harmless):
-    #     `$#hermes` (arg count), `$?hermes` (exit status), `$$hermes` (pid).
-    #   ALLOW (bash reads a longer word, so it is never the `hermes` CLI):
-    #     `$_hermes` — `_hermes` is a valid identifier, so `$_hermes` expands the variable
-    #       *named* `_hermes` (unset -> empty), never `$_` + `hermes`; the `_` word-char tail is
-    #       correctly inert.
-    #     `$-hermes` — `$-` (shell option flags) is never empty under `bash -c`, so this expands to
-    #       `<flags>hermes`, a different command; the `-` tail is correctly inert.
-    # Fork deviation: upstream also excludes a preceding `/`. That allows a path-invoked CLI
-    # (`/usr/local/bin/hermes gateway restart`, `./venv/bin/hermes gateway stop`), which is a real
-    # command, so `/` stays a matching position here (a path such as
-    # `/docs/hermes gateway restart-notes.md` keeps blocking, as it did before the port).
-    r"(?:(?:(?<![\w.\-])|(?<=\$\d))hermes\s+gateway\s+(?:restart|stop|uninstall)\b)"
+    # gateway is benign and a job may legitimately start a sibling profile.
+    # Fork deviation: the pre-port LEFT-UNANCHORED form — no lookbehind of any kind before `hermes`.
+    # Upstream's command-position lookbehind (#77173) treats the character before `hermes` as proof
+    # of an inert word tail, but a shell expansion can put a character there that vanishes at
+    # runtime: `$1hermes` and `zsh -c '$10hermes'` (empty positional parameters), `$-hermes` (`$-` is
+    # EMPTY under dash `-c` and dash/busybox script files), `$\<NL>1hermes` (the shell deletes the
+    # continuation), `$_hermes` / `$MYHERMES` (a variable holding `hermes`). Every lookbehind patch
+    # left another such form open (MUSTPORT-5B r1-r3), so there is no left anchor at all.
+    # Accepted over-blocking: inert look-alikes (`myhermes gateway restart`, `.hermes …`,
+    # `x-hermes …`), a path-invoked CLI (`/usr/local/bin/hermes gateway restart`, which is real) and
+    # a path such as `/docs/hermes gateway restart-notes.md` all block, as they did before the port.
+    # No trailing boundary either: upstream's `\b` (#92372) allows `hermes gateway restarted`, which
+    # the pre-port guard blocked. `uninstall` is an upstream addition.
+    r"(?:hermes\s+gateway\s+(?:restart|stop|uninstall))"
     # Branch B: launchctl ops anchored on a hermes-gateway label so unrelated hermes services stay
     # unblocked. `submit`/`bootstrap` register a NEW keepalive job wrapping an arbitrary helper (a
     # laundered restart); neutral-label submissions are caught by
@@ -100,15 +91,13 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"|(?:p?kill\b[^\n]*\bgateway\b[^\n]*\bhermes)"
 )
 
-# Every branch uses `[^\n]*` between verb and label so matches cannot span unrelated lines. A POSIX
-# backslash-newline continuation is therefore collapsed to a space before matching (as the shell
-# does) rather than loosening `[^\n]*`.
-# Every branch above uses `[^\n]*` between its verb and the gateway identifier so the match can't span
-# unrelated lines of a longer cron prompt/script, but that also means a real multi-line shell invocation
-# split across continuation lines (e.g. `launchctl submit \` / `  -l ai.hermes.gateway-... \` / `  -- ...`,
-# the exact reported shape in #62891) would otherwise slip past. Collapse continuations to a single space
-# before matching, mirroring what the shell itself does, rather than loosening `[^\n]*` and risking false
-# positives across genuinely separate lines.
+# Every branch uses `[^\n]*` between its verb and the gateway identifier so a match cannot span
+# unrelated lines of a longer cron prompt/script, but a real multi-line invocation split across
+# backslash-newline continuations (`launchctl submit \` / `  -l ai.hermes.gateway-... \`, the exact
+# reported shape in #62891) must still match. Continuations are therefore normalized before matching
+# rather than loosening `[^\n]*`. This is the legacy space-substituted view (it also covers `\` +
+# CRLF); `contains_gateway_lifecycle_command` additionally scans the view with continuations DELETED,
+# which is what the shell does.
 _SHELL_LINE_CONTINUATION = re.compile(r"\\\r?\n[ \t]*")
 
 # Python argv-list punctuation (`subprocess.run(["launchctl", "bootout", ...])`) separates exec'd
@@ -142,17 +131,20 @@ _PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
 # stays correct, but the check is "verb anywhere AND label anywhere".
 # No profile identity available: cannot prove self-targeting, so do not block — sibling restarts must stay
 # allowed (#78028).
-# `(?:\b|(?<=\$\d))launchctl` mirrors Branch A's positional-parameter fix: `\b` still requires a
-# word boundary in the ordinary case (so `mylaunchctl` stays out), and the `(?<=\$\d)` alternative
-# also matches `$1launchctl` etc., whose `$0`..`$9` prefix expands to nothing and leaves a bare
-# `launchctl` at runtime (MUSTPORT-5B r1). Same-span shapes are already caught by Branch B (which
-# has no left anchor); this closes the order-independent split-label pass for the same input.
+# Left-unanchored like Branch A and Branch B: no `\b` or lookbehind before `launchctl`, so an
+# expansion glued in front (`$1launchctl`, `$_launchctl`, `zsh -c '$10launchctl …'`) cannot hide the
+# verb (MUSTPORT-5B r3). Accepted over-blocking: a `mylaunchctl stop …` next to a gateway label.
 _LAUNCHCTL_LIFECYCLE_VERBS_RE = re.compile(
-    r"(?i)(?:\b|(?<=\$\d))launchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
+    r"(?i)launchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
 )
 _HERMES_GATEWAY_LABEL_RE = re.compile(r"(?i)\bhermes[.\-]?gateway\b")
 
-_SHELL_EXECUTABLES = frozenset({"sh", "bash", "dash", "ksh", "zsh"})
+_SHELL_EXECUTABLES = frozenset({"sh", "bash", "dash", "ksh", "zsh", "ash"})
+# Shells that refuse a binary file given as their script operand (bash `check_binary_file`: a NUL in
+# the first line). dash/ksh/zsh/ash strip NULs or run straight through them.
+_BINARY_REFUSING_SHELLS = frozenset({"bash"})
+# `busybox <applet> X`: every busybox shell applet (its `bash` is an ash/hush alias) runs X as text.
+_BUSYBOX_SHELL_APPLETS = frozenset({"sh", "ash", "hush", "bash"})
 _SHELL_OPTIONS_WITH_VALUES = frozenset({"-O", "+O", "-o", "+o"})
 _SHELL_COMMAND_FLAGS = {"-c", "--command"}
 _MAX_REFERENCED_SCRIPT_BYTES = 1024 * 1024
@@ -164,8 +156,31 @@ _CONTROL_CHARS = frozenset(";&|()")
 # Drive, ...).
 _CLOUD_PLACEHOLDER_MARKERS = frozenset({"Mobile Documents", "CloudStorage"})
 
-# Bytes sniffed before reading a referenced file in full (see _BINARY_MAGICS).
-_BINARY_SNIFF_BYTES = 4096
+# Header bytes read to classify a referenced file BEFORE its size is checked (see
+# _is_native_executable_header); must cover _BINARY_FIRST_LINE_BYTES.
+_BINARY_SNIFF_BYTES = 256
+
+# bash's check_binary_file() inspects this many leading bytes for a NUL in the first line.
+_BINARY_FIRST_LINE_BYTES = 80
+
+_NATIVE_EXECUTABLE_MAGICS = (
+    b"\x7fELF",              # ELF — Linux/BSD executables and shared objects
+    b"MZ",                   # PE/COFF — Windows .exe/.dll
+    b"\xfe\xed\xfa\xce",     # Mach-O 32-bit
+    b"\xfe\xed\xfa\xcf",     # Mach-O 64-bit
+    b"\xce\xfa\xed\xfe",     # Mach-O 32-bit, byte-swapped
+    b"\xcf\xfa\xed\xfe",     # Mach-O 64-bit, byte-swapped
+    b"\xca\xfe\xba\xbe",     # Mach-O universal ("fat") binary
+    b"\xca\xfe\xba\xbf",     # Mach-O universal 64-bit
+)
+
+# Ancestors `_unfollowable_link` inspects: one failed open must not turn a pathological path token
+# into thousands of lstat() calls.
+_MAX_LINK_ANCESTORS = 64
+
+# Windows `st_reparse_tag` bit marking a name-surrogate reparse point (symlink, junction). An app
+# execution alias (WindowsApps\python.exe) is not one and stays nothing-to-scan.
+_REPARSE_TAG_NAME_SURROGATE = 0x20000000
 
 _ReadRemoteScriptFn = Callable[[str], Optional[str]]
 
@@ -216,19 +231,6 @@ _ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 # Bound the walk: a pathological token run must not spin here.
 _MAX_PREFIX_PEELS = 8
-
-_BINARY_MAGICS = (
-    b"\x7fELF",              # ELF — Linux/BSD executables and shared objects
-    b"\xfe\xed\xfa\xce",     # Mach-O 32-bit
-    b"\xfe\xed\xfa\xcf",     # Mach-O 64-bit
-    b"\xce\xfa\xed\xfe",     # Mach-O 32-bit, byte-swapped
-    b"\xcf\xfa\xed\xfe",     # Mach-O 64-bit, byte-swapped
-    b"\xca\xfe\xba\xbe",     # Mach-O universal ("fat") binary
-    b"MZ",                   # PE/COFF — Windows .exe/.dll
-    b"!<arch>",              # static archive (.a)
-    b"\x1f\x8b",             # gzip
-    b"PK\x03\x04",           # zip (also .jar/.whl/.egg)
-)
 
 
 # --- profile identity -------------------------------------------------------------------------
@@ -283,6 +285,11 @@ def contains_gateway_lifecycle_command(text: str) -> bool:
     ``_contains_unsafe_gateway_action`` calls at every recursion level, so referenced-script and ``sh -c``
     payload scanning inherit the fix automatically.
 
+    Every pass runs over two views of backslash-newline continuations and blocks if EITHER matches
+    (MUSTPORT-5B r3, M1): continuations DELETED, as the shell does (``$\\<NL>1hermes`` runs as
+    ``$1hermes``, ``her\\<NL>mes`` as ``hermes``), and the pre-r3 space-substituted view, kept so no
+    form it blocked becomes allowed.
+
     Not budgeted: callers holding untrusted, possibly huge text gate on
     ``lifecycle_scan_root_within_budget`` first (the tokenizer passes are quadratic on a giant token).
     """
@@ -290,39 +297,46 @@ def contains_gateway_lifecycle_command(text: str) -> bool:
         return False
     # Fork deviation: upstream masks "inert" heredoc bodies here (#88336). Not ported — see the
     # module docstring — so heredoc bodies are scanned like any other text.
-    normalized = _SHELL_LINE_CONTINUATION.sub(" ", text)
-    if _GATEWAY_LIFECYCLE_PATTERN.search(normalized):
+    joined = text.replace("\\\n", "")
+    spaced = _SHELL_LINE_CONTINUATION.sub(" ", text)
+    views = (joined,) if spaced == joined else (joined, spaced)
+    if any(_GATEWAY_LIFECYCLE_PATTERN.search(view) for view in views):
         return True
     # Profile-flag form: blocked only when the named profile IS the one running the guard.
     # Profile-flag form (#78028): `hermes -p <profile> gateway restart|stop` bypasses Branch A because the
     # selector sits between `hermes` and `gateway`. It is only the same foot-gun when the named profile IS
     # the profile running the guard — sibling-profile restarts are legitimate fleet operations and stay
     # allowed.
-    profile_match = _PROFILE_FLAG_LIFECYCLE_PATTERN.search(normalized)
-    if profile_match:
-        named = profile_match.group(1) or profile_match.group(2)
-        # Profile ids cannot contain quotes (`^[a-z0-9][a-z0-9_-]{0,63}$`), so a shell-quoted
-        # `-p 'zeus'` compares equal to the bare name.
-        if named and _named_profile_is_current(named.strip().strip("\"'")):
-            return True
+    for view in views:
+        profile_match = _PROFILE_FLAG_LIFECYCLE_PATTERN.search(view)
+        if profile_match:
+            named = profile_match.group(1) or profile_match.group(2)
+            # Profile ids cannot contain quotes (`^[a-z0-9][a-z0-9_-]{0,63}$`), so a shell-quoted
+            # `-p 'zeus'` compares equal to the bare name.
+            if named and _named_profile_is_current(named.strip().strip("\"'")):
+                return True
     # Token-aware pass. Tokens are also re-joined with Python argv-list punctuation stripped, since
     # `subprocess.run(["launchctl", "bootout", ...])` separates argv words with commas/brackets.
     # Token-aware second pass (#80269): re-run the pattern on shell-tokenized segments where quotes/escapes
     # are resolved, closing splice bypasses like `kick"start"`. Runs after the profile-flag check so both
     # passes apply independently.
-    for segment in _iter_command_segments(normalized):
-        joined = " ".join(segment)
-        if joined and _GATEWAY_LIFECYCLE_PATTERN.search(joined):
-            return True
-        stripped = _ARGV_LIST_PUNCTUATION.sub(" ", joined)
-        if stripped != joined and _GATEWAY_LIFECYCLE_PATTERN.search(stripped):
-            return True
+    # `_iter_command_segments` deletes continuations itself, so it gets the RAW text (deleted exactly
+    # once, never an already-normalized view — M1) plus, when it differs, the spaced view (which has no
+    # continuation left to delete).
+    for source in ((text,) if spaced == joined else (text, spaced)):
+        for segment in _iter_command_segments(source):
+            joined_segment = " ".join(segment)
+            if joined_segment and _GATEWAY_LIFECYCLE_PATTERN.search(joined_segment):
+                return True
+            stripped = _ARGV_LIST_PUNCTUATION.sub(" ", joined_segment)
+            if stripped != joined_segment and _GATEWAY_LIFECYCLE_PATTERN.search(stripped):
+                return True
     # The label may be built in an earlier `;`-segment, so no pass above sees verb + label together.
     # Order-independent launchctl pass (#77083): a shell loop can build the gateway label from a variable
     # defined in an earlier `;`-separated segment (`label=${item%%:*}; launchctl bootout
     # "gui/$uid/$label"`), so neither the same-span regex nor same-segment tokenization sees verb and label
     # together. Check "verb anywhere AND label anywhere" instead.
-    return _contains_launchctl_gateway_lifecycle(normalized)
+    return any(_contains_launchctl_gateway_lifecycle(view) for view in views)
 
 
 # Whole-walk work limits. The per-file cap and depth bound above limit one read, not the walk: a
@@ -472,7 +486,8 @@ def _split_segments(tokens: list[str], *, keep_controls: bool = False) -> Iterat
 
 def _iter_command_segments(command: str) -> Iterator[list[str]]:
     """Yield shell-tokenized command segments per logical line; a line shlex rejects (unbalanced
-    quotes) falls back to per-physical-line tokenization."""
+    quotes) falls back to per-physical-line tokenization. Backslash-newline continuations are
+    deleted here, once — callers pass raw text."""
     for line in _split_logical_lines(command.replace("\\\n", "")):
         try:
             tokens = _shlex_tokens(line)
@@ -537,6 +552,15 @@ def _executed_command_index(segment: list[str]) -> Optional[int]:
     return index if index < len(segment) else None
 
 
+def _is_busybox_shell(segment: list[str], index: int) -> bool:
+    """True for ``busybox <shell applet> ...`` at *index*."""
+    return (
+        _executable_name(segment[index]) == "busybox"
+        and index + 1 < len(segment)
+        and segment[index + 1] in _BUSYBOX_SHELL_APPLETS
+    )
+
+
 def contains_launchctl_submit_command(command: str) -> bool:
     """Detect an executed ``launchctl submit``/``bootstrap``, not quoted text.
 
@@ -574,7 +598,8 @@ def _resolve_lenient(path: Path) -> Path:
     referenced-script walk (the top-level guard then falls back to the direct scan only, so a
     sibling `hermes gateway restart` script in the same command slips through). Falling back to the
     unresolved *path* keeps the walk going; the subsequent ``os.open`` on the cyclic path fails
-    closed with ELOOP in ``_read_referenced_script``. See F4 (MUSTPORT-5B r1)."""
+    closed in ``_read_referenced_script`` (ELOOP on POSIX; on Windows, where the open reports a plain
+    ENOENT, via ``_unfollowable_link``). See F4 (MUSTPORT-5B r1), M7 (r3)."""
     try:
         return path.resolve(strict=False)
     except (OSError, ValueError, RuntimeError):
@@ -674,8 +699,44 @@ def _iter_option_values(segment: list[str], start: int, option: str) -> Iterator
             yield token[len(prefix):]
 
 
-def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterator[Path]:
-    """Yield the scripts the token at *index* executes, if any."""
+def _shell_operand_references(
+    arguments: list[str], cwd: Optional[str], *, skip_binary: bool
+) -> Iterator[tuple[Path, bool]]:
+    """Yield the script operand of a shell invocation; *arguments* follow the shell name."""
+    arg_index = 0
+    while arg_index < len(arguments):
+        argument = arguments[arg_index]
+        if argument == "--":
+            arg_index += 1
+            break
+        if argument in _SHELL_COMMAND_FLAGS:
+            break
+        if argument in _SHELL_OPTIONS_WITH_VALUES:
+            arg_index += 2
+            continue
+        # `+x` style options unset a flag; they are never the script operand.
+        if argument.startswith(("-", "+")):
+            arg_index += 1
+            continue
+        break
+    if arg_index < len(arguments) and arguments[arg_index] not in _SHELL_COMMAND_FLAGS:
+        for path in _resolved_or_nothing(arguments[arg_index], cwd):
+            yield path, skip_binary
+
+
+def _references_at(
+    segment: list[str], index: int, cwd: Optional[str]
+) -> Iterator[tuple[Path, bool]]:
+    """Yield ``(script, skip_binary)`` for each script the token at *index* executes.
+
+    *skip_binary* records the reference position (MUSTPORT-5B r3, M6). True only where the program
+    running the file refuses a native executable as a script: a direct-exec path (the kernel loads a
+    real binary; bash — which runs terminal commands and cron ``.sh`` jobs — refuses a NUL-first-line
+    file on the ENOEXEC fallback) and a ``bash X`` operand. False for ``.``/``source X`` and
+    ``sh|dash|ksh|zsh|ash|busybox sh X``, which read the file as text whatever its header.
+    Residual: a direct exec whose ENOEXEC fallback is ``/bin/sh`` (a dash parent, or a wrapper's
+    ``execvp``) runs a crafted native-header text file; the pre-port guard read no referenced file at
+    all, so this never widens it."""
     if index >= len(segment):
         return
     executable = segment[index]
@@ -683,40 +744,33 @@ def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterat
 
     if executable_name in {".", "source"}:
         if len(segment) > index + 1:
-            yield from _resolved_or_nothing(segment[index + 1], cwd)
+            for path in _resolved_or_nothing(segment[index + 1], cwd):
+                yield path, False
         return
 
     if executable_name in _SHELL_EXECUTABLES:
-        arguments = segment[index + 1 :]
-        arg_index = 0
-        while arg_index < len(arguments):
-            argument = arguments[arg_index]
-            if argument == "--":
-                arg_index += 1
-                break
-            if argument in _SHELL_COMMAND_FLAGS:
-                break
-            if argument in _SHELL_OPTIONS_WITH_VALUES:
-                arg_index += 2
-                continue
-            if argument.startswith("-"):
-                arg_index += 1
-                continue
-            break
-        if arg_index < len(arguments) and arguments[arg_index] not in _SHELL_COMMAND_FLAGS:
-            yield from _resolved_or_nothing(arguments[arg_index], cwd)
-        return
+        yield from _shell_operand_references(
+            segment[index + 1 :], cwd, skip_binary=executable_name in _BINARY_REFUSING_SHELLS
+        )
+    elif _is_busybox_shell(segment, index):
+        yield from _shell_operand_references(segment[index + 2 :], cwd, skip_binary=False)
 
+    # The executable itself when invoked by path — a local `./bash x.sh` or `./ash x.sh` is a script
+    # too; a real `/bin/sh` is a native executable and skipped from its header.
     # A bare "/" is pathlib's division operator in Python sources, not an executable; resolving it
     # hits the filesystem root and fails the regular-file check, hard-blocking innocent .py scripts.
     if executable.strip("/") and ("/" in executable or executable.endswith((".sh", ".bash", ".zsh"))):
-        yield from _resolved_or_nothing(executable, cwd)
+        for path in _resolved_or_nothing(executable, cwd):
+            yield path, True
 
 
-def _iter_referenced_shell_scripts(command: str, *, cwd: Optional[str] = None) -> Iterator[Path]:
-    """Yield scripts executed directly or through a POSIX shell. Each segment is read at the
-    original token AND at the peeled wrapper target — additive on purpose: peeling must never REMOVE
-    a reference (a local ``./timeout`` is a script, not the coreutils wrapper)."""
+def _iter_referenced_shell_scripts(
+    command: str, *, cwd: Optional[str] = None
+) -> Iterator[tuple[Path, bool]]:
+    """Yield ``(script, skip_binary)`` for scripts executed directly or through a POSIX shell (see
+    ``_references_at``). Each segment is read at the original token AND at the peeled wrapper target
+    — additive on purpose: peeling must never REMOVE a reference (a local ``./timeout`` is a script,
+    not the coreutils wrapper)."""
     for segment in _iter_command_segments(command):
         index = _command_token_index(segment)
         if index is None:
@@ -728,8 +782,8 @@ def _iter_referenced_shell_scripts(command: str, *, cwd: Optional[str] = None) -
 
 
 def _iter_shell_command_payloads(command: str) -> Iterator[str]:
-    """Yield code passed through ``sh|bash|... -c`` (and ``su -c`` / ``env -S``) for recursive
-    scanning."""
+    """Yield code passed through ``sh|bash|... -c`` (also ``busybox sh -c``, ``su -c``,
+    ``env -S``) for recursive scanning."""
     for segment in _iter_command_segments(command):
         index = _command_token_index(segment)
         if index is None:
@@ -738,7 +792,11 @@ def _iter_shell_command_payloads(command: str) -> Iterator[str]:
         for option in _STRING_COMMAND_OPTIONS.get(_executable_name(segment[index]), ()):
             yield from _iter_option_values(segment, index, option)
         index = _executed_command_index(segment)
-        if index is None or _executable_name(segment[index]) not in _SHELL_EXECUTABLES:
+        if index is None:
+            continue
+        if _is_busybox_shell(segment, index):
+            index += 1
+        elif _executable_name(segment[index]) not in _SHELL_EXECUTABLES:
             continue
         arguments = segment[index + 1 :]
         for arg_index, argument in enumerate(arguments[:-1]):
@@ -754,20 +812,72 @@ def _iter_shell_command_payloads(command: str) -> Iterator[str]:
 # rule — a refusal stays a refusal; only the message differs.
 _BLOCK_REASON_COMMAND = "lifecycle-command"   # a lifecycle/submit command was detected
 _BLOCK_REASON_BUDGET = "scan-budget"          # scan budget exhausted / referenced file oversized
-_BLOCK_REASON_DEVICE = "device-or-fifo"       # referenced path is a device/FIFO/socket/cyclic link
+_BLOCK_REASON_DEVICE = "device-or-fifo"       # device/FIFO/socket, or a cyclic/dangling symlink
 _BLOCK_REASON_CLOUD = "cloud-path"            # referenced path is a cloud-synced FileProvider path
 
 
 # --- referenced-script reading ----------------------------------------------------------------
 
-def _has_binary_magic(data: bytes) -> bool:
-    """True when *data* starts with a known compiled-binary signature. Deliberately narrower than
-    "contains a NUL": ``bash`` still executes a NUL-bearing script, so a padded script must not
-    bypass the scan. A shebang always wins (interpreted, never binary). Extensions are not
-    consulted: a suffixless script must still be scanned and fail closed if oversized."""
-    if data.startswith(b"#!"):
+def _is_native_executable_header(header: bytes) -> bool:
+    """True when *header* (a file's leading bytes) is a compiled executable: a native magic (ELF /
+    PE / Mach-O) AND a NUL before the first newline within the first ``_BINARY_FIRST_LINE_BYTES``.
+    Every real ELF, PE and Mach-O header satisfies both.
+
+    Requiring both keeps the skip inside what bash itself refuses as "cannot execute binary file"
+    (``check_binary_file``: a NUL in the first line, in every version including macOS /bin/bash
+    3.2). A bare magic followed by a newline (``MZ\\nhermes gateway restart``) is text bash runs, so
+    it is scanned (F3); a NUL-first-line file without a native magic is scanned too (accepted
+    over-blocking). A shebang file never starts with a magic. Only consulted for skip-eligible
+    reference positions — see ``_references_at``."""
+    if not header.startswith(_NATIVE_EXECUTABLE_MAGICS):
         return False
-    return data.startswith(_BINARY_MAGICS)
+    return b"\x00" in header[:_BINARY_FIRST_LINE_BYTES].split(b"\n", 1)[0]
+
+
+def _is_link_metadata(metadata: os.stat_result) -> bool:
+    """A POSIX symlink, or a Windows name-surrogate reparse point (symlink / junction)."""
+    reparse_tag = getattr(metadata, "st_reparse_tag", 0) or 0
+    return stat.S_ISLNK(metadata.st_mode) or bool(reparse_tag & _REPARSE_TAG_NAME_SURROGATE)
+
+
+def _unfollowable_link(path: Path) -> bool:
+    """True when *path* — whose open just failed — is, or sits under, a link the guard cannot follow.
+
+    Windows 11 reports a symlink loop as a plain ENOENT from ``os.open`` and ``os.stat`` (no ELOOP,
+    no RuntimeError, no loop-specific winerror) while ``os.lstat`` still succeeds, so this keys on
+    the link itself rather than on an error code (M7, MUSTPORT-5B r3):
+
+    * *path* is a link → fail closed (cyclic, dangling, or an unopenable target), except a link that
+      resolves to a directory (not a script, #86753 parity);
+    * an ancestor is a link ``os.stat`` cannot follow (cyclic or dangling) → fail closed.
+
+    A plain missing path with no such link stays nothing-to-scan. Refusing a dangling link is
+    accepted over-blocking."""
+    candidates = chain((path,), islice(path.parents, _MAX_LINK_ANCESTORS))
+    for position, candidate in enumerate(candidates):
+        try:
+            if not _is_link_metadata(os.lstat(candidate)):
+                continue
+        except (OSError, ValueError):
+            continue
+        try:
+            target = os.stat(candidate)
+        except (OSError, ValueError):
+            return True
+        if position == 0 and not stat.S_ISDIR(target.st_mode):
+            return True
+    return False
+
+
+def _read_at_most(descriptor: int, data: bytes, size: int) -> bytes:
+    """Extend *data* from *descriptor* until it holds *size* bytes or EOF (os.read may return
+    short)."""
+    while len(data) < size:
+        chunk = os.read(descriptor, size - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
 
 
 def _read_referenced_script(
@@ -782,15 +892,19 @@ def _read_referenced_script(
     FileProvider path is never opened — not even to check hydration — because an evicted
     placeholder's ``open()`` can hang preflight. Lexical check: direct paths; resolved: symlinks.
     ``max_bytes`` lowers the per-file cap to what the calling walk can still afford.
-    ``skip_binary=False`` (fork-local, cron ``script`` reads AND the referenced-script walk) scans
-    binary-magic files instead of treating them as nothing-to-scan.
+    ``skip_binary=True`` (direct-exec and ``bash X`` references) returns nothing-to-scan for a native
+    executable (``_is_native_executable_header``), classified from a small header BEFORE the size
+    check so a multi-MiB interpreter never fails closed (M6). ``skip_binary=False`` (``sh X``,
+    ``. X``, cron ``script`` reads) skips nothing: NULs are stripped and the text is scanned.
 
     See #88052.
     """
     byte_limit = _capped_read_limit(max_bytes)
     if _on_cloud_path(path):
         return None, True, _BLOCK_REASON_CLOUD
-    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
+    # O_BINARY: in Windows' CRT text mode a read stops at the first 0x1A (Ctrl-Z), hiding the rest of
+    # the file from the scan (M5, MUSTPORT-5B r3); the pre-port guard used read_bytes().
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
         descriptor = os.open(path, flags)
     except ValueError:
@@ -798,11 +912,11 @@ def _read_referenced_script(
         # the recursion (#77703). Nothing to scan; never crash the guard.
         return None, False, None
     except OSError as exc:
-        # A cyclic symlink (ELOOP) is not "missing": the path exists but cannot be opened safely, so
-        # fail closed rather than treating it as nothing to scan. On Python <= 3.12 the loop already
-        # raised RuntimeError in `_resolve_lenient` (caught there so the walk survives); here the
-        # unresolved cyclic path fails closed. See F4 (MUSTPORT-5B r1).
-        if getattr(exc, "errno", None) == errno.ELOOP:
+        # A cyclic or dangling symlink is not "missing": fail closed rather than treating it as
+        # nothing to scan. On Python <= 3.12 a loop already raised RuntimeError in `_resolve_lenient`
+        # (caught there so the walk survives); here the open fails with ELOOP on POSIX, and with a
+        # plain ENOENT on Windows, where only the link probe tells it apart. See F4 (r1), M7 (r3).
+        if exc.errno == errno.ELOOP or _unfollowable_link(path):
             return None, True, _BLOCK_REASON_DEVICE
         # Otherwise unreadable/missing/over-long — nothing to scan.
         return None, False, None
@@ -817,34 +931,27 @@ def _read_referenced_script(
             if stat.S_ISDIR(metadata.st_mode):
                 return None, False, None
             return None, True, _BLOCK_REASON_DEVICE
-        # Sniff a small prefix first: compiled binaries are never shell scripts, so skip them
-        # WITHOUT reading the rest or feeding decoded garbage into the recursion.
-        # Deliberately NOT keyed on the mere presence of a NUL byte (#77927): bash executes a text script
-        # straight past an embedded NUL, so NUL-bearing text must fall through to the magic-number check +
-        # NUL-strip below.
-        data = os.read(descriptor, _BINARY_SNIFF_BYTES)
-        if skip_binary and _has_binary_magic(data):
+        # Classify from a small header first: a native executable in a skip-eligible position is
+        # skipped WITHOUT reading the rest and BEFORE the size check (a real interpreter is MiBs and
+        # must not fail closed, M6), and without feeding decoded machine code into the recursion.
+        data = _read_at_most(descriptor, b"", _BINARY_SNIFF_BYTES)
+        if skip_binary and _is_native_executable_header(data):
             return None, False, None
         # A regular file whose size already exceeds the cap fails closed without reading it (the
         # walk budget can be far below 1 MiB).
         if metadata.st_size > byte_limit:
             return None, True, _BLOCK_REASON_BUDGET
-        # Read the remainder (bounded); loop because os.read may return short.
-        while len(data) <= byte_limit:
-            chunk = os.read(descriptor, byte_limit + 1 - len(data))
-            if not chunk:
-                break
-            data += chunk
+        data = _read_at_most(descriptor, data, byte_limit + 1)
     except OSError:
         return None, False, None
     finally:
         os.close(descriptor)
-    if skip_binary and _has_binary_magic(data):
-        return None, False, None
     # Size check BEFORE NUL stripping: stripping shrinks the buffer and would let an oversized file
     # slip under the threshold past this fail-closed branch.
     if len(data) > byte_limit:
         return None, True, _BLOCK_REASON_BUDGET
+    # Deliberately NOT a binary signal (#77927): bash runs a text script straight past an embedded
+    # NUL and dash strips them, so NUL-bearing text is stripped and scanned.
     if b"\x00" in data:
         data = data.replace(b"\x00", b"")
     return data.decode("utf-8", errors="replace"), False, None
@@ -876,8 +983,9 @@ def _sanitize_remote_script_text(
 def _read_script_for_scanning(script_path: str) -> str:
     """Read a cron script with the bounded scanner. Non-regular/oversized inputs fail closed via a
     lifecycle-shaped sentinel; missing/unreadable paths stay empty so scheduler validation reports
-    them. Binary-magic files are scanned too (fork deviation): the scheduler hands any script to
-    bash or python, both of which execute text behind such a prefix."""
+    them. Nothing is skipped as binary (fork deviation): the scheduler hands any script to bash or
+    python, dash/busybox run a native-header text file, and the pre-port guard decoded every cron
+    script in full."""
     resolved = _resolve_script_path(script_path)
     if resolved is None:
         return ""
@@ -890,13 +998,15 @@ def _read_script_for_scanning(script_path: str) -> str:
 # --- recursive walk ---------------------------------------------------------------------------
 
 def _contains_unsafe_gateway_action(
-    command: str, *, cwd: Optional[str], depth: int, visited: set[Path], budget: _LifecycleScanBudget,
+    command: str, *, cwd: Optional[str], depth: int, visited: dict[Path, set[bool]],
+    budget: _LifecycleScanBudget,
     read_remote_script: Optional[_ReadRemoteScriptFn] = None,
     reason_out: Optional[list[str]] = None,
 ) -> bool:
     # *reason_out*, when supplied, receives the FIRST block reason (a ``_BLOCK_REASON_*`` code) so a
     # caller can render an accurate refusal. It is threaded through the recursion so a reason set at
     # any depth propagates to the root. See F2 (MUSTPORT-5B r1).
+    # *visited* maps each resolved referenced path to the ``skip_binary`` positions already read.
     def _block(reason: str) -> bool:
         if reason_out is not None and not reason_out:
             reason_out.append(reason)
@@ -921,23 +1031,30 @@ def _contains_unsafe_gateway_action(
         if recurse(payload, cwd):
             return True
 
-    for script_path in _iter_referenced_shell_scripts(command, cwd=cwd):
+    for script_path, skip_binary in _iter_referenced_shell_scripts(command, cwd=cwd):
         # Do not touch a FileProvider path even to discover whether the file is hydrated.
         if _on_cloud_path(script_path):
             return _block(_BLOCK_REASON_CLOUD)
         resolved = _resolve_lenient(script_path)
-        if resolved in visited:
+        seen_positions = visited.get(resolved)
+        if seen_positions is None:
+            if not budget.charge_path():
+                _budget_exhausted("paths", depth)
+                return _block(_BLOCK_REASON_BUDGET)
+            seen_positions = visited[resolved] = set()
+        elif False in seen_positions or skip_binary in seen_positions:
             continue
-        if not budget.charge_path():
-            _budget_exhausted("paths", depth)
-            return _block(_BLOCK_REASON_BUDGET)
-        visited.add(resolved)
+        # Otherwise every earlier read was skip-eligible (direct exec / `bash X`) and may have
+        # skipped the file as a native executable, which does not cover this `sh X` / `. X`
+        # reference: read it again. At most one re-read per unique path, so the path budget is
+        # charged once.
+        seen_positions.add(skip_binary)
         # Never read more than the walk can still afford to tokenize; a file larger than the
-        # remainder fails closed exactly like an oversized one. skip_binary=False mirrors the cron
-        # `script` read (F3): the shell runs a binary-magic-prefixed text file (`bash ./x.sh` whose
-        # bytes start `MZ`/`\x7fELF` then `hermes gateway restart`), so its content must be scanned.
+        # remainder fails closed exactly like an oversized one. The skip is scoped by position (M6):
+        # a real executable run by path (`/usr/bin/python3 -c ...`) is not read, while `sh ./x`,
+        # `. ./x` and every non-native-header file are scanned (F3).
         script_text, unsafe, reason = _read_referenced_script(
-            script_path, max_bytes=budget.bytes_remaining, skip_binary=False
+            script_path, max_bytes=budget.bytes_remaining, skip_binary=skip_binary
         )
         if unsafe:
             return _block(reason or _BLOCK_REASON_COMMAND)
@@ -994,7 +1111,7 @@ def gateway_lifecycle_block_reason(
     reasons: list[str] = []
     try:
         blocked = _contains_unsafe_gateway_action(
-            command, cwd=cwd, depth=0, visited=set(), budget=_LifecycleScanBudget(),
+            command, cwd=cwd, depth=0, visited={}, budget=_LifecycleScanBudget(),
             read_remote_script=read_remote_script, reason_out=reasons,
         )
     except Exception:

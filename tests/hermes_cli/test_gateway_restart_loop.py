@@ -204,11 +204,6 @@ class TestGatewayLifecyclePattern:
         "Monitor the gateway and tell me if a restart is recommended",
         "research how the OpenAI API gateway handles restart after rate limiting",
         "compare AWS API Gateway vs Cloudflare on restart latency",
-        # #92372 Branch A: no trailing boundary meant ordinary prose matched —
-        # "restarted" carries the "restart" prefix and the old pattern ended
-        # exactly there. \b after the verb group fixes it.
-        "echo after the hermes gateway restarted cleanly",
-        "the hermes gateway stopped responding, please investigate",
     ])
     def test_safe_commands(self, text):
         assert not _contains_gateway_lifecycle_command(text), f"Should NOT match: {text!r}"
@@ -221,6 +216,11 @@ class TestGatewayLifecyclePattern:
         "hermes skill view gateway-notes && echo hermes gateway docs",
         "cat '/docs/hermes gateway restart-notes.md'",
         "less /home/user/notes/hermes gateway restart runbook.txt",
+        # fork (MUSTPORT-5B r3): the tag's trailing \b after the verb group
+        # (#92372) allows these, but the pre-port guard blocked them, so
+        # Branch A keeps no trailing boundary (accepted over-blocking).
+        "echo after the hermes gateway restarted cleanly",
+        "the hermes gateway stopped responding, please investigate",
     ])
     def test_fork_keeps_blocking_tag_allowed_shapes(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
@@ -230,8 +230,8 @@ class TestGatewayLifecyclePattern:
         "hermes gateway restart",
         "hermes gateway restart; echo done",
         "hermes gateway stop && echo stopped",
-        # #77173 command-position anchor must not weaken separator/subshell
-        # forms either.
+        # Separator/subshell forms (the tag's #77173 command-position anchor
+        # targets these; the fork keeps no left anchor) must block too.
         "true;hermes gateway restart",
         "true && hermes gateway stop",
         "echo $(hermes gateway restart)",
@@ -1970,8 +1970,13 @@ class TestLifecycleGuardNeverRaises:
             assert self._scan("bash /dev/null") is True
 
     def test_magic_prefix_binaries_skipped_without_full_read(self, tmp_path):
-        """Executable magic (ELF/PE/Mach-O) short-circuits the read: the
-        guard must not treat compiled binaries as scripts at all."""
+        """Native executable headers (ELF/PE/Mach-O: a magic AND a NUL before
+        the first newline) short-circuit a skip-eligible read (direct exec /
+        `bash X`) — before the size check, so a multi-MiB real interpreter
+        never fails closed (MUSTPORT-5B r3, M6).
+
+        A magic prefix WITHOUT that NUL is text bash would run, so it is
+        scanned rather than skipped (F3)."""
         from cron.lifecycle_guard import _read_referenced_script
         for name, magic in [
             ("elf", b"\x7fELF"),
@@ -1980,10 +1985,15 @@ class TestLifecycleGuardNeverRaises:
             ("fat", b"\xca\xfe\xba\xbe"),
         ]:
             path = tmp_path / name
-            # No NUL after the magic — proves the magic check itself fires.
-            path.write_bytes(magic + b"ABCDEF" * 10)
-            text, unsafe, _reason = _read_referenced_script(path)
+            path.write_bytes(magic + b"\x02\x01\x01\x00" + b"ABCDEF" * 10)
+            # Cap far below the file size: a skip must win over fail-closed.
+            text, unsafe, _reason = _read_referenced_script(path, max_bytes=16)
             assert text is None, name
+            assert unsafe is False, name
+
+            path.write_bytes(magic + b"\nABCDEF\n")
+            text, unsafe, _reason = _read_referenced_script(path)
+            assert text is not None and "ABCDEF" in text, name
             assert unsafe is False, name
 
     def test_check_gateway_lifecycle_adversarial_script_values(self, tmp_path):
