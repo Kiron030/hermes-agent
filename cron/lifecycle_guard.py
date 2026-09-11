@@ -22,6 +22,7 @@ Ported from upstream release tag v2026.9.7 (MUSTPORT-5B). Fork-local deviations 
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import re
@@ -43,14 +44,35 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
     # Branch A: destructive `hermes gateway` ops. `start` is excluded: starting from inside a
     # gateway is benign and a job may legitimately start a sibling profile. The lookbehind keeps
-    # `hermes` from being a word tail (`myhermes`, `.hermes`, `x-hermes`) while every real command
-    # position (text start, whitespace, `;`/`&`/`|`, `$(`, backtick, U+FFFD) still matches.
-    # See #77173.
+    # `hermes` from being a *lexical* word tail (`myhermes`, `.hermes`, `x-hermes`, `restarted`)
+    # while every real command position (text start, whitespace, `;`/`&`/`|`, `$(`, backtick,
+    # U+FFFD) still matches. See #77173.
+    # A word character before `hermes` is NOT proof of an inert word tail: bash *expansions* can
+    # produce a word char that then vanishes at runtime. `$1hermes gateway restart` runs
+    # `hermes gateway restart` because `$1`..`$9` (single-digit positional parameters) expand to
+    # nothing under `bash -c`/cron, leaving a bare `hermes`. The digit sits between `$` and
+    # `hermes`, so the `(?<![\w.\-])` alternative alone would (wrongly) treat it as a word tail and
+    # ALLOW it — a regression against the pre-port guard, which blocked it as a substring. The
+    # second `(?<=\$\d)` alternative restores that block for every `$0`..`$9` form (MUSTPORT-5B r1).
+    # Other special parameters glued to `hermes` are handled by the first alternative or are
+    # genuinely inert; see the special-parameter table below.
+    #   BLOCK (expansion yields a bare `hermes`):
+    #     `${x}hermes` (`}`), `$@hermes` (`@`), `$*hermes` (`*`), `$!hermes` (`!`, empty when no bg
+    #     job) — all preceded by a non-`[\w.\-]` char, so `(?<![\w.\-])` already matches them.
+    #   OVER-BLOCK, fail-closed (expansion yields `<something>hermes`, i.e. NOT the CLI, but the
+    #   preceding char is non-word so the first alternative matches anyway — harmless):
+    #     `$#hermes` (arg count), `$?hermes` (exit status), `$$hermes` (pid).
+    #   ALLOW (bash reads a longer word, so it is never the `hermes` CLI):
+    #     `$_hermes` — `_hermes` is a valid identifier, so `$_hermes` expands the variable
+    #       *named* `_hermes` (unset -> empty), never `$_` + `hermes`; the `_` word-char tail is
+    #       correctly inert.
+    #     `$-hermes` — `$-` (shell option flags) is never empty under `bash -c`, so this expands to
+    #       `<flags>hermes`, a different command; the `-` tail is correctly inert.
     # Fork deviation: upstream also excludes a preceding `/`. That allows a path-invoked CLI
     # (`/usr/local/bin/hermes gateway restart`, `./venv/bin/hermes gateway stop`), which is a real
     # command, so `/` stays a matching position here (a path such as
     # `/docs/hermes gateway restart-notes.md` keeps blocking, as it did before the port).
-    r"(?:(?<![\w.\-])hermes\s+gateway\s+(?:restart|stop|uninstall)\b)"
+    r"(?:(?:(?<![\w.\-])|(?<=\$\d))hermes\s+gateway\s+(?:restart|stop|uninstall)\b)"
     # Branch B: launchctl ops anchored on a hermes-gateway label so unrelated hermes services stay
     # unblocked. `submit`/`bootstrap` register a NEW keepalive job wrapping an arbitrary helper (a
     # laundered restart); neutral-label submissions are caught by
@@ -120,8 +142,13 @@ _PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
 # stays correct, but the check is "verb anywhere AND label anywhere".
 # No profile identity available: cannot prove self-targeting, so do not block — sibling restarts must stay
 # allowed (#78028).
+# `(?:\b|(?<=\$\d))launchctl` mirrors Branch A's positional-parameter fix: `\b` still requires a
+# word boundary in the ordinary case (so `mylaunchctl` stays out), and the `(?<=\$\d)` alternative
+# also matches `$1launchctl` etc., whose `$0`..`$9` prefix expands to nothing and leaves a bare
+# `launchctl` at runtime (MUSTPORT-5B r1). Same-span shapes are already caught by Branch B (which
+# has no left anchor); this closes the order-independent split-label pass for the same input.
 _LAUNCHCTL_LIFECYCLE_VERBS_RE = re.compile(
-    r"(?i)\blaunchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
+    r"(?i)(?:\b|(?<=\$\d))launchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
 )
 _HERMES_GATEWAY_LABEL_RE = re.compile(r"(?i)\bhermes[.\-]?gateway\b")
 
@@ -538,11 +565,19 @@ def _direct_lifecycle_scan(command: str) -> bool:
 # --- path handling ----------------------------------------------------------------------------
 
 def _resolve_lenient(path: Path) -> Path:
-    """``path.resolve(strict=False)``, falling back to *path* on OSError (unreadable/long) or
-    ValueError (embedded NUL from decoded binary tokenized as a path) — never crash the guard."""
+    """``path.resolve(strict=False)``, falling back to *path* on OSError (unreadable/long),
+    ValueError (embedded NUL from decoded binary tokenized as a path), or RuntimeError — never
+    crash the guard.
+
+    RuntimeError is the symlink-loop case: on Python <= 3.12 ``resolve(strict=False)`` raises
+    ``RuntimeError("Symlink loop ...")`` on a cyclic symlink. Uncaught it aborts the ENTIRE
+    referenced-script walk (the top-level guard then falls back to the direct scan only, so a
+    sibling `hermes gateway restart` script in the same command slips through). Falling back to the
+    unresolved *path* keeps the walk going; the subsequent ``os.open`` on the cyclic path fails
+    closed with ELOOP in ``_read_referenced_script``. See F4 (MUSTPORT-5B r1)."""
     try:
         return path.resolve(strict=False)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return path
 
 
@@ -712,6 +747,17 @@ def _iter_shell_command_payloads(command: str) -> Iterator[str]:
                 break
 
 
+# --- block-reason attribution -----------------------------------------------------------------
+
+# Why the guard refused, surfaced so a caller (terminal_tool) can render an accurate refusal
+# instead of always implying a detected lifecycle command. F2 (MUSTPORT-5B r1). These change no
+# rule — a refusal stays a refusal; only the message differs.
+_BLOCK_REASON_COMMAND = "lifecycle-command"   # a lifecycle/submit command was detected
+_BLOCK_REASON_BUDGET = "scan-budget"          # scan budget exhausted / referenced file oversized
+_BLOCK_REASON_DEVICE = "device-or-fifo"       # referenced path is a device/FIFO/socket/cyclic link
+_BLOCK_REASON_CLOUD = "cloud-path"            # referenced path is a cloud-synced FileProvider path
+
+
 # --- referenced-script reading ----------------------------------------------------------------
 
 def _has_binary_magic(data: bytes) -> bool:
@@ -726,31 +772,41 @@ def _has_binary_magic(data: bytes) -> bool:
 
 def _read_referenced_script(
     path: Path, *, max_bytes: Optional[int] = None, skip_binary: bool = True
-) -> tuple[Optional[str], bool]:
-    """Return ``(text, unsafe)`` using bounded, regular-file-only reads.
+) -> tuple[Optional[str], bool, Optional[str]]:
+    """Return ``(text, unsafe, reason)`` using bounded, regular-file-only reads.
+
+    *reason* is one of the ``_BLOCK_REASON_*`` codes when ``unsafe`` is True (so a caller can
+    attribute the refusal), else ``None``.
 
     Shared choke point for every local script read, so the cloud-placeholder refusal lives here: a
     FileProvider path is never opened — not even to check hydration — because an evicted
     placeholder's ``open()`` can hang preflight. Lexical check: direct paths; resolved: symlinks.
     ``max_bytes`` lowers the per-file cap to what the calling walk can still afford.
-    ``skip_binary=False`` (fork-local, cron ``script`` reads) scans binary-magic files instead of
-    treating them as nothing-to-scan.
+    ``skip_binary=False`` (fork-local, cron ``script`` reads AND the referenced-script walk) scans
+    binary-magic files instead of treating them as nothing-to-scan.
 
     See #88052.
     """
     byte_limit = _capped_read_limit(max_bytes)
     if _on_cloud_path(path):
-        return None, True
+        return None, True, _BLOCK_REASON_CLOUD
     flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     try:
         descriptor = os.open(path, flags)
-    except (OSError, ValueError):
-        # OSError: unreadable/missing/over-long. ValueError: embedded NUL in *path*. Either is
-        # "nothing to scan" — never crash the guard.
-        return None, False
+    except ValueError:
+        # Embedded NUL in *path* — a binary's decoded bytes tokenized into a bogus script path by
+        # the recursion (#77703). Nothing to scan; never crash the guard.
+        return None, False, None
+    except OSError as exc:
+        # A cyclic symlink (ELOOP) is not "missing": the path exists but cannot be opened safely, so
+        # fail closed rather than treating it as nothing to scan. On Python <= 3.12 the loop already
+        # raised RuntimeError in `_resolve_lenient` (caught there so the walk survives); here the
+        # unresolved cyclic path fails closed. See F4 (MUSTPORT-5B r1).
+        if getattr(exc, "errno", None) == errno.ELOOP:
+            return None, True, _BLOCK_REASON_DEVICE
+        # Otherwise unreadable/missing/over-long — nothing to scan.
+        return None, False, None
     try:
-        # ValueError: an embedded NUL byte in *path* itself — a binary's decoded bytes tokenized into a
-        # bogus script path by the recursion (#77703).
         metadata = os.fstat(descriptor)
         # Directories are not scripts. Docker Desktop writes ``fpath=(~/.docker/completions …)`` into
         # ``~/.zshrc``; the walk then treats that dir as a referenced script and used to fail-closed,
@@ -758,7 +814,9 @@ def _read_referenced_script(
         if not stat.S_ISREG(metadata.st_mode):
             # Directories are not scripts (`fpath=(~/.docker/completions …)` in ~/.zshrc must not
             # block `source ~/.zshrc`). Devices/sockets stay fail-closed.
-            return None, not stat.S_ISDIR(metadata.st_mode)
+            if stat.S_ISDIR(metadata.st_mode):
+                return None, False, None
+            return None, True, _BLOCK_REASON_DEVICE
         # Sniff a small prefix first: compiled binaries are never shell scripts, so skip them
         # WITHOUT reading the rest or feeding decoded garbage into the recursion.
         # Deliberately NOT keyed on the mere presence of a NUL byte (#77927): bash executes a text script
@@ -766,11 +824,11 @@ def _read_referenced_script(
         # NUL-strip below.
         data = os.read(descriptor, _BINARY_SNIFF_BYTES)
         if skip_binary and _has_binary_magic(data):
-            return None, False
+            return None, False, None
         # A regular file whose size already exceeds the cap fails closed without reading it (the
         # walk budget can be far below 1 MiB).
         if metadata.st_size > byte_limit:
-            return None, True
+            return None, True, _BLOCK_REASON_BUDGET
         # Read the remainder (bounded); loop because os.read may return short.
         while len(data) <= byte_limit:
             chunk = os.read(descriptor, byte_limit + 1 - len(data))
@@ -778,18 +836,18 @@ def _read_referenced_script(
                 break
             data += chunk
     except OSError:
-        return None, False
+        return None, False, None
     finally:
         os.close(descriptor)
     if skip_binary and _has_binary_magic(data):
-        return None, False
+        return None, False, None
     # Size check BEFORE NUL stripping: stripping shrinks the buffer and would let an oversized file
     # slip under the threshold past this fail-closed branch.
     if len(data) > byte_limit:
-        return None, True
+        return None, True, _BLOCK_REASON_BUDGET
     if b"\x00" in data:
         data = data.replace(b"\x00", b"")
-    return data.decode("utf-8", errors="replace"), False
+    return data.decode("utf-8", errors="replace"), False, None
 
 
 def _sanitize_remote_script_text(
@@ -823,7 +881,7 @@ def _read_script_for_scanning(script_path: str) -> str:
     resolved = _resolve_script_path(script_path)
     if resolved is None:
         return ""
-    script_text, unsafe = _read_referenced_script(resolved, skip_binary=False)
+    script_text, unsafe, _reason = _read_referenced_script(resolved, skip_binary=False)
     if unsafe:
         return "hermes gateway restart"
     return script_text or ""
@@ -834,19 +892,29 @@ def _read_script_for_scanning(script_path: str) -> str:
 def _contains_unsafe_gateway_action(
     command: str, *, cwd: Optional[str], depth: int, visited: set[Path], budget: _LifecycleScanBudget,
     read_remote_script: Optional[_ReadRemoteScriptFn] = None,
+    reason_out: Optional[list[str]] = None,
 ) -> bool:
+    # *reason_out*, when supplied, receives the FIRST block reason (a ``_BLOCK_REASON_*`` code) so a
+    # caller can render an accurate refusal. It is threaded through the recursion so a reason set at
+    # any depth propagates to the root. See F2 (MUSTPORT-5B r1).
+    def _block(reason: str) -> bool:
+        if reason_out is not None and not reason_out:
+            reason_out.append(reason)
+        return True
+
     # Charge BEFORE _direct_lifecycle_scan: every scan in it tokenizes with shlex.
     if not budget.charge_text(command):
-        return _budget_exhausted("text", depth)
+        _budget_exhausted("text", depth)
+        return _block(_BLOCK_REASON_BUDGET)
     if _direct_lifecycle_scan(command):
-        return True
+        return _block(_BLOCK_REASON_COMMAND)
     if depth >= _MAX_REFERENCED_SCRIPT_DEPTH:
-        return True
+        return _block(_BLOCK_REASON_COMMAND)
 
     def recurse(text: str, cwd: Optional[str]) -> bool:
         return _contains_unsafe_gateway_action(
             text, cwd=cwd, depth=depth + 1, visited=visited, budget=budget,
-            read_remote_script=read_remote_script,
+            read_remote_script=read_remote_script, reason_out=reason_out,
         )
 
     for payload in _iter_shell_command_payloads(command):
@@ -856,28 +924,34 @@ def _contains_unsafe_gateway_action(
     for script_path in _iter_referenced_shell_scripts(command, cwd=cwd):
         # Do not touch a FileProvider path even to discover whether the file is hydrated.
         if _on_cloud_path(script_path):
-            return True
+            return _block(_BLOCK_REASON_CLOUD)
         resolved = _resolve_lenient(script_path)
         if resolved in visited:
             continue
         if not budget.charge_path():
-            return _budget_exhausted("paths", depth)
+            _budget_exhausted("paths", depth)
+            return _block(_BLOCK_REASON_BUDGET)
         visited.add(resolved)
         # Never read more than the walk can still afford to tokenize; a file larger than the
-        # remainder fails closed exactly like an oversized one.
-        script_text, unsafe = _read_referenced_script(script_path, max_bytes=budget.bytes_remaining)
+        # remainder fails closed exactly like an oversized one. skip_binary=False mirrors the cron
+        # `script` read (F3): the shell runs a binary-magic-prefixed text file (`bash ./x.sh` whose
+        # bytes start `MZ`/`\x7fELF` then `hermes gateway restart`), so its content must be scanned.
+        script_text, unsafe, reason = _read_referenced_script(
+            script_path, max_bytes=budget.bytes_remaining, skip_binary=False
+        )
         if unsafe:
-            return True
+            return _block(reason or _BLOCK_REASON_COMMAND)
         if script_text is None and read_remote_script is not None:
             # Local path missing; the remote backend's output crosses the same trust boundary as a
             # local read — sanitize identically (binary skip + size fail-closed).
             if not budget.charge_remote_read():
-                return _budget_exhausted("remote reads", depth)
+                _budget_exhausted("remote reads", depth)
+                return _block(_BLOCK_REASON_BUDGET)
             script_text, unsafe = _sanitize_remote_script_text(
                 read_remote_script(str(script_path)), max_bytes=budget.bytes_remaining
             )
             if unsafe:
-                return True
+                return _block(_BLOCK_REASON_BUDGET)
         if not script_text:
             continue
         # Relative references inside a script resolve against that script's directory, not the cwd.
@@ -901,10 +975,27 @@ def contains_gateway_lifecycle_command_or_referenced_script(
     every terminal command until the gateway restarts (#77780, #78256), which is strictly worse than either
     verdict.
     """
+    return gateway_lifecycle_block_reason(
+        command, cwd=cwd, read_remote_script=read_remote_script
+    ) is not None
+
+
+def gateway_lifecycle_block_reason(
+    command: str, *, cwd: Optional[str] = None,
+    read_remote_script: Optional[_ReadRemoteScriptFn] = None,
+) -> Optional[str]:
+    """Same verdict as ``contains_gateway_lifecycle_command_or_referenced_script`` but returns WHY.
+
+    ``None`` when the command is allowed; otherwise a ``_BLOCK_REASON_*`` code so a caller can render
+    an accurate refusal (a detected lifecycle command vs. a fail-closed scan-budget / device-FIFO /
+    cloud-path refusal) instead of always implying a detected lifecycle command. See F2
+    (MUSTPORT-5B r1). Total by construction: never raises (same #76762 contract as the bool wrapper).
+    """
+    reasons: list[str] = []
     try:
-        return _contains_unsafe_gateway_action(
+        blocked = _contains_unsafe_gateway_action(
             command, cwd=cwd, depth=0, visited=set(), budget=_LifecycleScanBudget(),
-            read_remote_script=read_remote_script,
+            read_remote_script=read_remote_script, reason_out=reasons,
         )
     except Exception:
         logger.warning(
@@ -912,7 +1003,10 @@ def contains_gateway_lifecycle_command_or_referenced_script(
             "falling back to direct-scan verdict",
             exc_info=True,
         )
-        return _direct_lifecycle_scan(command)
+        return _BLOCK_REASON_COMMAND if _direct_lifecycle_scan(command) else None
+    if not blocked:
+        return None
+    return reasons[0] if reasons else _BLOCK_REASON_COMMAND
 
 
 def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None) -> None:

@@ -15,6 +15,8 @@ Paths are passed as POSIX strings: backslash is a shell escape to the tokenizer.
 """
 
 import json
+import re
+import string
 
 import pytest
 
@@ -100,6 +102,15 @@ PRE_PORT_BLOCKED = [
     "ag --pager 'hermes gateway restart' needle .",
     "sqlite3 db \"select edit('', 'hermes gateway restart;')\"",
     "journalctl -u hermes-gateway --grep 'systemctl restart hermes-gateway'",
+    # --- positional-parameter bypass (MUSTPORT-5B r1, F1) -----------------------------------
+    # The port added Branch A's `(?<![\w.\-])` lookbehind, which treats the word char a bash
+    # expansion leaves before `hermes` as an inert word tail. `$1`..`$9` expand to nothing under
+    # `bash -c`/cron, so `$1hermes gateway restart` runs the CLI. The pre-port guard (no lookbehind)
+    # blocked these as substrings; the fork must keep blocking them.
+    "$1hermes gateway restart",
+    "true;$9hermes gateway stop",
+    "env -u _HERMES_GATEWAY $1hermes gateway restart",
+    "sh -c '$1hermes gateway restart'",
 ]
 
 
@@ -151,6 +162,15 @@ class TestAuthorityNotWidened:
     def test_non_utf8_cron_script_still_blocks(self, tmp_path):
         script = tmp_path / "weird.bin"
         script.write_bytes(b"\xfehermes gateway restart\xff")
+        with pytest.raises(GatewayLifecycleBlocked):
+            check_gateway_lifecycle("", script.as_posix())
+
+    def test_positional_param_python_script_content_blocks(self, tmp_path):
+        # F1: the lifecycle command lives in a .py cron script's body, using a positional
+        # parameter that expands to nothing (`$1hermes gateway stop` == `hermes gateway stop`).
+        # The .py branch scans the full text with the direct regex, which must block it.
+        script = tmp_path / "job.py"
+        script.write_text("import os\nos.system('$1hermes gateway stop')\n", encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("", script.as_posix())
 
@@ -361,6 +381,9 @@ class TestExecuteCodeLifecycleGuard:
         'import subprocess\nsubprocess.run(["launchctl", "bootout", "gui/501/ai.hermes.gateway"])\n',
         'import subprocess\nsubprocess.run(["systemctl", "--user", "stop", "hermes-gateway"])\n',
         'import os\nos.system("/usr/local/bin/hermes gateway stop")\n',
+        # F1: positional parameter unsets the gateway marker word char at runtime.
+        'import subprocess\n'
+        'subprocess.run("env -u _HERMES_GATEWAY $1hermes gateway restart", shell=True)\n',
     ])
     def test_lifecycle_code_blocked_inside_gateway(self, monkeypatch, code):
         result = self._run(monkeypatch, code)
@@ -428,8 +451,12 @@ class TestPrivilegePrefixTraversal:
             check_gateway_lifecycle(template.format(path=helper.as_posix()), None)
 
 
-# The only shapes the port lets through that the pre-port guard blocked. Each is inert: a
-# different command word than the `hermes` CLI, or an invalid subcommand the CLI rejects.
+# The only shapes the port lets through that the pre-port guard blocked. Each is inert because bash
+# reads a genuinely *longer command word* (`myhermes`, `.hermes`, `x-hermes`) or a *different word*
+# (`restarted`) — a LEXICAL word tail, present verbatim in the string that runs. A word char before
+# `hermes` is NOT by itself proof of inertness: a bash expansion can leave a word char that vanishes
+# at runtime (`$1hermes` -> `hermes`). Those are covered by NOT_INERT_LOOKALIKES below, which MUST
+# block. Keep this list to shapes where the preceding word char is literal and survives to exec.
 ALLOWS_ADDED = [
     "echo after the hermes gateway restarted cleanly",    # a74eb2dd41: trailing \b (#92372)
     "the hermes gateway stopped responding",              # a74eb2dd41: trailing \b (#92372)
@@ -438,13 +465,210 @@ ALLOWS_ADDED = [
     ".hermes gateway restart",                            # 180f981125/20e308fea7: dotfile name
 ]
 
+# Look like a word tail (a word char sits before `hermes`) but bash EXPANDS the prefix away, leaving
+# the bare `hermes` CLI. The pre-port guard blocked these as substrings; the fork must NOT enshrine
+# "any word char before hermes is inert" and let them through. See F1 (MUSTPORT-5B r1).
+NOT_INERT_LOOKALIKES = [
+    "$1hermes gateway restart",
+    "$9hermes gateway stop",
+    "$0hermes gateway uninstall",
+    "env -u _HERMES_GATEWAY $1hermes gateway restart",
+]
+
 
 class TestAllowsAddedAreExactlyTheInertOnes:
     @pytest.mark.parametrize("command", ALLOWS_ADDED)
     def test_inert_shapes_allowed(self, command):
         assert contains_gateway_lifecycle_command_or_referenced_script(command) is False
 
+    @pytest.mark.parametrize("command", NOT_INERT_LOOKALIKES)
+    def test_positional_parameter_lookalikes_still_block(self, command):
+        # Regression against e1bd3b3: these were allowed (word char before hermes). They must block.
+        assert contains_gateway_lifecycle_command(command) is True
+        assert contains_gateway_lifecycle_command_or_referenced_script(command) is True
+
     def test_unresolvable_cron_script_values_no_longer_crash(self, monkeypatch):
         # c8d48b8b13 / 863e313185: a NUL-bearing value cannot name a runnable script; the pre-port
         # guard raised a bare ValueError from read_bytes() instead of scanning nothing.
         check_gateway_lifecycle("nightly", "nul\x00byte.sh")
+
+
+# The pre-port (base) Branch A pattern, copied verbatim from
+# `git show 0bacb7fc84:cron/lifecycle_guard.py`. It has NO left-context lookbehind, so it blocks
+# `hermes gateway restart|stop` wherever the substring appears — including behind any prefix.
+_BASE_BRANCH_A = re.compile(r"(?i)hermes\s+gateway\s+(?:restart|stop)")
+
+# Prefixes placed immediately before `hermes`. Every printable ASCII punctuation char, plus the
+# shell special/positional parameters called out in the F1 brief.
+_DIFFERENTIAL_PREFIXES = sorted(set(
+    list(string.punctuation)
+    + [f"${d}" for d in range(10)]
+    + ["${x}", "$@", "$*", "$#", "$?", "$$", "$!", "$-", "$_", "'", '"', "\\"]
+))
+
+# The ONLY documented inert allow-list: bash reads a genuinely longer command word or a variable
+# name, so the CLI never runs. Keyed on the char immediately before `hermes`:
+#   `.`  -> `.hermes` dotfile command      `-` -> `-hermes` / `x-hermes` word tail
+#   `_`  -> `_hermes` word tail, and `$_hermes` (bash expands variable *named* `_hermes`)
+#   `$-` -> `$-` (shell flags) is never empty, so `$-hermes` == `<flags>hermes`, a different command
+# Everything else that the base pattern blocks MUST be blocked by the candidate too.
+_INERT_LAST_CHARS = "._-"
+
+
+class TestPositionalParameterDifferential:
+    """F1 differential: wherever the pre-port Branch A pattern blocked, the candidate must block —
+    except the small, commented inert allow-list. This FAILS against commit e1bd3b3 for the
+    `$0`..`$9` prefixes (base blocks the substring; e1bd3b3's `(?<![\\w.\\-])` lookbehind treats the
+    digit as an inert word tail and ALLOWS)."""
+
+    @pytest.mark.parametrize("command", ["hermes gateway restart", "hermes gateway stop"])
+    @pytest.mark.parametrize("prefix", _DIFFERENTIAL_PREFIXES)
+    def test_base_block_implies_candidate_block(self, prefix, command):
+        text = prefix + command
+        if not _BASE_BRANCH_A.search(text):
+            return  # base did not block this shape; nothing to enforce
+        if prefix[-1] in _INERT_LAST_CHARS:
+            # Documented inert allow-list: bash reads a longer word / a variable name, so allowing
+            # is correct. (`.hermes`, `-hermes`, `_hermes`, `$_hermes`, `$-hermes`.)
+            assert contains_gateway_lifecycle_command(text) is False, (prefix, command)
+            return
+        assert contains_gateway_lifecycle_command(text) is True, (prefix, command)
+
+    @pytest.mark.parametrize("verb", ["restart", "stop", "uninstall"])
+    @pytest.mark.parametrize("d", list(range(10)))
+    def test_every_positional_parameter_form_blocks(self, d, verb):
+        # `$0`..`$9` glued to `hermes` expand away, leaving the bare CLI — for all three verbs
+        # (base's pattern lacks `uninstall`, so this is asserted directly against the candidate).
+        text = f"${d}hermes gateway {verb}"
+        assert contains_gateway_lifecycle_command(text) is True
+
+    def test_dollar_underscore_reads_as_variable_name(self):
+        # `$_hermes` -> bash expands the variable *named* `_hermes` (unset), never `$_` + `hermes`.
+        assert contains_gateway_lifecycle_command("$_hermes gateway restart") is False
+
+    def test_dollar_dash_is_never_empty(self):
+        # `$-` (shell option flags) is non-empty under `bash -c`, so `$-hermes` == `<flags>hermes`.
+        assert contains_gateway_lifecycle_command("$-hermes gateway restart") is False
+
+
+class TestBinaryMagicReferencedScriptScanned:
+    """F3: a referenced script whose bytes start with a binary magic is still executed by the shell
+    (bash runs the text behind the `MZ`/ELF prefix), so the walk must scan it — matching D5's cron
+    `script` behaviour instead of skipping it. FAILS against e1bd3b3 (walk used skip_binary=True)."""
+
+    @pytest.mark.parametrize("payload", [
+        b"MZ\nhermes gateway restart\n",
+        b"\x7fELF\nsystemctl restart hermes-gateway\n",
+        b"\x1f\x8b\nhermes gateway stop\n",
+    ])
+    def test_binary_magic_referenced_shell_script_is_scanned(self, tmp_path, payload):
+        script = tmp_path / "x.sh"
+        script.write_bytes(payload)
+        assert contains_gateway_lifecycle_command_or_referenced_script(
+            f"bash {script.as_posix()}"
+        ) is True
+
+    def test_genuine_binary_reference_without_command_stays_allowed(self, tmp_path):
+        # A binary-magic file with no lifecycle command in it must still not false-positive.
+        script = tmp_path / "tool.sh"
+        script.write_bytes(b"MZ\nprintf hello\n")
+        assert contains_gateway_lifecycle_command_or_referenced_script(
+            f"bash {script.as_posix()}"
+        ) is False
+
+
+def _symlinks_available(tmp_path) -> bool:
+    probe = tmp_path / "_probe_link"
+    try:
+        probe.symlink_to(tmp_path / "_probe_target")
+    except (OSError, NotImplementedError):
+        return False
+    finally:
+        try:
+            probe.unlink()
+        except OSError:
+            pass
+    return True
+
+
+class TestSymlinkLoopFailsClosed:
+    """F4: a cyclic symlink referenced as a script must fail closed, not abort the whole walk (on
+    Python <= 3.12 `resolve()` raised RuntimeError, which fell back to the direct scan only)."""
+
+    def test_symlink_loop_referenced_script_is_blocked(self, tmp_path):
+        if not _symlinks_available(tmp_path):
+            pytest.skip("symlinks unavailable on this platform/privilege level")
+        a = tmp_path / "a.sh"
+        b = tmp_path / "b.sh"
+        a.symlink_to(b)
+        b.symlink_to(a)
+        assert contains_gateway_lifecycle_command_or_referenced_script(
+            f"bash {a.as_posix()}"
+        ) is True
+
+    def test_symlink_loop_does_not_hide_a_sibling_lifecycle_script(self, tmp_path):
+        # The core F4 concern: a loop must not abort the walk and let a sibling evil script slip.
+        if not _symlinks_available(tmp_path):
+            pytest.skip("symlinks unavailable on this platform/privilege level")
+        a = tmp_path / "loop.sh"
+        b = tmp_path / "loop2.sh"
+        a.symlink_to(b)
+        b.symlink_to(a)
+        evil = tmp_path / "evil.sh"
+        evil.write_text("#!/bin/sh\nhermes gateway restart\n", encoding="utf-8")
+        command = f"bash {a.as_posix()}; bash {evil.as_posix()}"
+        assert contains_gateway_lifecycle_command_or_referenced_script(command) is True
+
+
+class TestTerminalRefusalMessages:
+    """F2: the in-gateway hard block returns a distinct, accurate message when it fires on a
+    fail-closed scan-budget or device/FIFO refusal instead of a detected lifecycle command."""
+
+    def _patch_env(self, monkeypatch):
+        import tools.terminal_tool as tt
+        eid = "default"
+
+        class _FakeEnv:
+            env = {}
+            def execute(self, command, **kwargs):  # pragma: no cover
+                raise AssertionError("execute must not be reached")
+
+        monkeypatch.setattr(tt, "_active_environments", {eid: _FakeEnv()})
+        monkeypatch.setattr(tt, "_last_activity", {eid: 0.0})
+        monkeypatch.setattr(tt, "_task_env_overrides", {})
+        monkeypatch.setattr(
+            tt, "_get_env_config",
+            lambda: {"env_type": "local", "cwd": "/tmp", "timeout": 60, "lifetime_seconds": 3600},
+        )
+        monkeypatch.setenv("_HERMES_GATEWAY", "1")
+
+    def test_reason_codes(self, monkeypatch, tmp_path):
+        # Direct unit check of the reason channel the message maps from.
+        assert lifecycle_guard.gateway_lifecycle_block_reason("hermes gateway restart") == (
+            "lifecycle-command"
+        )
+        assert lifecycle_guard.gateway_lifecycle_block_reason("echo hi") is None
+        monkeypatch.setattr(lifecycle_guard, "_MAX_LIFECYCLE_SCAN_LINE_BYTES", 8)
+        assert lifecycle_guard.gateway_lifecycle_block_reason("echo " + "x" * 40) == "scan-budget"
+
+    def test_scan_budget_message(self, monkeypatch):
+        import tools.terminal_tool as tt
+        self._patch_env(monkeypatch)
+        monkeypatch.setattr(lifecycle_guard, "_MAX_LIFECYCLE_SCAN_LINE_BYTES", 8)
+
+        result = json.loads(tt.terminal_tool(command="echo " + "x" * 60, background=True))
+
+        assert result["exit_code"] == 1
+        assert "scan budget" in result["error"]
+
+    def test_device_or_fifo_message(self, monkeypatch):
+        import os as _os
+        if _os.name == "nt":
+            pytest.skip("no /dev/null device on Windows")
+        import tools.terminal_tool as tt
+        self._patch_env(monkeypatch)
+
+        result = json.loads(tt.terminal_tool(command="bash /dev/null", background=True))
+
+        assert result["exit_code"] == 1
+        assert "device" in result["error"]

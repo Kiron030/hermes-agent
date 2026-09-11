@@ -139,9 +139,9 @@ def test_referenced_read_is_capped_at_remaining_budget(monkeypatch, tmp_path):
     caps: list = []
     original = lifecycle_guard._read_referenced_script
 
-    def spy(path, *, max_bytes=None):
+    def spy(path, *, max_bytes=None, skip_binary=True):
         caps.append(max_bytes)
-        return original(path, max_bytes=max_bytes)
+        return original(path, max_bytes=max_bytes, skip_binary=skip_binary)
 
     monkeypatch.setattr(lifecycle_guard, "_read_referenced_script", spy)
 

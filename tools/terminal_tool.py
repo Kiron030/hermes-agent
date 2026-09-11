@@ -2360,8 +2360,8 @@ def terminal_tool(
         # script reads are not wired here.
         if os.environ.get("_HERMES_GATEWAY") == "1":
             from cron.lifecycle_guard import (
-                contains_gateway_lifecycle_command_or_referenced_script,
                 contains_launchctl_submit_command,
+                gateway_lifecycle_block_reason,
                 lifecycle_scan_root_within_budget,
             )
             _lifecycle_error = None
@@ -2384,7 +2384,31 @@ def terminal_tool(
                     default_cwd=cwd,
                     session_key=get_current_session_key(default="") or (task_id or ""),
                 )
-                if contains_gateway_lifecycle_command_or_referenced_script(command, cwd=_guard_cwd):
+                # A distinct, accurate refusal when the hard block fired on a fail-closed scan-budget
+                # or device/FIFO refusal rather than a detected lifecycle command. No budget or
+                # device rule is relaxed — only the message differs. See F2 (MUSTPORT-5B r1).
+                _block_reason = gateway_lifecycle_block_reason(command, cwd=_guard_cwd)
+                if _block_reason == "scan-budget":
+                    _lifecycle_error = (
+                        "Blocked: refused — command or referenced script exceeds the lifecycle-guard "
+                        "scan budget, so it cannot be verified free of a gateway restart/stop/uninstall "
+                        "before running. Simplify the command or reduce the number/size of referenced "
+                        "scripts, then retry."
+                    )
+                elif _block_reason == "device-or-fifo":
+                    _lifecycle_error = (
+                        "Blocked: refused — a referenced path is a device, FIFO, socket, or "
+                        "unresolvable (e.g. a cyclic symlink), so the lifecycle guard cannot read it "
+                        "to verify it is safe. It is refused rather than run."
+                    )
+                elif _block_reason == "cloud-path":
+                    _lifecycle_error = (
+                        "Blocked: refused — a referenced script lives on a cloud-synced path "
+                        "(iCloud Drive / ~/Library/CloudStorage). Opening an evicted FileProvider "
+                        "placeholder can hang the guard's preflight scan, so it is refused without "
+                        "being read. Move the script to a local, non-cloud path and retry."
+                    )
+                elif _block_reason is not None:
                     _lifecycle_error = (
                         "Blocked: command or referenced script cannot restart, stop, or "
                         "uninstall the gateway from inside the gateway process. The gateway would "

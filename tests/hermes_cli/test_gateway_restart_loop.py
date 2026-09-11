@@ -1139,6 +1139,9 @@ class TestLifecycleGuardModule:
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("", str(script))
 
+    def test_missing_script_does_not_raise(self, tmp_path):
+        from cron.lifecycle_guard import check_gateway_lifecycle
+        check_gateway_lifecycle("clean prompt", str(tmp_path / "nonexistent.sh"))
 
     def test_relative_script_resolved_under_scripts_dir(self, tmp_path, monkeypatch):
         """A bare/relative script name resolves under HERMES_HOME/scripts (the
@@ -1231,7 +1234,7 @@ class TestLifecycleGuardModule:
 
         from cron.lifecycle_guard import _read_referenced_script
 
-        text, unsafe = _read_referenced_script(Path("/tmp/hermes\x00binary"))
+        text, unsafe, _reason = _read_referenced_script(Path("/tmp/hermes\x00binary"))
         assert text is None
         assert unsafe is False
 
@@ -1365,9 +1368,10 @@ class TestLifecycleGuardModule:
 
         monkeypatch.setattr(lifecycle_guard.os, "open", forbid_open)
 
-        text, unsafe = lifecycle_guard._read_referenced_script(script)
+        text, unsafe, reason = lifecycle_guard._read_referenced_script(script)
         assert text is None
         assert unsafe is True
+        assert reason == lifecycle_guard._BLOCK_REASON_CLOUD
 
     def test_cron_script_scan_blocks_cloud_script_without_opening(
         self, tmp_path, monkeypatch
@@ -1953,7 +1957,7 @@ class TestLifecycleGuardNeverRaises:
             return _DirStat()
 
         monkeypatch.setattr(os, "fstat", _dir_fstat)
-        text, unsafe = _read_referenced_script(probe)
+        text, unsafe, _reason = _read_referenced_script(probe)
         assert text is None
         assert unsafe is False
 
@@ -1978,7 +1982,7 @@ class TestLifecycleGuardNeverRaises:
             path = tmp_path / name
             # No NUL after the magic — proves the magic check itself fires.
             path.write_bytes(magic + b"ABCDEF" * 10)
-            text, unsafe = _read_referenced_script(path)
+            text, unsafe, _reason = _read_referenced_script(path)
             assert text is None, name
             assert unsafe is False, name
 
