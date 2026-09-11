@@ -9,10 +9,12 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 
 from tools.powerunits_github_knowledge import (
-    github_branch_tip_sha,
+    PinnedRefError,
     github_fetch_json,
     github_fetch_raw_file,
+    github_read_provenance,
     github_token,
+    load_knowledge_pin,
     load_surfaces,
     log_powerunits_docs_read,
     normalize_subpath,
@@ -50,10 +52,24 @@ def _safe_int(value: Any, default: int) -> int:
         return default
 
 
+def _load_pinned_config() -> tuple[dict[str, dict[str, Any]], str, str]:
+    """Surfaces plus (approved_ref, approved_ref_commit_time); raises before any network call."""
+    surfaces = load_surfaces()
+    approved_ref, approved_ref_commit_time = load_knowledge_pin()
+    return surfaces, approved_ref, approved_ref_commit_time
+
+
+def _config_error(exc: Exception) -> str:
+    from tools.registry import tool_error
+
+    code = "pinned_ref_invalid" if isinstance(exc, PinnedRefError) else "config_invalid"
+    return tool_error(f"Powerunits GitHub knowledge config rejected (fail closed): {exc}", error_code=code)
+
+
 def check_powerunits_github_docs_requirements() -> bool:
     global _WARNED_MISSING_TOKEN, _WARNED_BAD_ALLOWLIST
     try:
-        load_surfaces()
+        _load_pinned_config()
         _WARNED_BAD_ALLOWLIST = False
     except Exception as exc:
         if not _WARNED_BAD_ALLOWLIST:
@@ -79,7 +95,10 @@ def list_powerunits_roadmap_dir(subpath: str | None = None, alias: str | None = 
     token = github_token()
     if not token:
         return tool_error("Missing POWERUNITS_GITHUB_TOKEN_READ.", error_code="missing_token")
-    surfaces = load_surfaces()
+    try:
+        surfaces, approved_ref, approved_ref_commit_time = _load_pinned_config()
+    except (ValueError, OSError) as exc:
+        return _config_error(exc)
     wanted = (alias or "powerunits_roadmap").strip() or "powerunits_roadmap"
     s = surfaces.get(wanted)
     if not s:
@@ -92,8 +111,9 @@ def list_powerunits_roadmap_dir(subpath: str | None = None, alias: str | None = 
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_subpath")
 
+    ref = str(s["ref"])
     try:
-        payload = github_fetch_json(str(s["repo"]), str(s["branch"]), api_path, token)
+        payload = github_fetch_json(str(s["repo"]), ref, api_path, token)
     except HTTPError as e:
         if e.code in (401, 403):
             return tool_error("GitHub token unauthorized/forbidden for this repo.", error_code="auth_failed")
@@ -119,30 +139,37 @@ def list_powerunits_roadmap_dir(subpath: str | None = None, alias: str | None = 
             }
         )
     out_entries.sort(key=lambda x: (x.get("type") != "dir", str(x.get("name", "")).lower()))
-    sha = github_branch_tip_sha(str(s["repo"]), str(s["branch"]), token)
+    provenance = github_read_provenance(
+        repo=str(s["repo"]),
+        read_sha=ref,
+        approved_ref=approved_ref,
+        approved_ref_commit_time=approved_ref_commit_time,
+        token=token,
+    )
     log_powerunits_docs_read(
         source="github_primary",
         repo=str(s["repo"]),
-        branch=str(s["branch"]),
-        commit_sha=sha,
+        branch=ref,
+        commit_sha=provenance["read_sha"],
         alias=str(s["alias"]),
         relative_path=api_path,
         extra="tool=list_powerunits_roadmap_dir",
+        provenance=provenance,
     )
-    return json.dumps(
-        {
-            "alias": s["alias"],
-            "repo": s["repo"],
-            "branch": s["branch"],
-            "commit_sha": sha,
-            "allowed_root": s["root_prefix"],
-            "subpath": sp,
-            "entries": out_entries,
-            "count": len(out_entries),
-            "read_only": True,
-        },
-        ensure_ascii=False,
-    )
+    result: dict[str, Any] = {
+        "alias": s["alias"],
+        "repo": s["repo"],
+        "branch": ref,
+        "ref": ref,
+        "commit_sha": provenance["read_sha"],
+        "allowed_root": s["root_prefix"],
+        "subpath": sp,
+        "entries": out_entries,
+        "count": len(out_entries),
+        "read_only": True,
+    }
+    result.update(provenance)
+    return json.dumps(result, ensure_ascii=False)
 
 
 def read_powerunits_roadmap_file(
@@ -156,7 +183,10 @@ def read_powerunits_roadmap_file(
     token = github_token()
     if not token:
         return tool_error("Missing POWERUNITS_GITHUB_TOKEN_READ.", error_code="missing_token")
-    surfaces = load_surfaces()
+    try:
+        surfaces, approved_ref, approved_ref_commit_time = _load_pinned_config()
+    except (ValueError, OSError) as exc:
+        return _config_error(exc)
     wanted = (alias or "powerunits_roadmap").strip() or "powerunits_roadmap"
     s = surfaces.get(wanted)
     if not s:
@@ -172,8 +202,9 @@ def read_powerunits_roadmap_file(
     except ValueError as exc:
         return tool_error(str(exc), error_code="invalid_name")
 
+    ref = str(s["ref"])
     try:
-        text = github_fetch_raw_file(str(s["repo"]), str(s["branch"]), api_path, token)
+        text = github_fetch_raw_file(str(s["repo"]), ref, api_path, token)
     except HTTPError as e:
         if e.code in (401, 403):
             return tool_error("GitHub token unauthorized/forbidden for this repo.", error_code="auth_failed")
@@ -189,32 +220,39 @@ def read_powerunits_roadmap_file(
     if truncated:
         text = text[:lim] + "\n\n[truncated to max_output_chars]"
 
-    sha = github_branch_tip_sha(str(s["repo"]), str(s["branch"]), token)
+    provenance = github_read_provenance(
+        repo=str(s["repo"]),
+        read_sha=ref,
+        approved_ref=approved_ref,
+        approved_ref_commit_time=approved_ref_commit_time,
+        token=token,
+    )
     log_powerunits_docs_read(
         source="github_primary",
         repo=str(s["repo"]),
-        branch=str(s["branch"]),
-        commit_sha=sha,
+        branch=ref,
+        commit_sha=provenance["read_sha"],
         alias=str(s["alias"]),
         relative_path=api_path,
         extra="tool=read_powerunits_roadmap_file",
+        provenance=provenance,
     )
-    return json.dumps(
-        {
-            "alias": s["alias"],
-            "repo": s["repo"],
-            "branch": s["branch"],
-            "commit_sha": sha,
-            "allowed_root": s["root_prefix"],
-            "key": sp,
-            "path": api_path,
-            "chars_returned": len(text),
-            "truncated": truncated,
-            "read_only": True,
-            "content": text,
-        },
-        ensure_ascii=False,
-    )
+    result: dict[str, Any] = {
+        "alias": s["alias"],
+        "repo": s["repo"],
+        "branch": ref,
+        "ref": ref,
+        "commit_sha": provenance["read_sha"],
+        "allowed_root": s["root_prefix"],
+        "key": sp,
+        "path": api_path,
+        "chars_returned": len(text),
+        "truncated": truncated,
+        "read_only": True,
+        "content": text,
+    }
+    result.update(provenance)
+    return json.dumps(result, ensure_ascii=False)
 
 
 LIST_SCHEMA = {
@@ -222,7 +260,8 @@ LIST_SCHEMA = {
     "description": (
         "List directory entries under an allowlisted GitHub root for Powerunits "
         "(default alias powerunits_roadmap -> docs/roadmap). "
-        "Repo/branch/roots are defined only in config/powerunits_github_knowledge.json. Read-only."
+        "Repo/roots and the pinned reviewed commit (see approved_ref) are defined only in "
+        "config/powerunits_github_knowledge.json. Read-only; payload includes read_sha provenance."
     ),
     "parameters": {
         "type": "object",
@@ -244,7 +283,8 @@ READ_SCHEMA = {
     "name": "read_powerunits_roadmap_file",
     "description": (
         "Read one .md/.txt file under an allowlisted GitHub root for Powerunits. "
-        "Repo/branch/roots come only from config/powerunits_github_knowledge.json. Read-only."
+        "Repo/roots and the pinned reviewed commit (see approved_ref) come only from "
+        "config/powerunits_github_knowledge.json. Read-only; payload includes read_sha provenance."
     ),
     "parameters": {
         "type": "object",

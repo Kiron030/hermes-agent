@@ -2,10 +2,13 @@
 """
 Powerunits allowlisted documentation reader (manifest-keyed, read-only).
 
-Primary knowledge path: GitHub (Kiron030/Powerunits.io, branch starting_the_seven_phases)
+Primary knowledge path: GitHub (Kiron030/Powerunits.io, pinned reviewed commit; see approved_ref)
 for paths declared in the doc-key allowlist (see config/powerunits_github_knowledge.json).
 
 Secondary / degraded: bundled snapshot under docker/powerunits_docs/ (build-time only).
+
+Every read/list payload carries the uniform provenance block (read_sha, read_commit_time,
+read_age_days, read_is_current_or_approved, read_source, read_provenance_complete).
 """
 
 from __future__ import annotations
@@ -124,12 +127,34 @@ def _read_stale_warning(age_days: float | None, tier: str | None) -> str | None:
     return None
 
 
+def _approved_ref_or_none() -> str | None:
+    try:
+        from tools.powerunits_github_knowledge import load_knowledge_pin
+
+        return load_knowledge_pin()[0]
+    except Exception:
+        return None
+
+
+def _bundle_provenance(meta: dict[str, Any]) -> dict[str, Any]:
+    """Provenance from MANIFEST.json source_repo_commit + source_commit_time (never checkout HEAD)."""
+    from tools.powerunits_github_knowledge import build_read_provenance
+
+    return build_read_provenance(
+        read_sha=meta.get("source_repo_commit"),
+        read_commit_time=meta.get("source_commit_time"),
+        approved_ref=_approved_ref_or_none(),
+        read_source="bundle",
+    )
+
+
 def _bundle_freshness_fields(meta: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for fld in (
         "generated_at",
         "source_repo_name",
         "source_repo_commit",
+        "source_commit_time",
         "source_repo_branch",
         "source_ref",
         "bundle_version",
@@ -144,6 +169,7 @@ def _bundle_freshness_fields(meta: dict[str, Any]) -> dict[str, Any]:
     sw = _list_stale_warning(age)
     if sw:
         out["stale_warning"] = sw
+    out.update(_bundle_provenance(meta))
     return out
 
 
@@ -211,6 +237,50 @@ def _github_doc_read_eligible() -> bool:
     return check_github_knowledge_available()
 
 
+def _pinned_ref_error() -> str | None:
+    """Fail closed (before any network call) when the knowledge config does not pin an immutable ref."""
+    from tools.powerunits_github_knowledge import PinnedRefError, load_knowledge_pin, load_surfaces
+    from tools.registry import tool_error
+
+    try:
+        load_knowledge_pin()
+        load_surfaces()
+    except PinnedRefError as exc:
+        return tool_error(
+            f"Powerunits read ref is not pinned to an immutable reviewed commit (fail closed): {exc}",
+            error_code="pinned_ref_invalid",
+        )
+    except Exception:
+        return None
+    return None
+
+
+def _list_keys_provenance(mode: str, bundle_meta: dict[str, Any] | None) -> dict[str, Any]:
+    """Provenance of the source a read would use (config/manifest only; no network)."""
+    from tools.powerunits_github_knowledge import (
+        build_read_provenance,
+        load_knowledge_pin,
+        load_surfaces,
+        pinned_listing_provenance,
+    )
+
+    use_github = mode == "github" or (mode == "auto" and _github_doc_read_eligible())
+    if not use_github:
+        return _bundle_provenance(bundle_meta or {})
+    try:
+        approved_ref, approved_ref_commit_time = load_knowledge_pin()
+        refs = [str(s["ref"]) for s in load_surfaces().values() if s.get("enabled")]
+    except Exception:
+        return build_read_provenance(
+            read_sha=None, read_commit_time=None, approved_ref=None, read_source="github"
+        )
+    return pinned_listing_provenance(
+        refs,
+        approved_ref=approved_ref,
+        approved_ref_commit_time=approved_ref_commit_time,
+    )
+
+
 def check_powerunits_docs_requirements() -> bool:
     """Expose read_powerunits_doc when GitHub primary is available OR bundled snapshot is valid."""
     global _BUNDLE_UNAVAILABLE_WARNED
@@ -234,9 +304,10 @@ def check_powerunits_docs_requirements() -> bool:
 def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str, Any]:
     from tools.powerunits_github_knowledge import (
         extension_allowed,
-        github_branch_tip_sha,
         github_fetch_raw_file,
+        github_read_provenance,
         github_token,
+        load_knowledge_pin,
         log_powerunits_docs_read,
         resolve_surface_for_repo_path,
     )
@@ -249,6 +320,7 @@ def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str
     if not rel or ".." in rel.split("/"):
         raise ValueError("bad source_relative")
     surface = resolve_surface_for_repo_path(rel)
+    approved_ref, approved_ref_commit_time = load_knowledge_pin()
     if not extension_allowed(rel, tuple(surface["allowed_extensions"])):
         raise ValueError("extension not allowed")
 
@@ -256,8 +328,9 @@ def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str
     if not (rel == root or rel.startswith(root + "/")):
         raise ValueError("path outside surface root")
 
+    ref = str(surface["ref"])
     try:
-        text = github_fetch_raw_file(str(surface["repo"]), str(surface["branch"]), rel, token)
+        text = github_fetch_raw_file(str(surface["repo"]), ref, rel, token)
     except HTTPError as e:
         raise RuntimeError(f"github_http:{e.code}") from e
     except URLError as e:
@@ -267,16 +340,23 @@ def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str
     if truncated:
         text = text[:max_out] + "\n\n[truncated to max_output_chars; use a smaller doc excerpt or raise max_output_chars within cap]"
 
-    sha = github_branch_tip_sha(str(surface["repo"]), str(surface["branch"]), token)
+    provenance = github_read_provenance(
+        repo=str(surface["repo"]),
+        read_sha=ref,
+        approved_ref=approved_ref,
+        approved_ref_commit_time=approved_ref_commit_time,
+        token=token,
+    )
     log_powerunits_docs_read(
         source="github_primary",
         repo=str(surface["repo"]),
-        branch=str(surface["branch"]),
-        commit_sha=sha,
+        branch=ref,
+        commit_sha=provenance["read_sha"],
         alias=str(surface["alias"]),
         relative_path=rel,
         key=key,
         extra="tool=read_powerunits_doc",
+        provenance=provenance,
     )
 
     meta = entry
@@ -290,10 +370,12 @@ def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str
         "knowledge_actual_source": "github_primary",
         "knowledge_source_notice": _GITHUB_PRIMARY_NOTICE,
         "github_repo": surface["repo"],
-        "github_branch": surface["branch"],
-        "github_commit_sha": sha,
+        "github_branch": ref,
+        "github_ref": ref,
+        "github_commit_sha": provenance["read_sha"],
         "allowlist_surface_alias": surface["alias"],
     }
+    payload.update(provenance)
     for fld in ("doc_class", "freshness_tier", "summary"):
         val = meta.get(fld)
         if isinstance(val, str) and val.strip():
@@ -339,10 +421,13 @@ def _read_from_bundle(
 
     surface_alias = "bundled_manifest"
     repo = str(bundle_meta.get("source_repo_name", "bundled"))
-    branch = str(bundle_meta.get("source_repo_branch", "unknown"))
+    branch = str(
+        bundle_meta.get("source_repo_branch") or bundle_meta.get("source_ref") or "unknown"
+    )
     sha = bundle_meta.get("source_repo_commit")
     sha_s = sha if isinstance(sha, str) and len(sha) >= 7 else None
     rel = str(meta.get("source_relative", key))
+    provenance = _bundle_provenance(bundle_meta)
 
     from tools.powerunits_github_knowledge import log_powerunits_docs_read
 
@@ -355,6 +440,7 @@ def _read_from_bundle(
         relative_path=rel,
         key=key,
         extra=f"tool=read_powerunits_doc reason={fallback_reason}",
+        provenance=provenance,
     )
 
     payload: dict[str, Any] = {
@@ -374,6 +460,7 @@ def _read_from_bundle(
         "github_commit_sha": None,
         "allowlist_surface_alias": surface_alias,
     }
+    payload.update(provenance)
     ga = bundle_meta.get("generated_at")
     if isinstance(ga, str):
         payload["bundle_generated_at"] = ga
@@ -400,6 +487,10 @@ def read_powerunits_doc(
     action = (action or "").strip().lower()
     if action not in {"read", "list_keys"}:
         return tool_error('Invalid action. Use "read" or "list_keys".')
+
+    pin_error = _pinned_ref_error()
+    if pin_error is not None:
+        return pin_error
 
     limit = max_output_chars if max_output_chars is not None else _DEFAULT_MAX_OUT
     try:
@@ -428,7 +519,8 @@ def read_powerunits_doc(
                 s = next(iter(load_surfaces().values()))
                 gh_meta = {
                     "github_repo": s.get("repo"),
-                    "github_branch": s.get("branch"),
+                    "github_branch": s.get("ref"),
+                    "github_ref": s.get("ref"),
                 }
         except Exception:
             keys = []
@@ -452,22 +544,24 @@ def read_powerunits_doc(
             "count": len(keys),
             "primary_knowledge_path": "github_allowlisted_docs",
             "primary_knowledge_policy": (
-                "Hermes Growth v1: GitHub docs (Kiron030/Powerunits.io, branch "
-                "starting_the_seven_phases) are the default read path when "
+                "Hermes Growth v1: GitHub docs (Kiron030/Powerunits.io, pinned reviewed commit "
+                "(see approved_ref)) are the default read path when "
                 "POWERUNITS_GITHUB_TOKEN_READ is set. Bundled docker/powerunits_docs is "
                 "legacy fallback / degraded mode only."
             ),
             "list_keys_primary_hint": primary_hint,
         }
         payload.update(gh_meta)
+        bundle_meta: dict[str, Any] | None = None
         try:
             bundle = _bundle_root()
             data = _load_manifest(bundle)
-            meta = data["meta"]
-            payload["bundled_snapshot_freshness"] = _bundle_freshness_fields(meta)
+            bundle_meta = data["meta"]
+            payload["bundled_snapshot_freshness"] = _bundle_freshness_fields(bundle_meta)
             payload["bundled_docs_notice"] = _BUNDLED_DOCS_NOTICE
         except Exception:
             payload["bundled_snapshot_freshness"] = {}
+        payload.update(_list_keys_provenance(mode, bundle_meta))
         return json.dumps(payload, ensure_ascii=False)
 
     # --- read ---
@@ -606,13 +700,14 @@ READ_POWERUNITS_DOC_SCHEMA = {
     "description": (
         "Read-only **doc-key manifest** Powerunits documentation (keys like "
         "`implementation_state.md`, `runbook.md`). "
-        "**Primary path:** GitHub (`Kiron030/Powerunits.io`, branch `starting_the_seven_phases`) "
+        "**Primary path:** GitHub (`Kiron030/Powerunits.io`, pinned reviewed commit (see `approved_ref`)) "
         "for keys listed in the doc-key allowlist (see `config/powerunits_github_knowledge.json`). "
         "**Do not use this tool** for Repo B implementation allowlist reads "
         "(snake_case keys such as `job_market_feature`, Python paths under `backend/`): "
         "use **`read_powerunits_repo_b_allowlisted`** with `list_repo_b_keys` / `read_repo_b_key`. "
         "**Fallback:** bundled snapshot under `docker/powerunits_docs/` when GitHub is "
-        "unavailable or after explicit degraded use — manifest keys only, never filesystem paths."
+        "unavailable or after explicit degraded use — manifest keys only, never filesystem paths. "
+        "Payloads include read_sha / read_commit_time / read_is_current_or_approved provenance."
     ),
     "parameters": {
         "type": "object",

@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+PINNED_REF = "4c489d5df3e289600eef004e3e71b5e8d4865ff4"
+
 
 @pytest.fixture
 def knowledge_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -10,13 +12,15 @@ def knowledge_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     cfg.write_text(
         json.dumps(
             {
-                "version": 1,
+                "version": 2,
+                "approved_ref": PINNED_REF,
+                "approved_ref_commit_time": "2026-07-21T09:51:31+02:00",
                 "doc_key_allowlist_relative": "scripts/powerunits_docs_allowlist.json",
                 "surfaces": [
                     {
                         "alias": "powerunits_roadmap",
                         "repo": "Kiron030/Powerunits.io",
-                        "branch": "starting_the_seven_phases",
+                        "ref": PINNED_REF,
                         "root_prefix": "docs/roadmap",
                         "allowed_extensions": [".md", ".txt"],
                         "enabled": True,
@@ -47,8 +51,9 @@ def test_list_and_read_happy_path(
 
     monkeypatch.setenv("POWERUNITS_GITHUB_TOKEN_READ", "t")
 
-    def fake_json(repo: str, branch: str, api_path: str, token: str):
+    def fake_json(repo: str, ref: str, api_path: str, token: str):
         assert "docs/roadmap" in api_path
+        assert ref == PINNED_REF
         assert token == "t"
         return [
             {"name": "phase1", "type": "dir", "path": "docs/roadmap/phase1"},
@@ -60,22 +65,20 @@ def test_list_and_read_happy_path(
     assert out["count"] == 2
     assert out["entries"][0]["type"] == "dir"
     assert out["alias"] == "powerunits_roadmap"
-    assert "commit_sha" in out
+    assert out["commit_sha"] == PINNED_REF
+    assert out["read_sha"] == PINNED_REF
 
-    monkeypatch.setattr(
-        m,
-        "github_fetch_raw_file",
-        lambda repo, branch, path, token: "# Title\n\nBody",
-    )
-    monkeypatch.setattr(
-        m,
-        "github_branch_tip_sha",
-        lambda r, b, t: "deadbeef",
-    )
+    def fake_raw(repo: str, ref: str, path: str, token: str) -> str:
+        assert ref == PINNED_REF
+        return "# Title\n\nBody"
+
+    monkeypatch.setattr(m, "github_fetch_raw_file", fake_raw)
     rout = json.loads(m.read_powerunits_roadmap_file("overview.md", alias="powerunits_roadmap"))
     assert rout["read_only"] is True
     assert "Title" in rout["content"]
-    assert rout.get("commit_sha") == "deadbeef"
+    assert rout.get("commit_sha") == PINNED_REF
+    assert rout.get("read_source") == "github"
+    assert rout.get("read_is_current_or_approved") is True
 
 
 def test_reject_escape_and_extension(

@@ -3,14 +3,21 @@
 Build-time bundle: copy allowlisted Powerunits markdown from the monorepo
 into docker/powerunits_docs/ and write MANIFEST.json (fail-closed).
 
+File content is read from the git object store at an explicit immutable commit
+(--ref, 40 lowercase hex; default: approved_ref from
+config/powerunits_github_knowledge.json) — never from the working tree or the
+local checkout HEAD. MANIFEST.json records that commit (source_repo_commit) and
+its committer time (source_commit_time).
+
 No runtime dependency on the monorepo; intended to run on an operator
 workstation or in CI before docker build / commit.
 
 Usage:
-  python scripts/bundle_powerunits_docs.py --source-root /path/to/EU-PP-Database
+  python scripts/bundle_powerunits_docs.py --source-root /path/to/EU-PP-Database [--ref <40-hex>]
 
 Env:
   POWERUNITS_REPO_ROOT — default for --source-root if flag omitted.
+  HERMES_POWERUNITS_GITHUB_KNOWLEDGE_CONFIG — knowledge config providing the default --ref.
 """
 
 from __future__ import annotations
@@ -20,17 +27,34 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 _KEY_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*\.md$")
+_SHA40_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def _knowledge_config_path() -> Path:
+    override = os.environ.get("HERMES_POWERUNITS_GITHUB_KNOWLEDGE_CONFIG", "").strip()
+    if override:
+        return Path(override).resolve()
+    return _repo_root() / "config" / "powerunits_github_knowledge.json"
+
+
+def _approved_ref() -> str:
+    """approved_ref from the knowledge config; empty string when unavailable."""
+    try:
+        data = json.loads(_knowledge_config_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    ref = data.get("approved_ref") if isinstance(data, dict) else None
+    return ref if isinstance(ref, str) else ""
 
 
 def _load_allowlist(path: Path) -> dict:
@@ -48,51 +72,33 @@ def _assert_key_safe(key: str) -> None:
         raise SystemExit(f"unsafe or invalid manifest key: {key!r}")
 
 
-def _git_provenance(repo_root: Path) -> dict[str, str]:
-    """Best-effort git metadata; never raises; omits keys if unavailable."""
-    out: dict[str, str] = {}
-    git_dir = repo_root / ".git"
-    if not git_dir.exists():
-        return out
-
-    def _run_git(*args: str) -> str:
-        try:
-            proc = subprocess.run(
-                ["git", *args],
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-            if proc.returncode != 0:
-                return ""
-            return (proc.stdout or "").strip()
-        except (OSError, subprocess.SubprocessError):
-            return ""
-
-    commit = _run_git("rev-parse", "HEAD")
-    if commit and len(commit) >= 7:
-        out["source_repo_commit"] = commit
-    branch = _run_git("rev-parse", "--abbrev-ref", "HEAD")
-    if branch and branch != "HEAD":
-        out["source_repo_branch"] = branch
-    if commit and branch:
-        out["source_ref"] = f"{branch}@{commit[:12]}"
-    elif commit:
-        out["source_ref"] = commit[:12]
-    elif branch:
-        out["source_ref"] = branch
-    return out
-
-
-def _assert_under_repo_root(repo_root: Path, candidate: Path) -> None:
-    repo_r = repo_root.resolve()
-    cand_r = candidate.resolve()
+def _git(repo_root: Path, *args: str) -> bytes | None:
+    """Run a read-only git command in repo_root; None on any failure (callers fail closed)."""
     try:
-        cand_r.relative_to(repo_r)
-    except ValueError as exc:
-        raise SystemExit(f"path escapes monorepo root: {candidate}") from exc
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout
+
+
+def _resolve_commit(repo_root: Path, ref: str) -> str:
+    """Committer time (ISO-8601 with offset) of the exact local commit ``ref``; exit if absent."""
+    out = _git(repo_root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+    resolved = out.decode("utf-8", errors="replace").strip() if out else ""
+    if resolved != ref:
+        raise SystemExit(f"error: commit {ref} not found in {repo_root} (fetch it first)")
+    out = _git(repo_root, "show", "-s", "--format=%cI", ref)
+    commit_time = out.decode("utf-8", errors="replace").strip() if out else ""
+    if not commit_time:
+        raise SystemExit(f"error: could not read commit time of {ref}")
+    return commit_time
 
 
 def main() -> int:
@@ -100,7 +106,12 @@ def main() -> int:
     parser.add_argument(
         "--source-root",
         default=os.environ.get("POWERUNITS_REPO_ROOT", ""),
-        help="Root of the EU-PP-Database (Powerunits) checkout",
+        help="Root of the EU-PP-Database (Powerunits) git clone",
+    )
+    parser.add_argument(
+        "--ref",
+        default=None,
+        help="Immutable 40-hex commit to bundle (default: approved_ref from the knowledge config)",
     )
     parser.add_argument(
         "--allowlist",
@@ -126,6 +137,23 @@ def main() -> int:
         print(f"error: source root is not a directory: {source_root}", file=sys.stderr)
         return 2
 
+    approved_ref = _approved_ref()
+    ref = args.ref if args.ref is not None else approved_ref
+    if not _SHA40_PATTERN.fullmatch(ref or ""):
+        print(
+            f"error: --ref must be a 40 lowercase hex commit SHA (got {ref!r}); "
+            "branch names, tags and short SHAs are rejected",
+            file=sys.stderr,
+        )
+        return 2
+    if ref != approved_ref:
+        print(
+            f"warning: --ref {ref} differs from approved_ref {approved_ref or '<unset>'}; "
+            "reads from this bundle will report read_is_current_or_approved=false",
+            file=sys.stderr,
+        )
+    commit_time = _resolve_commit(source_root, ref)
+
     allowlist_path = args.allowlist.resolve()
     out_dir = args.out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -144,10 +172,10 @@ def main() -> int:
         if ".." in Path(rel).parts or rel.startswith(("/", "\\")):
             raise SystemExit(f"unsafe source_relative: {rel!r}")
 
-        src = (source_root / rel).resolve()
-        _assert_under_repo_root(source_root, src)
-        if not src.is_file():
-            print(f"error: missing allowlisted source file: {src}", file=sys.stderr)
+        git_rel = rel.replace("\\", "/")
+        body = _git(source_root, "cat-file", "blob", f"{ref}:{git_rel}")
+        if body is None:
+            print(f"error: missing allowlisted source file at {ref}: {git_rel}", file=sys.stderr)
             return 1
 
         dest = (out_dir / key).resolve()
@@ -156,13 +184,13 @@ def main() -> int:
         except ValueError as exc:
             raise SystemExit(f"dest escapes out-dir: {key!r}") from exc
 
-        shutil.copy2(src, dest)
-        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+        dest.write_bytes(body)
+        digest = hashlib.sha256(body).hexdigest()
         entry: dict = {
             "key": key,
-            "source_relative": rel.replace("\\", "/"),
+            "source_relative": git_rel,
             "sha256": digest,
-            "bytes": dest.stat().st_size,
+            "bytes": len(body),
         }
         for opt in ("doc_class", "freshness_tier", "summary"):
             val = raw.get(opt)
@@ -173,28 +201,30 @@ def main() -> int:
         entries_out.append(entry)
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    prov = _git_provenance(source_root)
     repo_name = data.get("source_repo_name")
     if isinstance(repo_name, str) and repo_name.strip():
-        prov["source_repo_name"] = repo_name.strip()
-    elif "source_repo_name" not in prov:
-        prov["source_repo_name"] = source_root.resolve().name or "source"
+        source_repo_name = repo_name.strip()
+    else:
+        source_repo_name = source_root.resolve().name or "source"
 
     manifest: dict = {
         "bundle_version": 2,
         "allowlist_version": data.get("allowlist_version", 1),
         "generated_at": generated_at,
-        "source_root_note": "paths are relative to monorepo root at bundle time",
+        "source_root_note": "paths are relative to monorepo root; content read from git at source_repo_commit",
         "entries": sorted(entries_out, key=lambda e: e["key"]),
+        "source_repo_commit": ref,
+        "source_commit_time": commit_time,
+        "source_ref": ref,
+        "source_repo_name": source_repo_name,
     }
-    manifest.update(prov)
     manifest_path = out_dir / "MANIFEST.json"
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=False) + "\n",
         encoding="utf-8",
     )
 
-    print(f"Wrote {len(entries_out)} files + MANIFEST.json -> {out_dir}")
+    print(f"Wrote {len(entries_out)} files + MANIFEST.json -> {out_dir} (ref {ref})")
     return 0
 
 

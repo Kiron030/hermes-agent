@@ -248,7 +248,7 @@ TOOLSETS = {
     "powerunits_github_docs": {
         "description": (
             "Read-only GitHub docs access, hard-allowlisted to "
-            "Kiron030/Powerunits.io docs/roadmap on branch starting_the_seven_phases."
+            "Kiron030/Powerunits.io docs/roadmap at the pinned reviewed commit (see approved_ref)."
         ),
         "tools": ["list_powerunits_roadmap_dir", "read_powerunits_roadmap_file"],
         "includes": [],

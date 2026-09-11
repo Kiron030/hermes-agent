@@ -129,20 +129,24 @@ def test_github_primary_when_token_and_auto(
     from tools import powerunits_docs_tool as m
     from tools import powerunits_github_knowledge as km
 
-    def _fake_fetch(repo: str, branch: str, api_path: str, token: str) -> str:
+    pinned = "4c489d5df3e289600eef004e3e71b5e8d4865ff4"
+
+    def _fake_fetch(repo: str, ref: str, api_path: str, token: str) -> str:
         assert repo == "Kiron030/Powerunits.io"
-        assert branch == "starting_the_seven_phases"
+        assert ref == pinned
         assert api_path == "docs/test_doc.md"
         assert token == "tok"
         return "# From GitHub\n"
 
     monkeypatch.setattr(km, "github_fetch_raw_file", _fake_fetch)
-    monkeypatch.setattr(km, "github_branch_tip_sha", lambda r, b, t: "abc1234")
 
     out = json.loads(m.read_powerunits_doc(action="read", key="test_doc.md"))
     assert out.get("knowledge_actual_source") == "github_primary"
     assert "From GitHub" in out["content"]
-    assert out.get("github_commit_sha") == "abc1234"
+    assert out.get("github_commit_sha") == pinned
+    assert out.get("read_sha") == pinned
+    assert out.get("read_source") == "github"
+    assert out.get("read_is_current_or_approved") is True
 
 
 def test_explicit_fallback_when_github_fails(
@@ -163,6 +167,8 @@ def test_explicit_fallback_when_github_fails(
     assert out.get("bundled_fallback_explicit") is True
     assert "github_primary_failed" in str(out.get("bundled_fallback_reason", ""))
     assert "Hello" in out["content"]
+    assert out.get("read_source") == "bundle"
+    assert out.get("read_is_current_or_approved") is False
 
 
 def test_first_safe_tool_cap_includes_reader(
