@@ -1195,6 +1195,25 @@ def execute_code(
     if not code or not code.strip():
         return tool_error("No code provided.")
 
+    # Hard-block gateway-lifecycle commands, mirroring the terminal_tool guard (#68289): without
+    # this, execute_code is a straight bypass — `os.system("launchctl bootout ...")` /
+    # `subprocess.run([...])` here SIGTERMs the gateway mid-task. Gated on the same
+    # `_HERMES_GATEWAY` marker as the terminal_tool guard. Code too large to tokenize safely is
+    # refused rather than scanned (the tokenizer passes are quadratic on a giant token).
+    if os.environ.get("_HERMES_GATEWAY") == "1":
+        from cron.lifecycle_guard import (
+            contains_gateway_lifecycle_command,
+            lifecycle_scan_root_within_budget,
+        )
+        if not lifecycle_scan_root_within_budget(code) or contains_gateway_lifecycle_command(code):
+            return tool_error(
+                "Blocked: cannot restart or stop the gateway from inside the "
+                "gateway process. The gateway would kill this script before "
+                "it could complete (SIGTERM propagates to child processes). "
+                "Run the lifecycle command from a shell outside the gateway. "
+                "(Scripts too large for the lifecycle scan are also refused here.)"
+            )
+
     # Dispatch: remote backends use file-based RPC, local uses UDS
     from tools.terminal_tool import _get_env_config, _docker_has_host_access
     _env_config = _get_env_config()
