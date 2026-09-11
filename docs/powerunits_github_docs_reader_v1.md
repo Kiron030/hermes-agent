@@ -5,7 +5,7 @@
 Kleinstmoegliche read-only GitHub-Dokuoberflaeche fuer Hermes:
 
 - Repo: `Kiron030/Powerunits.io`
-- Ref: gepinnter, reviewter Commit (`approved_ref`, 40 lowercase hex, plus `approved_ref_commit_time`) — **kein** beweglicher Branch. Jede Surface und jeder Repo-B-Eintrag traegt `ref`; fehlende, kurze oder Branch-Refs werden fail-closed ohne Netzwerkaufruf abgelehnt. Repin erfordert eine separate reviewte Entscheidung.
+- Ref: gepinnter, reviewter Commit (`approved_ref`, 40 lowercase hex, plus `approved_ref_commit_time`) — **kein** beweglicher Branch. Jede Surface und jeder Repo-B-Eintrag traegt `ref`; fehlende, kurze oder Branch-Refs sowie gueltige SHAs ungleich `approved_ref` werden fail-closed ohne Netzwerkaufruf abgelehnt. Repin erfordert eine separate reviewte Entscheidung.
 - **Zentrale Konfiguration:** `config/powerunits_github_knowledge.json`
   - Feld `surfaces`: aliasgebundene `root_prefix`-Roots (z. B. `powerunits_docs -> docs`, `powerunits_roadmap -> docs/roadmap`, `powerunits_architecture -> docs/architecture`).
   - Feld `doc_key_allowlist_relative`: Pfad zur Manifest-Key-Datei (Standard: `scripts/powerunits_docs_allowlist.json`) fuer `read_powerunits_doc` (GitHub-primary + Bundle-Fallback).
@@ -55,9 +55,9 @@ Beide nutzen dieselbe zentrale Config; `alias` muss in `surfaces` existieren und
 Jede Read-/List-Antwort aller vier Tools (GitHub-Primary und Bundle-Fallback) enthaelt additiv:
 
 - `read_sha` — der tatsaechlich angefragte gepinnte Commit (GitHub) bzw. `source_repo_commit` aus `MANIFEST.json` (Bundle); keine nachtraegliche Branch-Tip-Abfrage.
-- `read_commit_time` — `approved_ref_commit_time` wenn `read_sha == approved_ref`; sonst `commits/<sha>`-Lookup (GitHub) bzw. `source_commit_time` (Bundle), sonst `null`.
+- `read_commit_time` — `approved_ref_commit_time` (GitHub; Loader lassen nur `ref == approved_ref` zu) bzw. `source_commit_time` (Bundle), sonst `null`. Kein `commits/<sha>`-Lookup.
 - `read_age_days` — Tage von Commit-Zeit bis jetzt (UTC).
-- `read_is_current_or_approved` — `read_sha == approved_ref`.
+- `read_is_current_or_approved` — `read_provenance_complete` **und** `read_sha == approved_ref` (ein Bundle ohne `source_commit_time` ist nie approved).
 - `read_source` — `github` | `bundle`.
 - `read_provenance_complete` — `false`, wenn SHA, Commit-Zeit oder `approved_ref` fehlen.
 

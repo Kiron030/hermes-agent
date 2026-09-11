@@ -57,7 +57,7 @@ Top-level (additive; older bundles may omit new fields):
 - `source_ref` (the same 40-hex commit; legacy bundles: `branch@abcdef123456`)
 - `entries[]`: each entry keeps `key`, `source_relative`, `sha256`, `bytes` and may include `doc_class`, `freshness_tier`, `summary`
 
-Bundling reads file content from the git object store at `--ref` (not the working tree or checkout HEAD) and **fails closed** if the commit or a path cannot be resolved. At runtime a bundle whose `source_repo_commit` differs from `approved_ref` reports `read_is_current_or_approved=false`; a bundle without `source_commit_time` reports `read_provenance_complete=false`.
+Bundling reads file content from the git object store at `--ref` (not the working tree or checkout HEAD) and **fails closed** if the commit or a path cannot be resolved. At runtime a bundle whose `source_repo_commit` differs from `approved_ref` reports `read_is_current_or_approved=false`; a bundle without `source_commit_time` (e.g. an old-format bundle copied from the working tree) reports `read_provenance_complete=false` and therefore also `read_is_current_or_approved=false`, even when its commit equals `approved_ref`.
 
 ---
 

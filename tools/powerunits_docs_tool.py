@@ -341,11 +341,9 @@ def _read_from_github(key: str, entry: dict[str, Any], max_out: int) -> dict[str
         text = text[:max_out] + "\n\n[truncated to max_output_chars; use a smaller doc excerpt or raise max_output_chars within cap]"
 
     provenance = github_read_provenance(
-        repo=str(surface["repo"]),
         read_sha=ref,
         approved_ref=approved_ref,
         approved_ref_commit_time=approved_ref_commit_time,
-        token=token,
     )
     log_powerunits_docs_read(
         source="github_primary",

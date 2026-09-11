@@ -43,6 +43,8 @@ BAD_REFS = [
     pytest.param("z" * 40, id="non_hex_40"),
     pytest.param(PIN + "0", id="41_chars"),
 ]
+# Per-surface / per-entry refs: additionally, a valid SHA that is not approved_ref is rejected.
+NON_APPROVED_REFS = BAD_REFS + [pytest.param(OTHER_SHA, id="valid_sha_not_approved_ref")]
 
 _TOOL_LOGGERS = (
     "tools.powerunits_github_knowledge",
@@ -295,6 +297,29 @@ def test_build_read_provenance_rejects_unknown_source() -> None:
         km.build_read_provenance(read_sha=PIN, read_commit_time=PIN_TIME, approved_ref=PIN, read_source="branch")
 
 
+@pytest.mark.parametrize("source", ["github", "bundle"])
+def test_build_read_provenance_approved_requires_complete(source: str) -> None:
+    from tools import powerunits_github_knowledge as km
+
+    incomplete = km.build_read_provenance(read_sha=PIN, read_commit_time=None, approved_ref=PIN, read_source=source)
+    assert incomplete["read_provenance_complete"] is False
+    assert incomplete["read_is_current_or_approved"] is False
+
+    complete = km.build_read_provenance(read_sha=PIN, read_commit_time=PIN_TIME, approved_ref=PIN, read_source=source)
+    assert complete["read_provenance_complete"] is True
+    assert complete["read_is_current_or_approved"] is True
+
+
+def test_github_read_provenance_approved_is_complete_without_network(github: _FakeGitHub) -> None:
+    from tools import powerunits_github_knowledge as km
+
+    approved = km.github_read_provenance(read_sha=PIN, approved_ref=PIN, approved_ref_commit_time=PIN_TIME)
+    _assert_block(approved, source="github")
+    other = km.github_read_provenance(read_sha=OTHER_SHA, approved_ref=PIN, approved_ref_commit_time=PIN_TIME)
+    _assert_block(other, source="github", sha=OTHER_SHA, current=False, complete=False, commit_time=None)
+    assert github.calls == []
+
+
 # --- shipped configs ------------------------------------------------------------------
 
 
@@ -352,6 +377,18 @@ def test_knowledge_surface_rejects_omitted_ref(
     _write_knowledge_config(tmp_path, monkeypatch, surface_ref=_OMIT)
     with pytest.raises(km.PinnedRefError, match="missing 'ref'"):
         km.load_surfaces()
+    assert github.calls == []
+
+
+def test_knowledge_surface_rejects_valid_sha_other_than_approved_ref(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
+) -> None:
+    from tools import powerunits_github_knowledge as km
+
+    _write_knowledge_config(tmp_path, monkeypatch, surface_ref=OTHER_SHA)
+    with pytest.raises(km.PinnedRefError, match="differs from approved_ref"):
+        km.load_surfaces()
+    assert km.check_github_knowledge_available() is False
     assert github.calls == []
 
 
@@ -422,6 +459,18 @@ def test_repo_b_allowlist_rejects_legacy_branch(
     assert github.calls == []
 
 
+def test_repo_b_allowlist_rejects_valid_sha_other_than_approved_ref(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
+) -> None:
+    from tools import powerunits_github_knowledge as km
+    from tools import powerunits_repo_b_read_tool as rb
+
+    _write_repo_b_allowlist(tmp_path, monkeypatch, entry_ref=OTHER_SHA)
+    with pytest.raises(km.PinnedRefError, match="differs from approved_ref"):
+        rb._load_allowlist_entries()
+    assert github.calls == []
+
+
 @pytest.mark.parametrize("bad_ref", BAD_REFS)
 def test_repo_b_allowlist_rejects_bad_approved_ref(
     bad_ref: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
@@ -448,7 +497,7 @@ def test_contents_fetch_refuses_branch_ref(github: _FakeGitHub) -> None:
 # --- tools fail closed without network -------------------------------------------------
 
 
-@pytest.mark.parametrize("bad_ref", BAD_REFS)
+@pytest.mark.parametrize("bad_ref", NON_APPROVED_REFS)
 def test_roadmap_tools_fail_closed_without_network(
     bad_ref: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
 ) -> None:
@@ -463,7 +512,7 @@ def test_roadmap_tools_fail_closed_without_network(
     assert github.calls == []
 
 
-@pytest.mark.parametrize("bad_ref", BAD_REFS)
+@pytest.mark.parametrize("bad_ref", NON_APPROVED_REFS)
 def test_repo_b_tool_fails_closed_without_network(
     bad_ref: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
 ) -> None:
@@ -480,7 +529,7 @@ def test_repo_b_tool_fails_closed_without_network(
 
 
 @pytest.mark.parametrize("mode", ["auto", "github", "bundle"])
-@pytest.mark.parametrize("bad_ref", BAD_REFS)
+@pytest.mark.parametrize("bad_ref", NON_APPROVED_REFS)
 def test_docs_tool_fails_closed_without_network(
     bad_ref: Any, mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
 ) -> None:
@@ -580,7 +629,8 @@ def test_docs_bundle_without_source_commit_time_is_incomplete(
     _write_bundle(tmp_path, monkeypatch, commit_time=_OMIT)
 
     out = json.loads(m.read_powerunits_doc(action="read", key="implementation_state.md"))
-    _assert_block(out, source="bundle", current=True, complete=False, commit_time=None)
+    # Old-format bundle: commit equals approved_ref, but content may not match it -> never approved.
+    _assert_block(out, source="bundle", current=False, complete=False, commit_time=None)
 
 
 def test_docs_bundle_legacy_short_commit_is_incomplete(
@@ -663,41 +713,6 @@ def test_repo_b_list_has_provenance_without_network(
     assert len(out["keys"]) == 27
     _assert_block(out, source="github")
     assert github.calls == []
-
-
-def test_repo_b_read_non_approved_ref_uses_exact_commit_lookup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
-) -> None:
-    from tools import powerunits_repo_b_read_tool as rb
-
-    monkeypatch.setenv("HERMES_POWERUNITS_REPO_B_READ_ENABLED", "1")
-    _write_repo_b_allowlist(tmp_path, monkeypatch, entry_ref=OTHER_SHA)
-    github.routes["/contents/"] = b"body"
-    github.routes[f"/commits/{OTHER_SHA}"] = {
-        "sha": OTHER_SHA,
-        "commit": {"committer": {"date": "2026-08-01T10:00:00Z"}},
-    }
-
-    out = json.loads(rb.read_powerunits_repo_b_allowlisted("read_repo_b_key", key="implementation_state"))
-    _assert_block(
-        out, source="github", sha=OTHER_SHA, current=False, complete=True, commit_time="2026-08-01T10:00:00Z"
-    )
-    assert github.calls[0] == _contents_url("docs/implementation_state.md", OTHER_SHA)
-    assert github.calls[1].endswith(f"/commits/{OTHER_SHA}")
-
-
-def test_repo_b_read_non_approved_ref_lookup_failure_is_incomplete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, github: _FakeGitHub
-) -> None:
-    from tools import powerunits_repo_b_read_tool as rb
-
-    monkeypatch.setenv("HERMES_POWERUNITS_REPO_B_READ_ENABLED", "1")
-    _write_repo_b_allowlist(tmp_path, monkeypatch, entry_ref=OTHER_SHA)
-    github.routes["/contents/"] = b"body"
-    github.routes["/commits/"] = URLError("down")
-
-    out = json.loads(rb.read_powerunits_repo_b_allowlisted("read_repo_b_key", key="implementation_state"))
-    _assert_block(out, source="github", sha=OTHER_SHA, current=False, complete=False, commit_time=None)
 
 
 # --- list_powerunits_roadmap_dir / read_powerunits_roadmap_file ------------------------
@@ -805,3 +820,24 @@ def test_bundler_rejects_non_immutable_ref_before_git(
     )
     assert mod.main() == 2
     assert not out_dir.exists()
+
+
+def test_bundler_commit_time_read_ignores_signature_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    mod = _load_bundler()
+    calls: list[tuple[str, ...]] = []
+
+    def _fake_git(_root: Path, *args: str) -> bytes:
+        calls.append(args)
+        return f"{PIN if args[0] == 'rev-parse' else PIN_TIME}\n".encode("utf-8")
+
+    monkeypatch.setattr(mod, "_git", _fake_git)
+    assert mod._resolve_commit(tmp_path, PIN) == PIN_TIME
+    assert calls[1] == (
+        "-c",
+        "log.showSignature=false",
+        "show",
+        "-s",
+        "--no-show-signature",
+        "--format=%cI",
+        PIN,
+    )

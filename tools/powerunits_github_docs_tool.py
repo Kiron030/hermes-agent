@@ -140,11 +140,9 @@ def list_powerunits_roadmap_dir(subpath: str | None = None, alias: str | None = 
         )
     out_entries.sort(key=lambda x: (x.get("type") != "dir", str(x.get("name", "")).lower()))
     provenance = github_read_provenance(
-        repo=str(s["repo"]),
         read_sha=ref,
         approved_ref=approved_ref,
         approved_ref_commit_time=approved_ref_commit_time,
-        token=token,
     )
     log_powerunits_docs_read(
         source="github_primary",
@@ -221,11 +219,9 @@ def read_powerunits_roadmap_file(
         text = text[:lim] + "\n\n[truncated to max_output_chars]"
 
     provenance = github_read_provenance(
-        repo=str(s["repo"]),
         read_sha=ref,
         approved_ref=approved_ref,
         approved_ref_commit_time=approved_ref_commit_time,
-        token=token,
     )
     log_powerunits_docs_read(
         source="github_primary",

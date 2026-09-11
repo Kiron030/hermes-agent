@@ -94,7 +94,17 @@ def _resolve_commit(repo_root: Path, ref: str) -> str:
     resolved = out.decode("utf-8", errors="replace").strip() if out else ""
     if resolved != ref:
         raise SystemExit(f"error: commit {ref} not found in {repo_root} (fetch it first)")
-    out = _git(repo_root, "show", "-s", "--format=%cI", ref)
+    # Pin signature output off so user git config (e.g. log.showSignature) cannot pollute %cI.
+    out = _git(
+        repo_root,
+        "-c",
+        "log.showSignature=false",
+        "show",
+        "-s",
+        "--no-show-signature",
+        "--format=%cI",
+        ref,
+    )
     commit_time = out.decode("utf-8", errors="replace").strip() if out else ""
     if not commit_time:
         raise SystemExit(f"error: could not read commit time of {ref}")

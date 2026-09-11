@@ -17,7 +17,6 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -139,6 +138,7 @@ def load_surfaces() -> dict[str, dict[str, Any]]:
     raw = load_knowledge_config()
     surfaces = raw.get("surfaces")
     assert isinstance(surfaces, list)
+    approved_ref, _ = load_approved_pin(raw, context="knowledge config")
     out: dict[str, dict[str, Any]] = {}
     for item in surfaces:
         if not isinstance(item, dict):
@@ -157,6 +157,11 @@ def load_surfaces() -> dict[str, dict[str, Any]]:
             context=f"surface {alias}",
             legacy_branch=item.get("branch"),
         )
+        if ref != approved_ref:
+            raise PinnedRefError(
+                f"surface {alias}: 'ref' {ref} differs from approved_ref {approved_ref}; "
+                "only the approved commit is readable"
+            )
         if not root:
             raise ValueError(f"surface {alias}: invalid root_prefix")
         if not isinstance(exts, list) or not exts:
@@ -215,26 +220,6 @@ def github_token() -> str:
     return os.getenv(_TOKEN_ENV_LEGACY, "").strip()
 
 
-def github_commit_time(repo: str, sha: str, token: str) -> str | None:
-    """Committer time of an exact commit; used only when a read ref differs from approved_ref."""
-    if not is_pinned_sha(sha):
-        return None
-    url = f"https://api.github.com/repos/{quote(repo, safe='/')}/commits/{sha}"
-    try:
-        req = Request(url, headers=_headers(token), method="GET")
-        with urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        if isinstance(data, dict) and data.get("sha") == sha:
-            commit = data.get("commit")
-            committer = commit.get("committer") if isinstance(commit, dict) else None
-            date = committer.get("date") if isinstance(committer, dict) else None
-            if parse_commit_time(date) is not None:
-                return str(date).strip()
-    except (HTTPError, URLError, OSError, json.JSONDecodeError, TypeError, ValueError):
-        return None
-    return None
-
-
 def _contents_url(repo: str, ref: str, api_path: str) -> str:
     validate_pinned_ref(ref, context="github contents read")
     return (
@@ -273,29 +258,30 @@ def build_read_provenance(
     if commit_dt is not None:
         ref_now = now or datetime.now(timezone.utc)
         age_days = round(max(0.0, (ref_now - commit_dt).total_seconds() / 86400.0), 2)
+    complete = bool(sha and approved and commit_dt is not None)
     return {
         "read_sha": sha,
         "read_commit_time": str(read_commit_time).strip() if commit_dt is not None else None,
         "read_age_days": age_days,
-        "read_is_current_or_approved": bool(sha and approved and sha == approved),
+        # Incomplete provenance (e.g. old-format bundle without commit time) never counts as approved.
+        "read_is_current_or_approved": bool(complete and sha == approved),
         "read_source": read_source,
-        "read_provenance_complete": bool(sha and approved and commit_dt is not None),
+        "read_provenance_complete": complete,
     }
 
 
 def github_read_provenance(
     *,
-    repo: str,
     read_sha: str,
     approved_ref: str | None,
     approved_ref_commit_time: str | None,
-    token: str,
 ) -> dict[str, Any]:
-    """Provenance for a GitHub read: READ_SHA is the pinned ref actually requested."""
-    if approved_ref is not None and read_sha == approved_ref:
-        commit_time = approved_ref_commit_time
-    else:
-        commit_time = github_commit_time(repo, read_sha, token)
+    """Provenance for a GitHub read: READ_SHA is the pinned ref actually requested (no network).
+
+    Loaders only admit ``ref == approved_ref``, so the commit time is the validated
+    ``approved_ref_commit_time``; any other SHA gets no commit time (incomplete, not approved).
+    """
+    commit_time = approved_ref_commit_time if approved_ref is not None and read_sha == approved_ref else None
     return build_read_provenance(
         read_sha=read_sha,
         read_commit_time=commit_time,

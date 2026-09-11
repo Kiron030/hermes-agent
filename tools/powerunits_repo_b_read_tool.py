@@ -54,8 +54,8 @@ def check_powerunits_repo_b_read_requirements() -> bool:
 
 
 def _load_allowlist() -> dict[str, Any]:
-    """Entries by key plus the approved pin; fails closed on any non-immutable ref."""
-    from tools.powerunits_github_knowledge import load_approved_pin, validate_pinned_ref
+    """Entries by key plus the approved pin; fails closed on any ref other than approved_ref."""
+    from tools.powerunits_github_knowledge import PinnedRefError, load_approved_pin, validate_pinned_ref
 
     p = repo_b_allowlist_path()
     raw = json.loads(p.read_text(encoding="utf-8"))
@@ -76,11 +76,16 @@ def _load_allowlist() -> dict[str, Any]:
             continue
         if not isinstance(repo, str) or "/" not in repo:
             raise ValueError(f"repo b allowlist entry {key!r}: invalid repo")
-        validate_pinned_ref(
+        ref = validate_pinned_ref(
             item.get("ref"),
             context=f"repo b allowlist entry {key!r}",
             legacy_branch=item.get("branch"),
         )
+        if ref != approved_ref:
+            raise PinnedRefError(
+                f"repo b allowlist entry {key!r}: 'ref' {ref} differs from approved_ref {approved_ref}; "
+                "only the approved commit is readable"
+            )
         if not isinstance(path, str) or not path.strip():
             raise ValueError(f"repo b allowlist entry {key!r}: invalid path")
         norm = path.strip().replace("\\", "/").lstrip("/")
