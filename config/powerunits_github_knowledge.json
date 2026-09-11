@@ -1,12 +1,14 @@
 {
-  "version": 1,
-  "description": "Canonical Hermes config for Powerunits GitHub docs (read-only). No secrets. Override paths via env HERMES_POWERUNITS_DOC_KEY_ALLOWLIST if needed.",
+  "version": 2,
+  "description": "Canonical Hermes config for Powerunits GitHub docs (read-only). No secrets. Reads are pinned to approved_ref (immutable reviewed commit, 40 lowercase hex); moving branch names are rejected. Repin requires a separate reviewed decision. Override paths via env HERMES_POWERUNITS_DOC_KEY_ALLOWLIST if needed.",
+  "approved_ref": "4c489d5df3e289600eef004e3e71b5e8d4865ff4",
+  "approved_ref_commit_time": "2026-07-21T09:51:31+02:00",
   "doc_key_allowlist_relative": "scripts/powerunits_docs_allowlist.json",
   "surfaces": [
     {
       "alias": "powerunits_docs",
       "repo": "Kiron030/Powerunits.io",
-      "branch": "starting_the_seven_phases",
+      "ref": "4c489d5df3e289600eef004e3e71b5e8d4865ff4",
       "root_prefix": "docs",
       "allowed_extensions": [".md", ".txt"],
       "enabled": true
@@ -14,7 +16,7 @@
     {
       "alias": "powerunits_roadmap",
       "repo": "Kiron030/Powerunits.io",
-      "branch": "starting_the_seven_phases",
+      "ref": "4c489d5df3e289600eef004e3e71b5e8d4865ff4",
       "root_prefix": "docs/roadmap",
       "allowed_extensions": [".md", ".txt"],
       "enabled": true
@@ -22,7 +24,7 @@
     {
       "alias": "powerunits_architecture",
       "repo": "Kiron030/Powerunits.io",
-      "branch": "starting_the_seven_phases",
+      "ref": "4c489d5df3e289600eef004e3e71b5e8d4865ff4",
       "root_prefix": "docs/architecture",
       "allowed_extensions": [".md", ".txt"],
       "enabled": true

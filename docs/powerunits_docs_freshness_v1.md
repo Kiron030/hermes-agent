@@ -51,12 +51,13 @@ Top-level (additive; older bundles may omit new fields):
 - `generated_at` (UTC ISO8601 with `Z`)
 - `source_root_note` (unchanged)
 - `source_repo_name` (optional; from allowlist or checkout folder name)
-- `source_repo_commit` (optional; full SHA when `git` works in monorepo)
-- `source_repo_branch` (optional; absent on detached HEAD)
-- `source_ref` (optional; short human-readable ref, e.g. `branch@abcdef123456`)
+- `source_repo_commit` (40-hex commit the content was read from; `--ref`, default `approved_ref`)
+- `source_commit_time` (committer time of that commit, ISO-8601 with offset)
+- `source_repo_branch` (legacy bundles only; no longer written)
+- `source_ref` (the same 40-hex commit; legacy bundles: `branch@abcdef123456`)
 - `entries[]`: each entry keeps `key`, `source_relative`, `sha256`, `bytes` and may include `doc_class`, `freshness_tier`, `summary`
 
-If git metadata cannot be resolved, bundling **continues**; commit/branch/ref fields are simply omitted.
+Bundling reads file content from the git object store at `--ref` (not the working tree or checkout HEAD) and **fails closed** if the commit or a path cannot be resolved. At runtime a bundle whose `source_repo_commit` differs from `approved_ref` reports `read_is_current_or_approved=false`; a bundle without `source_commit_time` (e.g. an old-format bundle copied from the working tree) reports `read_provenance_complete=false` and therefore also `read_is_current_or_approved=false`, even when its commit equals `approved_ref`.
 
 ---
 
@@ -71,8 +72,8 @@ If git metadata cannot be resolved, bundling **continues**; commit/branch/ref fi
 
 ## Operator refresh workflow
 
-1. Update the Powerunits monorepo checkout to the desired commit/branch.
-2. Run `python scripts/bundle_powerunits_docs.py --source-root "<path-to-EU-PP-Database>"`.
+1. Make sure the Powerunits monorepo clone contains the pinned commit (`approved_ref`); no checkout needed.
+2. Run `python scripts/bundle_powerunits_docs.py --source-root "<path-to-EU-PP-Database>"` (optionally `--ref <40-hex>`; repin requires a separate reviewed decision).
 3. Review diff under `docker/powerunits_docs/` and `MANIFEST.json`.
 4. Commit, build Docker image, redeploy Hermes.
 

@@ -3,7 +3,8 @@
 Bounded read-only access to allowlisted Repo B files via GitHub API (no local clone).
 
 Keys and paths come only from config/powerunits_repo_b_read_allowlist.json (or
-HERMES_POWERUNITS_REPO_B_READ_ALLOWLIST). No free path arguments.
+HERMES_POWERUNITS_REPO_B_READ_ALLOWLIST). No free path arguments. Every entry is
+pinned to an immutable reviewed commit (``ref``; see top-level ``approved_ref``).
 """
 
 from __future__ import annotations
@@ -52,11 +53,15 @@ def check_powerunits_repo_b_read_requirements() -> bool:
     return True
 
 
-def _load_allowlist_entries() -> dict[str, dict[str, Any]]:
+def _load_allowlist() -> dict[str, Any]:
+    """Entries by key plus the approved pin; fails closed on any ref other than approved_ref."""
+    from tools.powerunits_github_knowledge import PinnedRefError, load_approved_pin, validate_pinned_ref
+
     p = repo_b_allowlist_path()
     raw = json.loads(p.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError("repo b allowlist root must be object")
+    approved_ref, approved_ref_commit_time = load_approved_pin(raw, context="repo b allowlist")
     entries = raw.get("entries")
     if not isinstance(entries, list) or not entries:
         raise ValueError("repo b allowlist: entries must be non-empty list")
@@ -66,14 +71,21 @@ def _load_allowlist_entries() -> dict[str, dict[str, Any]]:
             continue
         key = item.get("key")
         repo = item.get("repo")
-        branch = item.get("branch")
         path = item.get("path")
         if not isinstance(key, str) or not key.strip():
             continue
         if not isinstance(repo, str) or "/" not in repo:
             raise ValueError(f"repo b allowlist entry {key!r}: invalid repo")
-        if not isinstance(branch, str) or not branch.strip():
-            raise ValueError(f"repo b allowlist entry {key!r}: invalid branch")
+        ref = validate_pinned_ref(
+            item.get("ref"),
+            context=f"repo b allowlist entry {key!r}",
+            legacy_branch=item.get("branch"),
+        )
+        if ref != approved_ref:
+            raise PinnedRefError(
+                f"repo b allowlist entry {key!r}: 'ref' {ref} differs from approved_ref {approved_ref}; "
+                "only the approved commit is readable"
+            )
         if not isinstance(path, str) or not path.strip():
             raise ValueError(f"repo b allowlist entry {key!r}: invalid path")
         norm = path.strip().replace("\\", "/").lstrip("/")
@@ -83,7 +95,15 @@ def _load_allowlist_entries() -> dict[str, dict[str, Any]]:
         by_key[key.strip()] = cleaned
     if not by_key:
         raise ValueError("repo b allowlist: no valid entries")
-    return by_key
+    return {
+        "entries": by_key,
+        "approved_ref": approved_ref,
+        "approved_ref_commit_time": approved_ref_commit_time,
+    }
+
+
+def _load_allowlist_entries() -> dict[str, dict[str, Any]]:
+    return _load_allowlist()["entries"]
 
 
 def _resolve_entry(key: str) -> dict[str, Any]:
@@ -114,8 +134,15 @@ def read_powerunits_repo_b_allowlisted(
     _fetch_raw: Callable[..., str] | None = None,
     **_: Any,
 ) -> str:
-    """List allowlist keys or read one file from GitHub (raw contents API)."""
-    from tools.powerunits_github_knowledge import github_branch_tip_sha, github_fetch_raw_file, github_token
+    """List allowlist keys or read one file from GitHub (raw contents API) at the pinned ref."""
+    from tools.powerunits_github_knowledge import (
+        PinnedRefError,
+        format_provenance_for_log,
+        github_fetch_raw_file,
+        github_read_provenance,
+        github_token,
+        pinned_listing_provenance,
+    )
     from tools.registry import tool_error
 
     if not _truthy_env(_FEATURE_ENV):
@@ -141,32 +168,41 @@ def read_powerunits_repo_b_allowlisted(
         )
 
     try:
-        entries = _load_allowlist_entries()
+        allowlist = _load_allowlist()
     except Exception as exc:
         logger.warning("repo_b_read allowlist error: %s", type(exc).__name__)
-        return tool_error(f"Allowlist invalid or unreadable: {exc}", error_code="allowlist_error")
+        code = "pinned_ref_invalid" if isinstance(exc, PinnedRefError) else "allowlist_error"
+        return tool_error(f"Allowlist invalid or unreadable: {exc}", error_code=code)
+    entries = allowlist["entries"]
+    approved_ref = allowlist["approved_ref"]
+    approved_ref_commit_time = allowlist["approved_ref_commit_time"]
 
     if act == "list_repo_b_keys":
         keys = sorted(entries.keys())
+        provenance = pinned_listing_provenance(
+            [str(e["ref"]) for e in entries.values()],
+            approved_ref=approved_ref,
+            approved_ref_commit_time=approved_ref_commit_time,
+        )
         logger.info(
-            "repo_b_read target=github action=list_repo_b_keys keys_count=%s outcome=success",
+            "repo_b_read target=github action=list_repo_b_keys keys_count=%s outcome=success %s",
             len(keys),
+            format_provenance_for_log(provenance),
         )
-        return json.dumps(
-            {
-                "surface": "powerunits_repo_b_read",
-                "key_namespace": "repo_b_allowlist_snake_case",
-                "action": "list_repo_b_keys",
-                "keys": keys,
-                "allowlist_path": str(repo_b_allowlist_path()),
-                "disambiguation": (
-                    "These keys are from config/powerunits_repo_b_read_allowlist.json only. "
-                    "If you expected *.md filenames (e.g. implementation_state.md), "
-                    "that is read_powerunits_doc (doc manifest), not this tool."
-                ),
-            },
-            ensure_ascii=False,
-        )
+        result: dict[str, Any] = {
+            "surface": "powerunits_repo_b_read",
+            "key_namespace": "repo_b_allowlist_snake_case",
+            "action": "list_repo_b_keys",
+            "keys": keys,
+            "allowlist_path": str(repo_b_allowlist_path()),
+            "disambiguation": (
+                "These keys are from config/powerunits_repo_b_read_allowlist.json only. "
+                "If you expected *.md filenames (e.g. implementation_state.md), "
+                "that is read_powerunits_doc (doc manifest), not this tool."
+            ),
+        }
+        result.update(provenance)
+        return json.dumps(result, ensure_ascii=False)
 
     try:
         entry = _resolve_entry(str(key or ""))
@@ -175,44 +211,49 @@ def read_powerunits_repo_b_allowlisted(
         return tool_error(str(exc), error_code="invalid_key")
 
     repo = str(entry["repo"])
-    branch = str(entry["branch"])
+    ref = str(entry["ref"])
     api_path = str(entry["path"])
     lim = _clamp_max_chars(max_output_chars)
     fetch = _fetch_raw or github_fetch_raw_file
 
     try:
-        body = fetch(repo, branch, api_path, token)
+        body = fetch(repo, ref, api_path, token)
     except Exception as exc:
         logger.warning("repo_b_read target=github outcome=github_error type=%s", type(exc).__name__)
         return tool_error("GitHub fetch failed (see logs for error type).", error_code="github_error")
 
-    tip = github_branch_tip_sha(repo, branch, token)
+    provenance = github_read_provenance(
+        read_sha=ref,
+        approved_ref=approved_ref,
+        approved_ref_commit_time=approved_ref_commit_time,
+    )
     truncated = len(body) > lim
     out = body if not truncated else body[:lim] + "\n\n[... truncated to max_output_chars ...]\n"
 
     logger.info(
-        "repo_b_read target=github action=read key=%s path=%s chars_returned=%s truncated=%s outcome=success",
+        "repo_b_read target=github action=read key=%s path=%s chars_returned=%s truncated=%s outcome=success %s",
         entry.get("key"),
         api_path,
         len(out),
         truncated,
+        format_provenance_for_log(provenance),
     )
-    return json.dumps(
-        {
-            "surface": "powerunits_repo_b_read",
-            "key_namespace": "repo_b_allowlist_snake_case",
-            "action": "read_repo_b_key",
-            "key": entry.get("key"),
-            "repo": repo,
-            "branch": branch,
-            "path": api_path,
-            "branch_tip_sha": tip,
-            "content_type": entry.get("content_type"),
-            "truncated": truncated,
-            "content": out,
-        },
-        ensure_ascii=False,
-    )
+    result = {
+        "surface": "powerunits_repo_b_read",
+        "key_namespace": "repo_b_allowlist_snake_case",
+        "action": "read_repo_b_key",
+        "key": entry.get("key"),
+        "repo": repo,
+        "branch": ref,
+        "ref": ref,
+        "path": api_path,
+        "branch_tip_sha": provenance["read_sha"],
+        "content_type": entry.get("content_type"),
+        "truncated": truncated,
+        "content": out,
+    }
+    result.update(provenance)
+    return json.dumps(result, ensure_ascii=False)
 
 
 READ_POWERUNITS_REPO_B_SCHEMA = {
@@ -221,9 +262,11 @@ READ_POWERUNITS_REPO_B_SCHEMA = {
         "**Repo B implementation allowlist only** (snake_case keys such as "
         "`implementation_state`, `job_market_feature` from "
         "`config/powerunits_repo_b_read_allowlist.json`). Reads **code and docs paths** "
-        "outside the doc-key manifest via GitHub API — **not** the same keys as "
+        "outside the doc-key manifest via GitHub API at the pinned reviewed commit "
+        "(see `approved_ref`) — **not** the same keys as "
         "`read_powerunits_doc` (those are *.md manifest names like `implementation_state.md`). "
         "Actions: `list_repo_b_keys`, `read_repo_b_key` (not list_keys/read). "
+        "Payloads include read_sha provenance. "
         f"Requires {_FEATURE_ENV}. No free path parameters."
     ),
     "parameters": {
