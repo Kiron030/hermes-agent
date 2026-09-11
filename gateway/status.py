@@ -671,13 +671,29 @@ def _pid_exists(pid: int) -> bool:
     killing that process (and often unrelated processes in the same
     console group). Long-standing Python quirk; see bpo-14484.
 
-    Implementation: prefer :mod:`psutil` (hard dependency — the canonical
-    cross-platform answer, maintained by Giampaolo Rodolà, uses
-    ``OpenProcess + GetExitCodeProcess`` on Windows internally). Fall back
-    to a hand-rolled ctypes ``OpenProcess`` / ``WaitForSingleObject`` pair
-    on Windows + ``os.kill(pid, 0)`` on POSIX if psutil is somehow
+    Implementation: :func:`_pid_liveness` — prefer :mod:`psutil` (hard
+    dependency — the canonical cross-platform answer, maintained by Giampaolo
+    Rodolà, uses ``OpenProcess + GetExitCodeProcess`` on Windows internally).
+    Fall back to a hand-rolled ctypes ``OpenProcess`` / ``WaitForSingleObject``
+    pair on Windows + ``os.kill(pid, 0)`` on POSIX only, if psutil is somehow
     unavailable — e.g. stripped-down install or import error during the
     scaffold phase before ``psutil`` is pip-installed.
+
+    An undeterminable probe reads as "not alive" here, as it always has.
+    Owner/lock/lease guards must call :func:`_pid_liveness` and hold instead.
+    """
+    return _pid_liveness(pid) is True
+
+
+def _pid_liveness(pid: int) -> Optional[bool]:
+    """Tri-state liveness probe: True alive, False proven gone, None undeterminable.
+
+    Proven gone: psutil ``NoSuchProcess`` / zombie, ``OpenProcess`` failing with
+    ``ERROR_INVALID_PARAMETER`` or an already-signalled process handle (Windows),
+    ``ESRCH`` (POSIX). Errors raised by psutil itself propagate unchanged. No
+    Windows branch ever calls ``os.kill`` (bpo-14484). A caller guarding an
+    owner record, lock or lease treats None — and a raised error — as alive:
+    freeing the record on an uncertain probe lets a second owner in.
     """
     try:
         import psutil  # type: ignore
@@ -705,38 +721,7 @@ def _pid_exists(pid: int) -> bool:
     except ImportError:
         pass  # Fall through to stdlib fallback.
     if _IS_WINDOWS:
-        try:
-            import ctypes
-            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-            # Pin return types — default ctypes restype is c_int (signed),
-            # which mangles WAIT_* DWORD return codes into negative numbers.
-            kernel32.OpenProcess.restype = ctypes.c_void_p
-            kernel32.WaitForSingleObject.restype = ctypes.c_uint
-            kernel32.GetLastError.restype = ctypes.c_uint
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            SYNCHRONIZE = 0x100000  # required for WaitForSingleObject
-            WAIT_TIMEOUT = 0x00000102
-            ERROR_INVALID_PARAMETER = 87
-            ERROR_ACCESS_DENIED = 5
-            handle = kernel32.OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, int(pid)
-            )
-            if not handle:
-                err = kernel32.GetLastError()
-                if err == ERROR_INVALID_PARAMETER:
-                    return False  # PID definitely gone
-                if err == ERROR_ACCESS_DENIED:
-                    return True   # Exists but owned by another user/session
-                return False      # Conservative default for unknown errors
-            try:
-                wait_result = kernel32.WaitForSingleObject(handle, 0)
-                # WAIT_TIMEOUT = still running; anything else (WAIT_OBJECT_0
-                # via exit, WAIT_FAILED via handle issue) = treat as gone.
-                return wait_result == WAIT_TIMEOUT
-            finally:
-                kernel32.CloseHandle(handle)
-        except (OSError, AttributeError):
-            return False
+        return _pid_liveness_win32(int(pid))
     else:
         # psutil missing (stripped install / scaffold phase). Catch the same
         # zombie case as the psutil path above (issue #42126): a zombie
@@ -772,7 +757,60 @@ def _pid_exists(pid: int) -> bool:
             # Process exists but we can't signal it — still alive.
             return True
         except OSError:
-            return False
+            return None  # Unexpected errno: undeterminable (_pid_exists reads False).
+
+
+def _win32_kernel32():
+    """Return ``(kernel32, get_last_error)`` with pinned prototypes (test seam).
+
+    A private ``WinDLL`` keeps these prototypes off the shared ``ctypes.windll``
+    and ``use_last_error`` keeps the error code intact across ctypes' own calls.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD  # unsigned: WAIT_FAILED stays 0xFFFFFFFF
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    return kernel32, ctypes.get_last_error  # type: ignore[attr-defined]
+
+
+def _pid_liveness_win32(pid: int) -> Optional[bool]:
+    """psutil-free Windows probe: ``OpenProcess`` + ``WaitForSingleObject(h, 0)``.
+
+    Handle-based, so it never signals the target (unlike ``os.kill``, bpo-14484).
+    """
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    SYNCHRONIZE = 0x100000  # required for WaitForSingleObject
+    WAIT_OBJECT_0 = 0x00000000
+    WAIT_TIMEOUT = 0x00000102
+    ERROR_ACCESS_DENIED = 5
+    ERROR_INVALID_PARAMETER = 87
+    try:
+        kernel32, get_last_error = _win32_kernel32()
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, pid)
+        if not handle:
+            err = get_last_error()
+            if err == ERROR_INVALID_PARAMETER:
+                return False  # PID definitely gone
+            if err == ERROR_ACCESS_DENIED:
+                return True   # Exists but owned by another user/session
+            return None       # Unknown error: undeterminable
+        try:
+            wait_result = kernel32.WaitForSingleObject(handle, 0)
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        return None  # ctypes/kernel32 unavailable or failed: undeterminable
+    if wait_result == WAIT_TIMEOUT:
+        return True   # Still running
+    if wait_result == WAIT_OBJECT_0:
+        return False  # Process object signalled: it has exited
+    return None       # WAIT_FAILED
 
 
 
