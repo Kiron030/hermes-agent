@@ -2353,21 +2353,74 @@ def terminal_tool(
         # gateway process itself. The restart would SIGTERM the gateway, which
         # kills this very subprocess before it can complete — the service may
         # never restart. This mirrors the `hermes gateway restart` guard in
-        # hermes_cli/gateway.py and the cron-path guard in hermes_cli/cron.py,
-        # but applies unconditionally (force=True cannot help here).
+        # hermes_cli/gateway.py and the cron-path guard in cron/lifecycle_guard.py,
+        # but applies unconditionally (force=True cannot help here). Scripts the
+        # command runs (directly, via sh -c, or behind sudo/env/nohup wrappers)
+        # are read from the local filesystem and scanned too; remote-backend
+        # script reads are not wired here.
         if os.environ.get("_HERMES_GATEWAY") == "1":
-            from hermes_cli.cron import _contains_gateway_lifecycle_command
-            if _contains_gateway_lifecycle_command(command):
+            from cron.lifecycle_guard import (
+                contains_launchctl_submit_command,
+                gateway_lifecycle_block_reason,
+                lifecycle_scan_root_within_budget,
+            )
+            _lifecycle_error = None
+            # Keep the specific launchctl diagnostic when this optional pre-scan
+            # fits the budget; the full fail-closed guard below still runs when it
+            # does not, so oversized commands never reach shlex here.
+            if lifecycle_scan_root_within_budget(command) and contains_launchctl_submit_command(command):
+                _lifecycle_error = (
+                    "Blocked: launchctl submit/bootstrap is restricted inside a supervised "
+                    "gateway regardless of the job label, to prevent indirect gateway "
+                    "restart loops. This guard does not inspect the job's KeepAlive settings "
+                    "or determine whether it is independent of Hermes. Perform authorized "
+                    "LaunchAgent maintenance from a separate shell outside the gateway, "
+                    "not by switching launchctl verbs to bypass this rejection."
+                )
+            else:
+                from tools.approval import get_current_session_key
+                _guard_cwd = _resolve_command_cwd(
+                    workdir=workdir,
+                    default_cwd=cwd,
+                    session_key=get_current_session_key(default="") or (task_id or ""),
+                )
+                # A distinct, accurate refusal when the hard block fired on a fail-closed scan-budget
+                # or device/FIFO refusal rather than a detected lifecycle command. No budget or
+                # device rule is relaxed — only the message differs. See F2 (MUSTPORT-5B r1).
+                _block_reason = gateway_lifecycle_block_reason(command, cwd=_guard_cwd)
+                if _block_reason == "scan-budget":
+                    _lifecycle_error = (
+                        "Blocked: refused — command or referenced script exceeds the lifecycle-guard "
+                        "scan budget, so it cannot be verified free of a gateway restart/stop/uninstall "
+                        "before running. Simplify the command or reduce the number/size of referenced "
+                        "scripts, then retry."
+                    )
+                elif _block_reason == "device-or-fifo":
+                    _lifecycle_error = (
+                        "Blocked: refused — a referenced path is a device, FIFO, socket, or "
+                        "unresolvable (e.g. a cyclic symlink), so the lifecycle guard cannot read it "
+                        "to verify it is safe. It is refused rather than run."
+                    )
+                elif _block_reason == "cloud-path":
+                    _lifecycle_error = (
+                        "Blocked: refused — a referenced script lives on a cloud-synced path "
+                        "(iCloud Drive / ~/Library/CloudStorage). Opening an evicted FileProvider "
+                        "placeholder can hang the guard's preflight scan, so it is refused without "
+                        "being read. Move the script to a local, non-cloud path and retry."
+                    )
+                elif _block_reason is not None:
+                    _lifecycle_error = (
+                        "Blocked: command or referenced script cannot restart, stop, or "
+                        "uninstall the gateway from inside the gateway process. The gateway would "
+                        "kill this command before it could complete (SIGTERM propagates "
+                        "to child processes). Run `hermes gateway restart` from a "
+                        "separate shell outside the running gateway."
+                    )
+            if _lifecycle_error:
                 return json.dumps({
                     "output": "",
                     "exit_code": 1,
-                    "error": (
-                        "Blocked: cannot restart or stop the gateway from inside the "
-                        "gateway process. The gateway would kill this command before "
-                        "it could complete (SIGTERM propagates to child processes). "
-                        "Run `hermes gateway restart` from a separate shell outside "
-                        "the running gateway."
-                    ),
+                    "error": _lifecycle_error,
                     "status": "error",
                 }, ensure_ascii=False)
 
